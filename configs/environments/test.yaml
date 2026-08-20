@@ -1,0 +1,10 @@
+environment:
+  name: test
+  fail_on_validation_error: true
+
+execution:
+  thread_count: 1
+  memory_budget_gb: 1.0
+
+data:
+  overwrite_existing_run: true

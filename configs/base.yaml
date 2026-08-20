@@ -1,0 +1,28 @@
+project:
+  name: voltez-ml
+  seed: 20260821
+  timezone: Asia/Kolkata
+  city: Pune
+
+paths:
+  data_root: data
+  artifact_root: artifacts
+  report_root: reports
+
+execution:
+  device: cpu
+  thread_count: -1
+  memory_budget_gb: 10.0
+  deterministic: true
+
+time:
+  bucket_minutes: 15
+  demand_horizons_minutes: [15, 30, 60, 120, 360]
+  availability_eta_buckets_minutes: [15, 30, 60, 120]
+
+data:
+  source: synthetic
+  output_format: parquet
+  include_personal_data: false
+  feature_view_version: v1
+  label_definition_version: v1

@@ -1,0 +1,32 @@
+synthetic:
+  profile_name: pune_v1
+  generator_version: v1
+  start_date: 2026-01-01
+  days: 90
+  zone_count: 24
+  business_count: 180
+  charger_count: 240
+  driver_count: 6000
+  scenario_mix:
+    normal_weekday: 0.58
+    weekend_retail: 0.20
+    monsoon_disruption: 0.08
+    local_event_spike: 0.06
+    outage_cluster: 0.04
+    stale_status_reports: 0.04
+
+  demand:
+    average_requests_per_zone_per_day: 18.0
+    negative_binomial_dispersion: 4.0
+    spatial_spillover_weight: 0.15
+
+  availability:
+    base_operational_probability: 0.96
+    owner_report_error_probability: 0.08
+    user_report_error_probability: 0.04
+    median_status_ttl_minutes: 30
+
+  safeguards:
+    maximum_generated_rows: 5000000
+    require_reproducible_manifest: true
+    keep_latent_variables_out_of_features: true

@@ -1,0 +1,38 @@
+# macOS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Python environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Generated data and model artifacts
+data/raw/
+data/interim/
+data/processed/
+data/synthetic/
+artifacts/
+models/
+reports/figures/
+reports/metrics/
+
+# Notebook state
+.ipynb_checkpoints/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
