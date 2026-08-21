@@ -16,12 +16,12 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Python project foundation: installed, locked, and verified on Apple M4
 - Schema v1.1 synthetic generator: implemented and verified on the small Pune profile
 - Point-in-time feature builder: implemented with chronological purging and leakage audits
-- Multi-seed experiment readiness gate: implemented; full data generation awaits approval
-- Five-world two-day rehearsal: passed; full-scale memory and class-support gates remain
+- Multi-seed experiment readiness gate: implemented and passed on the final suite
+- Five-world 90-day Pune dataset: generated and ready for all four model tracks
 - Model 3/4 synthetic labels and leakage-safe feature views: implemented and smoke-tested
 - Memory-safe five-world feature-suite builder: implemented
-- Model 1 local training/evaluation command: implemented; no production model has been fitted
-- Final 90-day data generation: requires a clean commit before materialization
+- Model 1 point-demand baseline: trained, validated, and published with the test still locked
+- Step 10B evaluator and causal 60-minute rolling-demand experiment: implemented locally
 
 ## Local environment
 
@@ -77,6 +77,24 @@ uv run voltez-train-demand \
   --feature-suite-manifest data/final/pune_v1/features/feature_suite_manifest.json
 ```
 
+Train the causal 60-minute experiment, which sums four future 15-minute targets while retaining
+only the feature vector available at the origin:
+
+```bash
+uv run voltez-train-demand-window \
+  --feature-suite-manifest data/final/pune_v1/features/feature_suite_manifest.json \
+  --window-minutes 60 \
+  --forecast-lead-minutes 15
+```
+
+Run the reusable evaluator on validation and stress without touching the locked test:
+
+```bash
+uv run voltez-evaluate-demand \
+  --artifact-dir artifacts/demand/<model-id> \
+  --include-train
+```
+
 ## Project structure
 
 ```text
@@ -98,3 +116,4 @@ See `docs/experiment_readiness.md` for Step 7 seeds, evaluation isolation, M4 sa
 sponsor boundaries.
 See `docs/README.md` for the ordered documentation map and `docs/rehearsal_results.md` for Step 8.
 See `docs/model_training_handoff.md` for the final dataset, teammate handoff, and Model 1 commands.
+See `docs/demand_evaluation.md` for Step 10B evaluation logic and the 60-minute experiment.

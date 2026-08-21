@@ -22,6 +22,8 @@ voltez-plan-data = "voltez_ml.experiments.cli:main"
 voltez-audit-rehearsal = "voltez_ml.experiments.rehearsal_cli:main"
 voltez-build-feature-suite = "voltez_ml.features.suite_cli:main"
 voltez-train-demand = "voltez_ml.training.demand_cli:main"
+voltez-train-demand-window = "voltez_ml.training.demand_window_cli:main"
+voltez-evaluate-demand = "voltez_ml.evaluation.demand_cli:main"
 
 [dependency-groups]
 dev = [

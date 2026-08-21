@@ -30,6 +30,7 @@ artifacts/
 models/
 reports/figures/
 reports/metrics/
+reports/demand/
 
 # Notebook state
 .ipynb_checkpoints/

@@ -35,6 +35,9 @@ NON_FEATURE_COLUMNS = {
     "target_time",
     "split",
     "run_holdout_split",
+    "forecast_lead_minutes",
+    "target_window_minutes",
+    "seasonal_naive_window",
 }
 
 
