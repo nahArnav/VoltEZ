@@ -1,0 +1,83 @@
+{
+  "algorithm": "HistGradientBoostingRegressor(loss=poisson)",
+  "data_readiness": {
+    "failures": [],
+    "status": "ready"
+  },
+  "device": "cpu",
+  "feature_count": 33,
+  "features": [
+    "request_lag_1",
+    "search_lag_1",
+    "unserved_lag_1",
+    "booking_lag_1",
+    "session_lag_1",
+    "listed_ports_lag_1",
+    "available_ports_lag_1",
+    "occupancy_lag_1",
+    "request_lag_same_time_yesterday",
+    "request_lag_same_time_last_week",
+    "missing_lag_yesterday",
+    "missing_lag_last_week",
+    "request_sum_prior_1_buckets",
+    "request_sum_prior_2_buckets",
+    "request_sum_prior_4_buckets",
+    "request_sum_prior_24_buckets",
+    "request_mean_prior_window",
+    "request_std_prior_window",
+    "request_ewm_prior",
+    "no_candidate_rate_prior_hour",
+    "neighbor_request_lag_1",
+    "history_bucket_count",
+    "centroid_latitude",
+    "centroid_longitude",
+    "target_hour_sin",
+    "target_hour_cos",
+    "target_day_sin",
+    "target_day_cos",
+    "target_is_weekend",
+    "request_sum_same_window_yesterday",
+    "request_sum_same_window_last_week",
+    "missing_same_window_yesterday",
+    "missing_same_window_last_week"
+  ],
+  "hardware_note": "scikit-learn histogram boosting uses the Apple M4 CPU, not MPS",
+  "locked_test_unlocked": false,
+  "model": "demand_forecasting_rolling_window",
+  "model_settings": {
+    "l2_regularization": 0.2,
+    "learning_rate": 0.05,
+    "max_iter": 250,
+    "max_leaf_nodes": 31,
+    "maximum_training_rows": 1500000,
+    "random_seed": 20260821
+  },
+  "target_spec": {
+    "bucket_minutes": 15,
+    "forecast_lead_minutes": 15,
+    "kind": "rolling_sum",
+    "window_minutes": 60
+  },
+  "training_rows": 413952,
+  "validation": {
+    "poisson_hist_gradient_boosting": {
+      "mae": 0.7901803955832668,
+      "mean_poisson_deviance": 1.180779721907439,
+      "nonzero_mae": 0.8718372442713604,
+      "prediction_mean": 0.9141930020305086,
+      "rmse": 1.071742541769989,
+      "truth_mean": 0.9398770871985158,
+      "wape": 0.8407273741916097
+    },
+    "seasonal_naive": {
+      "mae": 0.9743971409371233,
+      "mean_poisson_deviance": 9.428993649590442,
+      "nonzero_mae": 1.2434126920464577,
+      "prediction_mean": 0.9364642962915113,
+      "rmse": 1.4494475664163664,
+      "truth_mean": 0.9398770871985158,
+      "wape": 1.0367282639493864
+    }
+  },
+  "validation_rows": 206976
+}
