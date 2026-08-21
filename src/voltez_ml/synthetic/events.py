@@ -1385,15 +1385,30 @@ def generate_event_tables(
         "cancelled_at",
         "simulation_run_id",
     ]
+    bookings_frame = (
+        pd.DataFrame(bookings)[public_booking_columns]
+        if bookings
+        else pd.DataFrame(columns=public_booking_columns)
+    )
+    for timestamp_column in (
+        "start_at",
+        "end_at",
+        "hold_expires_at",
+        "expected_arrival_at",
+        "created_at",
+        "confirmed_at",
+        "cancelled_at",
+    ):
+        bookings_frame[timestamp_column] = pd.to_datetime(
+            bookings_frame[timestamp_column], utc=True
+        ).dt.tz_convert(config.project.timezone)
     tables = {
         "context_events": context_events,
         "charging_requests": pd.DataFrame(requests),
         "trips": trips,
         "trip_charger_options": trip_charger_options,
         "recommendation_impressions": pd.DataFrame(impressions),
-        "bookings": pd.DataFrame(bookings)[public_booking_columns]
-        if bookings
-        else pd.DataFrame(columns=public_booking_columns),
+        "bookings": bookings_frame,
         "booking_events": pd.DataFrame(booking_events),
         "charging_sessions": pd.DataFrame(sessions),
         "charger_status_events": pd.DataFrame(status_reports),

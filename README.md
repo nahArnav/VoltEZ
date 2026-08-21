@@ -15,6 +15,7 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Schema v1.1 synthetic generator: implemented and verified on the small Pune profile
 - Point-in-time feature builder: implemented with chronological purging and leakage audits
 - Multi-seed experiment readiness gate: implemented; full data generation awaits approval
+- Five-world two-day rehearsal: passed; full-scale memory and class-support gates remain
 - Model training: not implemented yet
 
 ## Local environment
@@ -50,6 +51,12 @@ Check the canonical two-train/validation/test/stress plan without generating dat
 uv run voltez-plan-data --profile pune_v1
 ```
 
+Audit an approved five-world rehearsal without training:
+
+```bash
+uv run voltez-audit-rehearsal --rehearsal-root data/rehearsals/step_08
+```
+
 ## Project structure
 
 ```text
@@ -69,3 +76,4 @@ See `docs/schema_reconciliation_v1_1.md` for the revised backend-to-ML schema ma
 See `docs/feature_engineering.md` for every Step 6 leakage rule, feature, split, and audit.
 See `docs/experiment_readiness.md` for Step 7 seeds, evaluation isolation, M4 safeguards, and
 sponsor boundaries.
+See `docs/README.md` for the ordered documentation map and `docs/rehearsal_results.md` for Step 8.

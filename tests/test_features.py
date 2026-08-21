@@ -37,15 +37,31 @@ def test_demand_target_is_exact_future_bucket(
 ) -> None:
     generated, features, _ = feature_fixture
     demand_features = pd.read_parquet(features.table_paths["demand_features"])
-    demand_buckets = _read_generated(generated, "demand_buckets")
-    sample = demand_features.iloc[len(demand_features) // 2]
-    expected = demand_buckets[
-        (demand_buckets["zone_id"] == sample["zone_id"])
-        & (demand_buckets["bucket_start"] == sample["target_time"])
-    ]
+    expected = _read_generated(generated, "demand_buckets")[[
+        "simulation_run_id",
+        "zone_id",
+        "bucket_start",
+        "request_count",
+    ]].rename(
+        columns={
+            "bucket_start": "target_time",
+            "request_count": "expected_target_request_count",
+        }
+    )
+    checked = demand_features.merge(
+        expected,
+        on=["simulation_run_id", "zone_id", "target_time"],
+        how="left",
+        validate="many_to_one",
+    )
 
-    assert len(expected) == 1
-    assert int(sample["target_request_count"]) == int(expected.iloc[0]["request_count"])
+    assert checked["expected_target_request_count"].notna().all()
+    assert bool(
+        (
+            checked["target_request_count"]
+            == checked["expected_target_request_count"]
+        ).all()
+    )
 
 
 def test_future_demand_mutation_changes_label_but_not_origin_features(

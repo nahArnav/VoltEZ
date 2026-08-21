@@ -139,14 +139,24 @@ def build_demand_features(
     history = history.merge(zone_columns, on=keys, how="left", validate="many_to_one")
 
     frames: list[pd.DataFrame] = []
+    target_lookup = history[[*keys, "bucket_start", "request_count"]].rename(
+        columns={
+            "bucket_start": "target_time",
+            "request_count": "target_request_count",
+        }
+    )
     for horizon_minutes in config.time.demand_horizons_minutes:
-        horizon_steps = horizon_minutes // bucket_minutes
         horizon = history.copy()
         horizon["target_time"] = horizon["prediction_origin"] + pd.to_timedelta(
             horizon_minutes, unit="m"
         )
         horizon["horizon_minutes"] = horizon_minutes
-        horizon["target_request_count"] = group["request_count"].shift(-horizon_steps)
+        horizon = horizon.merge(
+            target_lookup,
+            on=[*keys, "target_time"],
+            how="left",
+            validate="many_to_one",
+        )
         target_hour = horizon["target_time"].dt.hour + horizon["target_time"].dt.minute / 60
         target_day = horizon["target_time"].dt.dayofweek
         horizon["target_hour_sin"] = np.sin(2 * math.pi * target_hour / 24)

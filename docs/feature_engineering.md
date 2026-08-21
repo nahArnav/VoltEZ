@@ -65,6 +65,12 @@ part of the current bucket.
 The current bucket's `request_count` and all target-bucket facts are removed from the feature
 output. `target_request_count` is the only future count.
 
+### The keyed target rule
+
+Future demand is joined by `simulation_run_id`, `zone_id`, and `target_time`. It is never assigned
+by DataFrame row position, because a merge may legally reorder rows. The test suite compares every
+feature label against its exact raw future bucket so one zone cannot inherit another zone's count.
+
 ## 4. Availability model row
 
 One row means:
@@ -111,9 +117,11 @@ crosses that boundary. Therefore:
 - every validation target occurs before test begins;
 - no long-horizon label reaches into the next split.
 
-When at least three independently seeded simulation runs are supplied, an additional run-level
-holdout column keeps one entire seed for validation and one for test. With only one seed, the audit
-warns that temporal testing cannot prove robustness to a different synthetic city.
+An additional `run_holdout_split` column comes only from each source manifest's explicit
+experiment role. Directory names and sort order never assign evaluation roles. A canonical build
+requires independent `train`, `validation`, and `test` worlds; an optional `stress_test` world is
+kept outside headline metrics. Development-role runs are reported as unavailable for cross-seed
+claims and cannot be mixed with explicitly assigned runs.
 
 ## 6. Audits
 
