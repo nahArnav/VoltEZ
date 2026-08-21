@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -148,6 +149,19 @@ def _sample_training_rows(
     return frame.sample(n=maximum_rows, random_state=random_seed).sort_index()
 
 
+def _portable_artifact_reference(target: Path, artifact_dir: Path) -> str:
+    """Describe an input relative to the artifact so copied repositories remain usable."""
+
+    try:
+        return Path(
+            os.path.relpath(target.resolve(), start=artifact_dir.resolve())
+        ).as_posix()
+    except ValueError:
+        # Different Windows drives cannot be expressed relatively. The content hash below
+        # still identifies the exact input without leaking a machine-specific absolute path.
+        return target.name
+
+
 def train_demand_model(
     suite_manifest_path: Path,
     output_root: Path,
@@ -236,7 +250,9 @@ def train_demand_model(
         "model_name": "demand_forecasting",
         "model_version": "v1",
         "created_at": datetime.now(UTC).isoformat(),
-        "feature_suite_manifest": str(suite_manifest_path),
+        "feature_suite_manifest": _portable_artifact_reference(
+            suite_manifest_path, output_dir
+        ),
         "feature_suite_manifest_sha256": file_sha256(suite_manifest_path),
         "artifact": {"path": model_path.name, "sha256": file_sha256(model_path)},
         "evaluation_report": {

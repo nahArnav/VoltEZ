@@ -153,3 +153,6 @@ def test_tiny_training_smoke_writes_a_validation_only_portable_artifact(
     assert report["locked_test_unlocked"] is False
     assert "locked_test" not in report
     assert file_sha256(output / "model.joblib") == manifest["artifact"]["sha256"]
+    suite_reference = Path(manifest["feature_suite_manifest"])
+    assert not suite_reference.is_absolute()
+    assert (output / suite_reference).resolve() == suite_path.resolve()

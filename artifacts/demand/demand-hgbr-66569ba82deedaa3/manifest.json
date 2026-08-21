@@ -1,0 +1,18 @@
+{
+  "artifact": {
+    "path": "model.joblib",
+    "sha256": "7a7a45ed67580d3f899442aa91655d0ab233b567448c3a10a2eba7bb4a4f3a5e"
+  },
+  "created_at": "2026-08-21T20:22:09.800995+00:00",
+  "device": "cpu",
+  "evaluation_report": {
+    "path": "evaluation_report.json",
+    "sha256": "cc0954ab82a8c0a1e43e6e87c7883caf38e7f7e880ff7848ef79b206e027298d"
+  },
+  "feature_suite_manifest": "../../../data/final/pune_v1/features/feature_suite_manifest.json",
+  "feature_suite_manifest_sha256": "9d9fca7621b0635f013f3ff4d3a5f4920ffb7b80a9a2d8b6965be33b1b771bf9",
+  "locked_test_unlocked": false,
+  "model_id": "demand-hgbr-66569ba82deedaa3",
+  "model_name": "demand_forecasting",
+  "model_version": "v1"
+}
