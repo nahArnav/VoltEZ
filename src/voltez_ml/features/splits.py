@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import pandas as pd
@@ -12,6 +13,7 @@ from voltez_ml.config import SplitSettings
 def assign_purged_temporal_splits(
     frame: pd.DataFrame,
     settings: SplitSettings,
+    run_roles: Mapping[str, str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Assign train/validation/test without letting targets cross time boundaries."""
 
@@ -58,31 +60,44 @@ def assign_purged_temporal_splits(
         assigned.append(run_group[run_group["split"].notna()])
     result = pd.concat(assigned, ignore_index=True)
     run_ids = sorted(result["simulation_run_id"].astype(str).unique())
-    if len(run_ids) >= 3:
-        test_run = run_ids[-1]
-        validation_run = run_ids[-2]
-        result["run_holdout_split"] = (
-            result["simulation_run_id"]
-            .astype(str)
-            .map(
-                lambda run_id: (
-                    "test"
-                    if run_id == test_run
-                    else "validation"
-                    if run_id == validation_run
-                    else "train"
-                )
+    normalized_roles = {
+        run_id: str((run_roles or {}).get(run_id, "development")) for run_id in run_ids
+    }
+    declared_roles = {
+        run_id: role for run_id, role in normalized_roles.items() if role != "development"
+    }
+    required_roles = {"train", "validation", "test"}
+    if declared_roles:
+        if len(declared_roles) != len(run_ids):
+            missing = sorted(set(run_ids) - set(declared_roles))
+            raise ValueError(
+                "declared experiment roles cannot be mixed with development runs; "
+                f"missing explicit roles for {missing}"
             )
+        invalid = set(declared_roles.values()) - required_roles - {"stress_test"}
+        if invalid:
+            raise ValueError(f"unsupported experiment roles in source manifests: {sorted(invalid)}")
+        result["run_holdout_split"] = result["simulation_run_id"].astype(str).map(
+            declared_roles
         )
+        present_roles = set(declared_roles.values())
         report["cross_seed"] = {
-            "available": True,
-            "validation_run": validation_run,
-            "test_run": test_run,
+            "available": required_roles.issubset(present_roles),
+            "assignment_source": "declared_experiment_roles",
+            "run_roles": declared_roles,
         }
+        if not report["cross_seed"]["available"]:
+            report["cross_seed"]["reason"] = (
+                "declared runs must include train, validation, and test roles"
+            )
     else:
         result["run_holdout_split"] = "not_available"
         report["cross_seed"] = {
             "available": False,
-            "reason": "generate at least three independently seeded runs",
+            "assignment_source": "not_available",
+            "reason": (
+                "generate independently seeded runs with explicit train, validation, and test "
+                "experiment roles"
+            ),
         }
     return result.reset_index(drop=True), report

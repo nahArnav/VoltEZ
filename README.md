@@ -14,6 +14,7 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Python project foundation: installed, locked, and verified on Apple M4
 - Schema v1.1 synthetic generator: implemented and verified on the small Pune profile
 - Point-in-time feature builder: implemented with chronological purging and leakage audits
+- Multi-seed experiment readiness gate: implemented; full data generation awaits approval
 - Model training: not implemented yet
 
 ## Local environment
@@ -43,6 +44,12 @@ uv run voltez-build-features \
   --input-run data/synthetic/<run-id>
 ```
 
+Check the canonical two-train/validation/test/stress plan without generating data:
+
+```bash
+uv run voltez-plan-data --profile pune_v1
+```
+
 ## Project structure
 
 ```text
@@ -60,3 +67,5 @@ See `docs/local_environment.md` for the verified Apple M4 environment and valida
 See `docs/synthetic_generator.md` for every Step 5 rule, parameter effect, and knowledge check.
 See `docs/schema_reconciliation_v1_1.md` for the revised backend-to-ML schema mapping.
 See `docs/feature_engineering.md` for every Step 6 leakage rule, feature, split, and audit.
+See `docs/experiment_readiness.md` for Step 7 seeds, evaluation isolation, M4 safeguards, and
+sponsor boundaries.

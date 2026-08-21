@@ -4,6 +4,10 @@ project:
   timezone: Asia/Kolkata
   city: Pune
 
+experiment:
+  name: development
+  evaluation_role: development
+
 paths:
   data_root: data
   artifact_root: artifacts

@@ -1,0 +1,16 @@
+project:
+  seed: 20261205
+
+experiment:
+  name: stress_seed_01
+  evaluation_role: stress_test
+
+synthetic:
+  # This is intentionally harder than the headline train/validation/test distribution.
+  scenario_mix:
+    normal_weekday: 0.40
+    weekend_retail: 0.18
+    monsoon_disruption: 0.14
+    local_event_spike: 0.12
+    outage_cluster: 0.10
+    stale_status_reports: 0.06

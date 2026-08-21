@@ -163,7 +163,10 @@ uv run voltez-build-features \
 ```
 
 Repeat `--input-run` for independently seeded runs. The builder verifies every source Parquet hash
-against its generator manifest before reading it.
+against its generator manifest before reading it. New experiment manifests declare `train`,
+`validation`, `test`, or `stress_test`; those roles determine `run_holdout_split`. Directory order
+never decides the role. Development runs remain `not_available` for cross-seed claims, and they
+cannot be mixed with explicitly declared runs.
 
 Quality checks:
 

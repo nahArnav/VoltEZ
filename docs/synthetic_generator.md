@@ -293,7 +293,8 @@ directory. Partial output is never presented as a complete training dataset.
 
 Every table is compressed Parquet. The manifest records row counts, column order, schema hashes,
 file hashes, seed, city, date range, generator-source hash, Git commit, dirty-state flag, feature
-version, and label version.
+version, label version, experiment name, and declared evaluation role. The seed and role both
+participate in the simulation identity so a locked test run cannot be silently relabeled.
 
 Public operational/analytics tables include:
 

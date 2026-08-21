@@ -90,6 +90,17 @@ def _combine_runs(run_dirs: list[Path]) -> tuple[dict[str, pd.DataFrame], list[d
     return combined, manifests
 
 
+def _manifest_run_roles(manifests: list[dict[str, Any]]) -> dict[str, str]:
+    """Read explicit evaluation roles while retaining legacy-manifest compatibility."""
+
+    return {
+        str(manifest["run_id"]): str(
+            manifest.get("experiment", {}).get("evaluation_role", "development")
+        )
+        for manifest in manifests
+    }
+
+
 def _feature_source_hash(project_root: Path) -> str:
     digest = hashlib.sha256()
     paths = [
@@ -114,6 +125,7 @@ def _snapshot_identity(
                 "run_id": manifest["run_id"],
                 "snapshot_id": manifest["snapshot_id"],
                 "fingerprint": manifest["reproducibility_fingerprint"],
+                "experiment": manifest.get("experiment", {}),
             }
             for manifest in sorted(manifests, key=lambda values: str(values["run_id"]))
         ],
@@ -138,11 +150,14 @@ def build_feature_dataset(
     if not source_run_dirs:
         raise ValueError("at least one source run directory is required")
     tables, source_manifests = _combine_runs(source_run_dirs)
+    run_roles = _manifest_run_roles(source_manifests)
     demand = build_demand_features(config, tables["demand_buckets"], tables["zones"])
     availability = build_availability_features(config, tables)
-    demand, demand_split_report = assign_purged_temporal_splits(demand, config.features.split)
+    demand, demand_split_report = assign_purged_temporal_splits(
+        demand, config.features.split, run_roles
+    )
     availability, availability_split_report = assign_purged_temporal_splits(
-        availability, config.features.split
+        availability, config.features.split, run_roles
     )
     availability_labeled = availability[availability["label"] != "unknown"].reset_index(drop=True)
     audit = audit_feature_tables(
@@ -190,6 +205,7 @@ def build_feature_dataset(
                 "run_id": manifest["run_id"],
                 "snapshot_id": manifest["snapshot_id"],
                 "reproducibility_fingerprint": manifest["reproducibility_fingerprint"],
+                "experiment": manifest.get("experiment", {}),
             }
             for manifest in source_manifests
         ],

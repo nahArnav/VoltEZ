@@ -131,6 +131,7 @@ def _generator_source_fingerprint(project_root: Path) -> str:
 def _simulation_identity(config: VoltEZConfig, generator_source_hash: str) -> tuple[str, str, str]:
     identity_values = {
         "project_seed": config.project.seed,
+        "experiment": config.experiment.model_dump(mode="json"),
         "city": config.project.city,
         "timezone": config.project.timezone,
         "time": config.time.model_dump(mode="json"),
@@ -192,6 +193,7 @@ def generate_dataset(
         "source_type": "synthetic",
         "generator_version": config.synthetic.generator_version,
         "seed": config.project.seed,
+        "experiment": config.experiment.model_dump(mode="json"),
         "configuration_hash": configuration_hash,
         "generator_source_hash": generator_source_hash,
         "city": config.project.city,

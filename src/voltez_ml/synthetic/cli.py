@@ -19,6 +19,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--environment", choices=("development", "test"), default="development")
     parser.add_argument("--profile", default="pune_v1")
+    parser.add_argument(
+        "--experiment",
+        default=None,
+        help="Optional experiment overlay, for example train_seed_01 or test_seed_01.",
+    )
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
     parser.add_argument("--output-root", type=Path, default=None)
     return parser
@@ -30,6 +35,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     config = load_config(
         environment=args.environment,
         synthetic_profile=args.profile,
+        experiment_profile=args.experiment,
         project_root=project_root,
     )
     result = generate_dataset(config, project_root=project_root, output_root=args.output_root)

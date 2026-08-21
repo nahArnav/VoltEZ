@@ -130,11 +130,13 @@ def audit_feature_tables(
             failures.append(f"demand feature {column} exactly equals its target")
     if not demand_split_report["cross_seed"]["available"]:
         warnings.append(
-            "cross-seed holdout is unavailable; generate at least three seeds before model claims"
+            "cross-seed holdout is unavailable; declare independent train, validation, and test "
+            "seed roles before model claims"
         )
     if not availability_split_report["cross_seed"]["available"]:
         warnings.append(
-            "availability cross-seed holdout is unavailable; one seed only tests temporal drift"
+            "availability cross-seed holdout is unavailable; explicit train, validation, and "
+            "test seed roles are required"
         )
     label_distribution = availability_labeled["label"].value_counts().to_dict()
     if len(label_distribution) < 2:

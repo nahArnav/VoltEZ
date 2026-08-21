@@ -71,6 +71,11 @@ def test_schema_v1_1_normalized_relationships_are_materialized(
     manifest = json.loads(result.manifest_path.read_text("utf-8"))
     table_names = set(manifest["tables"])
 
+    assert manifest["experiment"] == {
+        "name": "development",
+        "evaluation_role": "development",
+    }
+
     assert {
         "users",
         "connector_types",
@@ -168,6 +173,32 @@ def test_same_seed_and_configuration_produce_identical_content(
     assert first.snapshot_id == second.snapshot_id
     assert first.row_counts == second.row_counts
     assert first.reproducibility_fingerprint == second.reproducibility_fingerprint
+
+
+def test_declared_experiment_role_is_immutable_manifest_lineage(tmp_path: Path) -> None:
+    development = load_config(
+        environment="test", synthetic_profile="pune_test", project_root=PROJECT_ROOT
+    )
+    locked_test = load_config(
+        environment="test",
+        synthetic_profile="pune_test",
+        project_root=PROJECT_ROOT,
+        experiment_profile="test_seed_01",
+    )
+    development_result = generate_dataset(
+        development, project_root=PROJECT_ROOT, output_root=tmp_path / "development"
+    )
+    test_result = generate_dataset(
+        locked_test, project_root=PROJECT_ROOT, output_root=tmp_path / "locked-test"
+    )
+    manifest = json.loads(test_result.manifest_path.read_text("utf-8"))
+
+    assert test_result.run_id != development_result.run_id
+    assert manifest["seed"] == 20261109
+    assert manifest["experiment"] == {
+        "name": "test_seed_01",
+        "evaluation_role": "test",
+    }
 
 
 def test_safety_limit_rejects_an_oversized_plan(tmp_path: Path) -> None:

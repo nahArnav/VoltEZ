@@ -129,3 +129,14 @@ def test_minimum_history_cannot_be_shorter_than_smallest_window() -> None:
 
     with pytest.raises(ValidationError, match="cannot be shorter"):
         VoltEZConfig.model_validate(values)
+
+
+def test_experiment_overlay_changes_seed_and_declares_role() -> None:
+    config = load_config(
+        project_root=PROJECT_ROOT,
+        experiment_profile="validation_seed_01",
+    )
+
+    assert config.project.seed == 20261013
+    assert config.experiment.name == "validation_seed_01"
+    assert config.experiment.evaluation_role == "validation"

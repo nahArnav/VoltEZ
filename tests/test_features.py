@@ -8,6 +8,7 @@ from voltez_ml.config import load_config
 from voltez_ml.features.availability import build_availability_features
 from voltez_ml.features.builder import FeatureDataset, build_feature_dataset
 from voltez_ml.features.demand import build_demand_features
+from voltez_ml.features.splits import assign_purged_temporal_splits
 from voltez_ml.synthetic.generator import GeneratedDataset, generate_dataset
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -182,3 +183,96 @@ def test_feature_build_is_reproducible_and_reports_single_seed_limit(
     assert first.reproducibility_fingerprint == second.reproducibility_fingerprint
     assert first_audit["status"] == "passed_with_warnings"
     assert any("cross-seed" in warning for warning in first_audit["warnings"])
+
+
+def test_declared_experiment_roles_control_cross_seed_assignment() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    origins = pd.date_range("2026-01-01", periods=20, freq="15min", tz="Asia/Kolkata")
+    targets = pd.date_range("2026-01-01 00:15", periods=20, freq="15min", tz="Asia/Kolkata")
+    frames = []
+    roles = {
+        "run-train-a": "train",
+        "run-train-b": "train",
+        "run-validation": "validation",
+        "run-test": "test",
+        "run-stress": "stress_test",
+    }
+    for run_id in roles:
+        frames.append(
+            pd.DataFrame(
+                {
+                    "simulation_run_id": run_id,
+                    "prediction_origin": origins,
+                    "target_time": targets,
+                }
+            )
+        )
+
+    assigned, report = assign_purged_temporal_splits(
+        pd.concat(frames, ignore_index=True),
+        config.features.split,
+        roles,
+    )
+
+    assert report["cross_seed"]["available"] is True
+    assert report["cross_seed"]["assignment_source"] == "declared_experiment_roles"
+    for run_id, role in roles.items():
+        assert set(
+            assigned.loc[
+                assigned["simulation_run_id"] == run_id,
+                "run_holdout_split",
+            ]
+        ) == {role}
+    locked_test_world = assigned[assigned["simulation_run_id"] == "run-test"]
+    assert set(locked_test_world["split"]) == {"train", "validation", "test"}
+    assert set(locked_test_world["run_holdout_split"]) == {"test"}
+
+
+def test_declared_roles_cannot_mix_with_development_runs() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    origins = pd.date_range("2026-01-01", periods=10, freq="15min", tz="Asia/Kolkata")
+    targets = pd.date_range("2026-01-01 00:15", periods=10, freq="15min", tz="Asia/Kolkata")
+    frame = pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "simulation_run_id": run_id,
+                    "prediction_origin": origins,
+                    "target_time": targets,
+                }
+            )
+            for run_id in ("declared", "forgotten")
+        ],
+        ignore_index=True,
+    )
+
+    with pytest.raises(ValueError, match="cannot be mixed with development runs"):
+        assign_purged_temporal_splits(
+            frame,
+            config.features.split,
+            {"declared": "train"},
+        )
+
+
+def test_directory_sort_order_never_assigns_evaluation_roles() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    origins = pd.date_range("2026-01-01", periods=10, freq="15min", tz="Asia/Kolkata")
+    targets = pd.date_range("2026-01-01 00:15", periods=10, freq="15min", tz="Asia/Kolkata")
+    frame = pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "simulation_run_id": run_id,
+                    "prediction_origin": origins,
+                    "target_time": targets,
+                }
+            )
+            for run_id in ("a-run", "b-run", "c-run")
+        ],
+        ignore_index=True,
+    )
+
+    assigned, report = assign_purged_temporal_splits(frame, config.features.split)
+
+    assert set(assigned["run_holdout_split"]) == {"not_available"}
+    assert report["cross_seed"]["available"] is False

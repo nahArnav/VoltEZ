@@ -28,6 +28,19 @@ class ProjectSettings(StrictConfigModel):
     city: str
 
 
+class ExperimentSettings(StrictConfigModel):
+    """Describe how one independently seeded run may be used during evaluation."""
+
+    name: str = Field(min_length=1, pattern=r"^[a-z0-9][a-z0-9_-]*$")
+    evaluation_role: Literal[
+        "development",
+        "train",
+        "validation",
+        "test",
+        "stress_test",
+    ] = "development"
+
+
 class PathSettings(StrictConfigModel):
     data_root: Path
     artifact_root: Path
@@ -207,6 +220,7 @@ class SyntheticSettings(StrictConfigModel):
 
 class VoltEZConfig(StrictConfigModel):
     project: ProjectSettings
+    experiment: ExperimentSettings
     paths: PathSettings
     execution: ExecutionSettings
     time: TimeSettings
@@ -247,8 +261,9 @@ def load_config(
     environment: Literal["development", "test"] = "development",
     synthetic_profile: str = "pune_v1",
     project_root: Path | None = None,
+    experiment_profile: str | None = None,
 ) -> VoltEZConfig:
-    """Load base, environment, and synthetic profile settings into one validated object."""
+    """Load validated base, environment, synthetic, and optional experiment settings."""
 
     root = project_root or Path(__file__).resolve().parents[2]
     base = _read_yaml(root / "configs" / "base.yaml")
@@ -257,4 +272,9 @@ def load_config(
 
     merged = _deep_merge(base, environment_values)
     merged = _deep_merge(merged, synthetic_values)
+    if experiment_profile is not None:
+        experiment_values = _read_yaml(
+            root / "configs" / "experiments" / f"{experiment_profile}.yaml"
+        )
+        merged = _deep_merge(merged, experiment_values)
     return VoltEZConfig.model_validate(merged)

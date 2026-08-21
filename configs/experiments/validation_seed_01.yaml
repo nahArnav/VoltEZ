@@ -1,0 +1,6 @@
+project:
+  seed: 20261013
+
+experiment:
+  name: validation_seed_01
+  evaluation_role: validation
