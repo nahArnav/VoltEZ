@@ -67,8 +67,7 @@ class TimeSettings(StrictConfigModel):
         ]
         if invalid_horizons:
             raise ValueError(
-                "demand horizons must be positive multiples of bucket_minutes: "
-                f"{invalid_horizons}"
+                f"demand horizons must be positive multiples of bucket_minutes: {invalid_horizons}"
             )
 
         if sorted(set(self.demand_horizons_minutes)) != self.demand_horizons_minutes:
@@ -113,6 +112,30 @@ class AvailabilitySyntheticSettings(StrictConfigModel):
     median_status_ttl_minutes: int = Field(gt=0)
 
 
+class SupplySyntheticSettings(StrictConfigModel):
+    minimum_ports_per_charger: int = Field(default=1, gt=0, le=8)
+    maximum_ports_per_charger: int = Field(default=3, gt=0, le=8)
+
+    @model_validator(mode="after")
+    def validate_port_range(self) -> SupplySyntheticSettings:
+        if self.maximum_ports_per_charger < self.minimum_ports_per_charger:
+            raise ValueError("maximum_ports_per_charger cannot be smaller than the minimum")
+        return self
+
+
+class BehaviourSyntheticSettings(StrictConfigModel):
+    recommendations_per_request: int = Field(default=5, gt=0, le=20)
+    selection_probability: float = Field(default=0.78, ge=0, le=1)
+    cancellation_probability: float = Field(default=0.08, ge=0, le=1)
+    no_show_probability: float = Field(default=0.07, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_outcome_probabilities(self) -> BehaviourSyntheticSettings:
+        if self.cancellation_probability + self.no_show_probability >= 1:
+            raise ValueError("cancellation and no-show probabilities must sum to less than 1")
+        return self
+
+
 class SyntheticSafeguards(StrictConfigModel):
     maximum_generated_rows: int = Field(gt=0)
     require_reproducible_manifest: bool = True
@@ -131,6 +154,8 @@ class SyntheticSettings(StrictConfigModel):
     scenario_mix: dict[str, float]
     demand: DemandSyntheticSettings
     availability: AvailabilitySyntheticSettings
+    supply: SupplySyntheticSettings
+    behaviour: BehaviourSyntheticSettings
     safeguards: SyntheticSafeguards
 
     @model_validator(mode="after")

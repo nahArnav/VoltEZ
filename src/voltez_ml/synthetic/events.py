@@ -1,0 +1,1125 @@
+"""Causal request, booking, session, status, and analytics simulation."""
+
+from __future__ import annotations
+
+import math
+from collections import defaultdict
+from datetime import date, timedelta
+from typing import Any, cast
+
+import numpy as np
+import pandas as pd
+
+from voltez_ml.config import VoltEZConfig
+from voltez_ml.synthetic.randomness import (
+    named_rng,
+    negative_binomial_parameters,
+    stable_id,
+)
+
+SCENARIO_DEMAND_MULTIPLIERS = {
+    "normal_weekday": 1.0,
+    "weekend_retail": 1.25,
+    "monsoon_disruption": 1.18,
+    "local_event_spike": 1.85,
+    "outage_cluster": 1.08,
+    "stale_status_reports": 1.0,
+}
+
+SCENARIO_SEVERITY = {
+    "normal_weekday": 0.0,
+    "weekend_retail": 0.3,
+    "monsoon_disruption": 0.75,
+    "local_event_spike": 0.9,
+    "outage_cluster": 0.8,
+    "stale_status_reports": 0.6,
+}
+
+
+def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
+    """Give pandas' dynamic records output a narrow type at one boundary."""
+
+    return cast(list[dict[str, Any]], frame.to_dict("records"))
+
+
+def _intervals_overlap(
+    first_start: pd.Timestamp,
+    first_end: pd.Timestamp,
+    second_start: pd.Timestamp,
+    second_end: pd.Timestamp,
+) -> bool:
+    return bool(first_start < second_end and second_start < first_end)
+
+
+def _is_business_open(
+    business_id: str,
+    moment: pd.Timestamp,
+    hours_lookup: dict[tuple[str, int], dict[str, Any]],
+) -> bool:
+    hours = hours_lookup[(business_id, moment.weekday())]
+    local_minute = moment.hour * 60 + moment.minute
+    return bool(
+        not hours["is_closed"]
+        and int(hours["open_minute"]) <= local_minute < int(hours["close_minute"])
+    )
+
+
+def _daily_profile(bucket_count: int) -> np.ndarray:
+    bucket_hours = (np.arange(bucket_count) + 0.5) * (24 / bucket_count)
+    morning = 1.15 * np.exp(-0.5 * ((bucket_hours - 8.5) / 1.6) ** 2)
+    midday = 0.55 * np.exp(-0.5 * ((bucket_hours - 13.0) / 2.2) ** 2)
+    evening = 1.45 * np.exp(-0.5 * ((bucket_hours - 19.0) / 1.9) ** 2)
+    profile = 0.22 + morning + midday + evening
+    return profile / profile.sum()
+
+
+def _scenario_tables(
+    config: VoltEZConfig,
+    run_id: str,
+    zones: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[tuple[str, date], str]]:
+    rng = named_rng(config.project.seed, "scenarios")
+    scenario_names = list(config.synthetic.scenario_mix)
+    probabilities = np.array([config.synthetic.scenario_mix[name] for name in scenario_names])
+    rows: list[dict[str, Any]] = []
+    lookup: dict[tuple[str, date], str] = {}
+    for day_offset in range(config.synthetic.days):
+        local_date = config.synthetic.start_date + timedelta(days=day_offset)
+        for zone_id in zones["zone_id"].astype(str):
+            scenario = str(rng.choice(scenario_names, p=probabilities))
+            lookup[(zone_id, local_date)] = scenario
+            if scenario == "normal_weekday":
+                continue
+            start_at = pd.Timestamp(local_date, tz=config.project.timezone)
+            rows.append(
+                {
+                    "context_event_id": stable_id(
+                        run_id, "context-event", f"{zone_id}:{local_date.isoformat()}"
+                    ),
+                    "zone_id": zone_id,
+                    "event_type": scenario,
+                    "start_at": start_at,
+                    "end_at": start_at + timedelta(days=1),
+                    "severity": SCENARIO_SEVERITY[scenario],
+                    "source": "synthetic_scenario",
+                    "simulation_run_id": run_id,
+                }
+            )
+    columns = [
+        "context_event_id",
+        "zone_id",
+        "event_type",
+        "start_at",
+        "end_at",
+        "severity",
+        "source",
+        "simulation_run_id",
+    ]
+    return pd.DataFrame(rows, columns=columns), lookup
+
+
+def _generate_outages_and_initial_reports(
+    config: VoltEZConfig,
+    run_id: str,
+    ports: pd.DataFrame,
+    scenario_lookup: dict[tuple[str, date], str],
+) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+    outage_rng = named_rng(config.project.seed, "outages")
+    report_rng = named_rng(config.project.seed, "status-reports")
+    outages: list[dict[str, Any]] = []
+    reports: list[dict[str, Any]] = []
+    dataset_start = pd.Timestamp(config.synthetic.start_date, tz=config.project.timezone)
+
+    for port in _records(ports):
+        initial_error = bool(
+            report_rng.random() < config.synthetic.availability.owner_report_error_probability
+        )
+        reports.append(
+            {
+                "status_event_id": stable_id(run_id, "status", f"initial:{port['port_id']}"),
+                "port_id": port["port_id"],
+                "status": "unknown" if initial_error else "available",
+                "source": "owner",
+                "event_time": dataset_start,
+                "ingested_at": dataset_start + timedelta(minutes=int(report_rng.integers(1, 8))),
+                "expires_at": dataset_start
+                + timedelta(minutes=config.synthetic.availability.median_status_ttl_minutes),
+                "evidence_type": "owner_declaration",
+                "simulation_run_id": run_id,
+            }
+        )
+        for day_offset in range(config.synthetic.days):
+            local_date = config.synthetic.start_date + timedelta(days=day_offset)
+            scenario = scenario_lookup[(str(port["zone_id"]), local_date)]
+            outage_probability = 1 - config.synthetic.availability.base_operational_probability
+            if scenario == "outage_cluster":
+                outage_probability = min(0.55, outage_probability + 0.35)
+            if outage_rng.random() >= outage_probability:
+                continue
+            day_start = pd.Timestamp(local_date, tz=config.project.timezone)
+            outage_start = day_start + timedelta(minutes=int(outage_rng.integers(0, 24 * 60 - 30)))
+            outage_end = min(
+                day_start + timedelta(days=1),
+                outage_start + timedelta(minutes=int(outage_rng.integers(30, 241))),
+            )
+            outage_id = stable_id(run_id, "outage", f"{port['port_id']}:{local_date.isoformat()}")
+            outages.append(
+                {
+                    "outage_id": outage_id,
+                    "port_id": port["port_id"],
+                    "zone_id": port["zone_id"],
+                    "start_at": outage_start,
+                    "end_at": outage_end,
+                    "latent_reason": "simulated_fault",
+                    "simulation_run_id": run_id,
+                }
+            )
+            stale_multiplier = 4 if scenario == "stale_status_reports" else 1
+            for marker, event_time, true_status in (
+                ("start", outage_start, "faulted"),
+                ("end", outage_end, "available"),
+            ):
+                error = bool(
+                    report_rng.random()
+                    < config.synthetic.availability.owner_report_error_probability
+                )
+                reported_status = "available" if true_status == "faulted" and error else true_status
+                delay = int(report_rng.integers(2, 25)) * stale_multiplier
+                reports.append(
+                    {
+                        "status_event_id": stable_id(
+                            run_id, "status", f"outage:{outage_id}:{marker}"
+                        ),
+                        "port_id": port["port_id"],
+                        "status": reported_status,
+                        "source": "owner",
+                        "event_time": event_time,
+                        "ingested_at": event_time + timedelta(minutes=delay),
+                        "expires_at": event_time
+                        + timedelta(
+                            minutes=config.synthetic.availability.median_status_ttl_minutes
+                            * stale_multiplier
+                        ),
+                        "evidence_type": "owner_declaration",
+                        "simulation_run_id": run_id,
+                    }
+                )
+
+    outage_columns = [
+        "outage_id",
+        "port_id",
+        "zone_id",
+        "start_at",
+        "end_at",
+        "latent_reason",
+        "simulation_run_id",
+    ]
+    return pd.DataFrame(outages, columns=outage_columns), reports
+
+
+def _latent_demand_grid(
+    config: VoltEZConfig,
+    run_id: str,
+    zones: pd.DataFrame,
+    latent_zones: pd.DataFrame,
+    scenario_lookup: dict[tuple[str, date], str],
+) -> pd.DataFrame:
+    rng = named_rng(config.project.seed, "demand-counts")
+    buckets_per_day = 24 * 60 // config.time.bucket_minutes
+    profile = _daily_profile(buckets_per_day)
+    zone_multipliers = latent_zones.set_index("zone_id")["base_demand_multiplier"].to_dict()
+    neighbor_values = np.array([zone_multipliers[zone_id] for zone_id in zones["zone_id"]])
+    neighbor_mean = (np.roll(neighbor_values, 1) + np.roll(neighbor_values, -1)) / 2
+    spillover = config.synthetic.demand.spatial_spillover_weight
+    blended_multipliers = (1 - spillover) * neighbor_values + spillover * neighbor_mean
+
+    rows: list[dict[str, Any]] = []
+    for day_offset in range(config.synthetic.days):
+        local_date = config.synthetic.start_date + timedelta(days=day_offset)
+        weekend_factor = 1.12 if local_date.weekday() >= 5 else 1.0
+        day_start = pd.Timestamp(local_date, tz=config.project.timezone)
+        for zone_index, zone_id in enumerate(zones["zone_id"].astype(str)):
+            scenario = scenario_lookup[(zone_id, local_date)]
+            scenario_factor = SCENARIO_DEMAND_MULTIPLIERS[scenario]
+            for bucket_index in range(buckets_per_day):
+                bucket_start = day_start + timedelta(
+                    minutes=bucket_index * config.time.bucket_minutes
+                )
+                mean = (
+                    config.synthetic.demand.average_requests_per_zone_per_day
+                    * profile[bucket_index]
+                    * blended_multipliers[zone_index]
+                    * weekend_factor
+                    * scenario_factor
+                )
+                n, p = negative_binomial_parameters(
+                    float(mean), config.synthetic.demand.negative_binomial_dispersion
+                )
+                request_count = int(rng.negative_binomial(n, p))
+                rows.append(
+                    {
+                        "zone_id": zone_id,
+                        "bucket_start": bucket_start,
+                        "latent_mean_requests": float(mean),
+                        "latent_request_count": request_count,
+                        "scenario": scenario,
+                        "simulation_run_id": run_id,
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
+def _generate_requests(
+    config: VoltEZConfig,
+    run_id: str,
+    latent_grid: pd.DataFrame,
+    vehicles: pd.DataFrame,
+    vehicle_connectors: pd.DataFrame,
+    driver_profiles: pd.DataFrame,
+) -> list[dict[str, Any]]:
+    rng = named_rng(config.project.seed, "requests")
+    vehicle_records = vehicles.merge(
+        vehicle_connectors, on=["vehicle_id", "simulation_run_id"]
+    ).merge(
+        driver_profiles[["training_user_id", "home_zone_id", "simulation_run_id"]],
+        on=["training_user_id", "simulation_run_id"],
+    )
+    vehicle_rows = _records(vehicle_records)
+    rows: list[dict[str, Any]] = []
+    request_index = 0
+    for bucket in _records(latent_grid):
+        for _ in range(int(bucket["latent_request_count"])):
+            vehicle = vehicle_rows[int(rng.integers(len(vehicle_rows)))]
+            requested_at = pd.Timestamp(bucket["bucket_start"]) + timedelta(
+                seconds=int(rng.integers(0, config.time.bucket_minutes * 60))
+            )
+            eta_minutes = int(
+                rng.choice(config.time.availability_eta_buckets_minutes, p=(0.42, 0.30, 0.20, 0.08))
+            )
+            current_soc = float(rng.uniform(8, 58))
+            reserve_soc = float(rng.uniform(5, min(20, current_soc)))
+            target_soc = float(rng.uniform(max(70, current_soc + 15), 95))
+            rows.append(
+                {
+                    "request_id": stable_id(run_id, "request", request_index),
+                    "training_user_id": vehicle["training_user_id"],
+                    "vehicle_id": vehicle["vehicle_id"],
+                    "origin_zone_id": vehicle["home_zone_id"],
+                    "destination_zone_id": bucket["zone_id"],
+                    "requested_at": requested_at,
+                    "desired_arrival_at": requested_at + timedelta(minutes=eta_minutes),
+                    "eta_minutes": eta_minutes,
+                    "current_soc": round(current_soc, 2),
+                    "reserve_soc": round(reserve_soc, 2),
+                    "target_soc": round(target_soc, 2),
+                    "required_connector_type_id": vehicle["connector_type_id"],
+                    "connector_code": vehicle["connector_code"],
+                    "request_type": str(
+                        rng.choice(
+                            ("nearby_search", "route_planning", "scheduled_search"),
+                            p=(0.63, 0.25, 0.12),
+                        )
+                    ),
+                    "request_status": "pending",
+                    "simulation_run_id": run_id,
+                }
+            )
+            request_index += 1
+    return rows
+
+
+def _known_fault_at_origin(
+    port_id: str,
+    prediction_origin: pd.Timestamp,
+    reports_by_port: dict[str, list[dict[str, Any]]],
+) -> bool:
+    known = [
+        report
+        for report in reports_by_port.get(port_id, [])
+        if report["ingested_at"] <= prediction_origin < report["expires_at"]
+    ]
+    if not known:
+        return False
+    latest = max(known, key=lambda report: report["ingested_at"])
+    return str(latest["status"]) in {"faulted", "offline", "maintenance"}
+
+
+def _booking_conflict(
+    port_bookings: list[dict[str, Any]],
+    start_at: pd.Timestamp,
+    end_at: pd.Timestamp,
+    known_at: pd.Timestamp,
+) -> bool:
+    for booking in port_bookings:
+        cancelled_at = booking.get("cancelled_at")
+        if cancelled_at is not None and cancelled_at <= known_at:
+            continue
+        if _intervals_overlap(start_at, end_at, booking["start_at"], booking["end_at"]):
+            return True
+    return False
+
+
+def _recommend_and_book(
+    config: VoltEZConfig,
+    run_id: str,
+    requests: list[dict[str, Any]],
+    static: dict[str, pd.DataFrame],
+    status_reports: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    rng = named_rng(config.project.seed, "recommendations-and-bookings")
+    ports = static["charger_ports"].merge(
+        static["chargers"][["charger_id", "base_price_per_kwh"]], on="charger_id"
+    )
+    ports_by_zone_connector: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for port in _records(ports):
+        ports_by_zone_connector[(str(port["zone_id"]), str(port["connector_type_id"]))].append(port)
+    ordered_zone_ids = [str(value) for value in static["zones"]["zone_id"]]
+    neighboring_zones: dict[str, list[str]] = {}
+    for index, zone_id in enumerate(ordered_zone_ids):
+        candidates = (
+            zone_id,
+            ordered_zone_ids[(index - 1) % len(ordered_zone_ids)],
+            ordered_zone_ids[(index + 1) % len(ordered_zone_ids)],
+        )
+        neighboring_zones[zone_id] = list(dict.fromkeys(candidates))
+    hours_lookup = {
+        (str(row["business_id"]), int(row["day_of_week"])): row
+        for row in _records(static["business_hours"])
+    }
+    vehicle_lookup = {str(row["vehicle_id"]): row for row in _records(static["vehicles"])}
+    reports_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for report in status_reports:
+        reports_by_port[str(report["port_id"])].append(report)
+    bookings_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    impressions: list[dict[str, Any]] = []
+    bookings: list[dict[str, Any]] = []
+    booking_events: list[dict[str, Any]] = []
+
+    for request in sorted(requests, key=lambda row: row["requested_at"]):
+        arrival = request["desired_arrival_at"]
+        vehicle = vehicle_lookup[str(request["vehicle_id"])]
+        required_energy = (
+            float(vehicle["battery_kwh"])
+            * (float(request["target_soc"]) - float(request["current_soc"]))
+            / 100
+        )
+        destination_zone_id = str(request["destination_zone_id"])
+        candidate_ports = [
+            port
+            for candidate_zone_id in neighboring_zones[destination_zone_id]
+            for port in ports_by_zone_connector.get(
+                (candidate_zone_id, str(request["required_connector_type_id"])), []
+            )
+        ]
+        scored: list[tuple[float, dict[str, Any], pd.Timestamp]] = []
+        for port in candidate_ports:
+            max_vehicle_power = (
+                float(vehicle["max_ac_kw"])
+                if port["current_type"] == "AC"
+                else float(vehicle["max_dc_kw"])
+            )
+            effective_power = max(1.0, min(float(port["max_power_kw"]), max_vehicle_power))
+            duration_minutes = int(
+                np.clip(math.ceil((required_energy / effective_power * 60 + 15) / 15) * 15, 30, 180)
+            )
+            end_at = arrival + timedelta(minutes=duration_minutes)
+            if not _is_business_open(str(port["business_id"]), arrival, hours_lookup):
+                continue
+            if _known_fault_at_origin(
+                str(port["port_id"]), request["requested_at"], reports_by_port
+            ):
+                continue
+            if _booking_conflict(
+                bookings_by_port[str(port["port_id"])], arrival, end_at, request["requested_at"]
+            ):
+                continue
+            power_score = math.log1p(float(port["max_power_kw"])) / math.log1p(60)
+            price_score = 1 - min(float(port["base_price_per_kwh"]), 35) / 35
+            proximity_score = 1.0 if str(port["zone_id"]) == destination_zone_id else 0.65
+            score = (
+                0.45 * power_score
+                + 0.25 * price_score
+                + 0.20 * proximity_score
+                + 0.10 * float(rng.random())
+            )
+            scored.append((score, port, end_at))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        shown = scored[: config.synthetic.behaviour.recommendations_per_request]
+        if not shown:
+            request["request_status"] = "no_candidate"
+            continue
+
+        selected_index: int | None = None
+        if rng.random() < config.synthetic.behaviour.selection_probability:
+            weights = np.exp(np.array([item[0] for item in shown]) * 3)
+            selected_index = int(rng.choice(len(shown), p=weights / weights.sum()))
+            request["request_status"] = "served"
+        else:
+            request["request_status"] = "abandoned"
+
+        selected_booking_id: str | None = None
+        if selected_index is not None:
+            score, selected_port, end_at = shown[selected_index]
+            del score
+            booking_index = len(bookings)
+            selected_booking_id = stable_id(run_id, "booking", booking_index)
+            outcome_draw = float(rng.random())
+            if outcome_draw < config.synthetic.behaviour.cancellation_probability:
+                planned_outcome = "cancelled"
+                gap_minutes = max(1, int((arrival - request["requested_at"]).total_seconds() / 60))
+                cancelled_at: pd.Timestamp | None = request["requested_at"] + timedelta(
+                    minutes=int(rng.integers(1, gap_minutes + 1))
+                )
+            elif outcome_draw < (
+                config.synthetic.behaviour.cancellation_probability
+                + config.synthetic.behaviour.no_show_probability
+            ):
+                planned_outcome = "no_show"
+                cancelled_at = None
+            else:
+                planned_outcome = "attend"
+                cancelled_at = None
+            booking = {
+                "booking_id": selected_booking_id,
+                "training_user_id": request["training_user_id"],
+                "vehicle_id": request["vehicle_id"],
+                "port_id": selected_port["port_id"],
+                "parking_space_id": selected_port["parking_space_id"],
+                "request_id": request["request_id"],
+                "start_at": arrival,
+                "end_at": end_at,
+                "status": "confirmed",
+                "expected_arrival_at": arrival,
+                "created_at": request["requested_at"],
+                "confirmed_at": request["requested_at"] + timedelta(seconds=30),
+                "cancelled_at": cancelled_at,
+                "planned_outcome": planned_outcome,
+                "simulation_run_id": run_id,
+            }
+            bookings.append(booking)
+            bookings_by_port[str(selected_port["port_id"])].append(booking)
+            booking_events.append(
+                {
+                    "booking_event_id": stable_id(
+                        run_id, "booking-event", f"{selected_booking_id}:0"
+                    ),
+                    "booking_id": selected_booking_id,
+                    "old_status": "pending",
+                    "new_status": "confirmed",
+                    "actor_type": "system",
+                    "event_time": booking["confirmed_at"],
+                    "ingested_at": booking["confirmed_at"],
+                    "simulation_run_id": run_id,
+                }
+            )
+
+        for rank, (score, port, _) in enumerate(shown, start=1):
+            is_selected = selected_index is not None and rank - 1 == selected_index
+            impressions.append(
+                {
+                    "impression_id": stable_id(
+                        run_id, "impression", f"{request['request_id']}:{port['port_id']}"
+                    ),
+                    "request_id": request["request_id"],
+                    "charger_id": port["charger_id"],
+                    "port_id": port["port_id"],
+                    "rank": rank,
+                    "recommendation_score": round(float(score), 6),
+                    "shown_at": request["requested_at"] + timedelta(seconds=2),
+                    "selected_at": request["requested_at"] + timedelta(seconds=20)
+                    if is_selected
+                    else pd.NaT,
+                    "booking_id": selected_booking_id if is_selected else None,
+                    "simulation_run_id": run_id,
+                }
+            )
+    return impressions, bookings, booking_events
+
+
+def _is_in_outage(
+    port_id: str,
+    moment: pd.Timestamp,
+    outages_by_port: dict[str, list[dict[str, Any]]],
+) -> bool:
+    return any(
+        outage["start_at"] <= moment < outage["end_at"]
+        for outage in outages_by_port.get(port_id, [])
+    )
+
+
+def _simulate_sessions(
+    config: VoltEZConfig,
+    run_id: str,
+    bookings: list[dict[str, Any]],
+    booking_events: list[dict[str, Any]],
+    static: dict[str, pd.DataFrame],
+    outages: pd.DataFrame,
+    status_reports: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rng = named_rng(config.project.seed, "sessions")
+    report_rng = named_rng(config.project.seed, "user-status-reports")
+    outages_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for outage in _records(outages):
+        outages_by_port[str(outage["port_id"])].append(outage)
+    port_lookup = {str(row["port_id"]): row for row in _records(static["charger_ports"])}
+    vehicle_lookup = {str(row["vehicle_id"]): row for row in _records(static["vehicles"])}
+    sessions_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    sessions: list[dict[str, Any]] = []
+
+    for booking in sorted(bookings, key=lambda row: row["start_at"]):
+        booking_id = str(booking["booking_id"])
+        if booking["planned_outcome"] == "cancelled":
+            booking["status"] = "cancelled"
+            booking_events.append(
+                {
+                    "booking_event_id": stable_id(run_id, "booking-event", f"{booking_id}:1"),
+                    "booking_id": booking_id,
+                    "old_status": "confirmed",
+                    "new_status": "cancelled",
+                    "actor_type": "driver",
+                    "event_time": booking["cancelled_at"],
+                    "ingested_at": booking["cancelled_at"],
+                    "simulation_run_id": run_id,
+                }
+            )
+            continue
+        if booking["planned_outcome"] == "no_show":
+            booking["status"] = "no_show"
+            event_time = booking["start_at"] + timedelta(minutes=10)
+            booking_events.append(
+                {
+                    "booking_event_id": stable_id(run_id, "booking-event", f"{booking_id}:1"),
+                    "booking_id": booking_id,
+                    "old_status": "confirmed",
+                    "new_status": "no_show",
+                    "actor_type": "system",
+                    "event_time": event_time,
+                    "ingested_at": event_time,
+                    "simulation_run_id": run_id,
+                }
+            )
+            continue
+
+        port_id = str(booking["port_id"])
+        arrival = booking["start_at"] + timedelta(minutes=int(rng.integers(-3, 9)))
+        prior_session_conflict = any(
+            session["charging_started_at"] <= arrival < session["charging_ended_at"]
+            for session in sessions_by_port[port_id]
+        )
+        outage_conflict = _is_in_outage(port_id, arrival, outages_by_port)
+        session_id = stable_id(run_id, "session", len(sessions))
+        if prior_session_conflict or outage_conflict:
+            reason = "occupied_overrun" if prior_session_conflict else "charger_fault"
+            booking["status"] = "cancelled"
+            booking["cancelled_at"] = arrival
+            booking_events.append(
+                {
+                    "booking_event_id": stable_id(run_id, "booking-event", f"{booking_id}:1"),
+                    "booking_id": booking_id,
+                    "old_status": "confirmed",
+                    "new_status": "cancelled",
+                    "actor_type": "system",
+                    "event_time": arrival,
+                    "ingested_at": arrival,
+                    "simulation_run_id": run_id,
+                }
+            )
+            sessions.append(
+                {
+                    "session_id": session_id,
+                    "booking_id": booking_id,
+                    "port_id": port_id,
+                    "vehicle_id": booking["vehicle_id"],
+                    "training_user_id": booking["training_user_id"],
+                    "arrived_at": arrival,
+                    "check_in_at": arrival,
+                    "charging_started_at": pd.NaT,
+                    "charging_ended_at": pd.NaT,
+                    "start_soc": pd.NA,
+                    "end_soc": pd.NA,
+                    "energy_kwh": 0.0,
+                    "status": "failed",
+                    "failure_reason": reason,
+                    "simulation_run_id": run_id,
+                }
+            )
+            continue
+
+        port = port_lookup[port_id]
+        vehicle = vehicle_lookup[str(booking["vehicle_id"])]
+        start = arrival + timedelta(minutes=int(rng.integers(1, 8)))
+        reserved_minutes = int((booking["end_at"] - booking["start_at"]).total_seconds() / 60)
+        actual_minutes = int(np.clip(reserved_minutes * rng.lognormal(-0.08, 0.22), 20, 210))
+        end = start + timedelta(minutes=actual_minutes)
+        max_vehicle_power = (
+            float(vehicle["max_ac_kw"])
+            if port["current_type"] == "AC"
+            else float(vehicle["max_dc_kw"])
+        )
+        effective_power = max(1.0, min(float(port["max_power_kw"]), max_vehicle_power))
+        energy_kwh = min(
+            float(vehicle["battery_kwh"]) * 0.9,
+            effective_power * actual_minutes / 60 * float(rng.uniform(0.82, 0.94)),
+        )
+        start_soc = float(rng.uniform(8, 58))
+        end_soc = min(100.0, start_soc + energy_kwh / float(vehicle["battery_kwh"]) * 100)
+        session = {
+            "session_id": session_id,
+            "booking_id": booking_id,
+            "port_id": port_id,
+            "vehicle_id": booking["vehicle_id"],
+            "training_user_id": booking["training_user_id"],
+            "arrived_at": arrival,
+            "check_in_at": arrival,
+            "charging_started_at": start,
+            "charging_ended_at": end,
+            "start_soc": round(start_soc, 2),
+            "end_soc": round(end_soc, 2),
+            "energy_kwh": round(energy_kwh, 3),
+            "status": "completed",
+            "failure_reason": None,
+            "simulation_run_id": run_id,
+        }
+        sessions.append(session)
+        sessions_by_port[port_id].append(session)
+        booking["status"] = "completed"
+        for sequence, (old_status, new_status, event_time) in enumerate(
+            (
+                ("confirmed", "checked_in", arrival),
+                ("checked_in", "charging", start),
+                ("charging", "completed", end),
+            ),
+            start=1,
+        ):
+            booking_events.append(
+                {
+                    "booking_event_id": stable_id(
+                        run_id, "booking-event", f"{booking_id}:{sequence}"
+                    ),
+                    "booking_id": booking_id,
+                    "old_status": old_status,
+                    "new_status": new_status,
+                    "actor_type": "system",
+                    "event_time": event_time,
+                    "ingested_at": event_time,
+                    "simulation_run_id": run_id,
+                }
+            )
+        for marker, event_time, status, source in (
+            ("start", start, "occupied", "driver_check_in"),
+            ("end", end, "available", "driver_check_out"),
+        ):
+            status_reports.append(
+                {
+                    "status_event_id": stable_id(
+                        run_id, "status", f"session:{session_id}:{marker}"
+                    ),
+                    "port_id": port_id,
+                    "status": status,
+                    "source": source,
+                    "event_time": event_time,
+                    "ingested_at": event_time + timedelta(seconds=30),
+                    "expires_at": event_time
+                    + timedelta(minutes=config.synthetic.availability.median_status_ttl_minutes),
+                    "evidence_type": "qr_check_in" if marker == "start" else "qr_check_out",
+                    "simulation_run_id": run_id,
+                }
+            )
+        user_report_is_wrong = bool(
+            report_rng.random() < config.synthetic.availability.user_report_error_probability
+        )
+        user_report_time = start + timedelta(minutes=int(report_rng.integers(2, 10)))
+        status_reports.append(
+            {
+                "status_event_id": stable_id(
+                    run_id, "status", f"session:{session_id}:voluntary-report"
+                ),
+                "port_id": port_id,
+                "status": "available" if user_report_is_wrong else "occupied",
+                "source": "driver_report",
+                "event_time": user_report_time,
+                "ingested_at": user_report_time + timedelta(minutes=1),
+                "expires_at": user_report_time
+                + timedelta(minutes=config.synthetic.availability.median_status_ttl_minutes),
+                "evidence_type": "gps_user_report",
+                "simulation_run_id": run_id,
+            }
+        )
+    return sessions
+
+
+def _availability_observations(
+    config: VoltEZConfig,
+    run_id: str,
+    requests: list[dict[str, Any]],
+    impressions: list[dict[str, Any]],
+    bookings: list[dict[str, Any]],
+    sessions: list[dict[str, Any]],
+    outages: pd.DataFrame,
+    static: dict[str, pd.DataFrame],
+    status_reports: list[dict[str, Any]],
+    snapshot_id: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    request_lookup = {str(row["request_id"]): row for row in requests}
+    booking_lookup = {str(row["booking_id"]): row for row in bookings}
+    port_lookup = {str(row["port_id"]): row for row in _records(static["charger_ports"])}
+    hours_lookup = {
+        (str(row["business_id"]), int(row["day_of_week"])): row
+        for row in _records(static["business_hours"])
+    }
+    outages_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for outage in _records(outages):
+        outages_by_port[str(outage["port_id"])].append(outage)
+    bookings_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for booking in bookings:
+        bookings_by_port[str(booking["port_id"])].append(booking)
+    sessions_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    sessions_by_booking: dict[str, dict[str, Any]] = {}
+    for session in sessions:
+        sessions_by_port[str(session["port_id"])].append(session)
+        sessions_by_booking[str(session["booking_id"])] = session
+    reports_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for report in status_reports:
+        reports_by_port[str(report["port_id"])].append(report)
+
+    observations: list[dict[str, Any]] = []
+    latent_rows: list[dict[str, Any]] = []
+    for impression in impressions:
+        request = request_lookup[str(impression["request_id"])]
+        port_id = str(impression["port_id"])
+        port = port_lookup[port_id]
+        target = request["desired_arrival_at"]
+        own_booking_id = impression.get("booking_id")
+        open_at_target = _is_business_open(str(port["business_id"]), target, hours_lookup)
+        outage_at_target = _is_in_outage(port_id, target, outages_by_port)
+        conflicting_session = any(
+            not pd.isna(session["charging_started_at"])
+            and session["booking_id"] != own_booking_id
+            and session["charging_started_at"] <= target < session["charging_ended_at"]
+            for session in sessions_by_port[port_id]
+        )
+        conflicting_booking = any(
+            booking["booking_id"] != own_booking_id
+            and booking["status"] not in {"cancelled"}
+            and _intervals_overlap(
+                target,
+                target + timedelta(minutes=1),
+                booking["start_at"],
+                booking["end_at"],
+            )
+            for booking in bookings_by_port[port_id]
+        )
+        latent_available = bool(
+            open_at_target
+            and not outage_at_target
+            and not conflicting_session
+            and not conflicting_booking
+        )
+        label: bool | None = None
+        label_source: str | None = None
+        label_observed_at: pd.Timestamp | None = None
+        censoring_reason: str | None = "unobserved_candidate"
+        if own_booking_id:
+            own_booking = booking_lookup[str(own_booking_id)]
+            selected_session = sessions_by_booking.get(str(own_booking_id))
+            if selected_session and selected_session["status"] == "completed":
+                label = True
+                label_source = "charging_session_start"
+                label_observed_at = selected_session["charging_started_at"]
+                censoring_reason = None
+            elif selected_session and selected_session["status"] == "failed":
+                label = False
+                label_source = "verified_check_in_failure"
+                label_observed_at = selected_session["check_in_at"]
+                censoring_reason = None
+            elif own_booking["status"] == "no_show":
+                censoring_reason = "driver_no_show"
+            elif own_booking["status"] == "cancelled":
+                censoring_reason = "booking_cancelled"
+        else:
+            strong_reports = [
+                report
+                for report in reports_by_port[port_id]
+                if report["source"] in {"driver_check_in", "driver_check_out", "support", "system"}
+                and abs((report["event_time"] - target).total_seconds()) <= 15 * 60
+            ]
+            if strong_reports:
+                strongest = min(
+                    strong_reports,
+                    key=lambda report: abs((report["event_time"] - target).total_seconds()),
+                )
+                label = latent_available
+                label_source = "independent_status_evidence"
+                label_observed_at = strongest["ingested_at"]
+                censoring_reason = None
+
+        observation_id = stable_id(run_id, "availability-observation", impression["impression_id"])
+        observations.append(
+            {
+                "observation_id": observation_id,
+                "request_id": request["request_id"],
+                "port_id": port_id,
+                "prediction_origin": request["requested_at"],
+                "target_arrival_at": target,
+                "feature_cutoff": request["requested_at"],
+                "eligible_at_origin": True,
+                "availability_label": label,
+                "label_source": label_source,
+                "label_observed_at": label_observed_at,
+                "censoring_reason": censoring_reason,
+                "source_snapshot_id": snapshot_id,
+                "simulation_run_id": run_id,
+            }
+        )
+        latent_rows.append(
+            {
+                "observation_id": observation_id,
+                "latent_available": latent_available,
+                "open_at_target": open_at_target,
+                "outage_at_target": outage_at_target,
+                "conflicting_session": conflicting_session,
+                "conflicting_booking": conflicting_booking,
+                "simulation_run_id": run_id,
+            }
+        )
+    return pd.DataFrame(observations), pd.DataFrame(latent_rows)
+
+
+def _interval_counts(
+    intervals: list[dict[str, Any]],
+    zone_by_port: dict[str, str],
+    start_key: str,
+    end_key: str,
+    bucket_minutes: int,
+) -> pd.DataFrame:
+    counts: dict[tuple[str, pd.Timestamp], set[str]] = defaultdict(set)
+    for interval in intervals:
+        start = interval.get(start_key)
+        end = interval.get(end_key)
+        if start is None or end is None or pd.isna(start) or pd.isna(end):
+            continue
+        bucket = start.floor(f"{bucket_minutes}min")
+        while bucket < end:
+            counts[(zone_by_port[str(interval["port_id"])], bucket)].add(str(interval["port_id"]))
+            bucket += timedelta(minutes=bucket_minutes)
+    return pd.DataFrame(
+        [
+            {"zone_id": zone_id, "bucket_start": bucket, "busy_port_count": len(port_ids)}
+            for (zone_id, bucket), port_ids in counts.items()
+        ]
+    )
+
+
+def _demand_buckets(
+    config: VoltEZConfig,
+    run_id: str,
+    latent_grid: pd.DataFrame,
+    requests: list[dict[str, Any]],
+    bookings: list[dict[str, Any]],
+    sessions: list[dict[str, Any]],
+    outages: pd.DataFrame,
+    ports: pd.DataFrame,
+    snapshot_id: str,
+) -> pd.DataFrame:
+    bucket_minutes = config.time.bucket_minutes
+    buckets = latent_grid[["zone_id", "bucket_start"]].copy()
+    request_frame = pd.DataFrame(requests)
+    request_frame["bucket_start"] = request_frame["requested_at"].dt.floor(f"{bucket_minutes}min")
+    request_counts = (
+        request_frame.groupby(["destination_zone_id", "bucket_start"], as_index=False)
+        .agg(
+            request_count=("request_id", "size"),
+            served_request_count=("request_status", lambda values: int((values == "served").sum())),
+            no_candidate_count=(
+                "request_status",
+                lambda values: int((values == "no_candidate").sum()),
+            ),
+        )
+        .rename(columns={"destination_zone_id": "zone_id"})
+    )
+    buckets = buckets.merge(request_counts, on=["zone_id", "bucket_start"], how="left")
+
+    port_zone = cast(dict[str, str], ports.set_index("port_id")["zone_id"].astype(str).to_dict())
+    if bookings:
+        booking_frame = pd.DataFrame(bookings)
+        booking_frame["zone_id"] = booking_frame["port_id"].map(port_zone)
+        booking_frame["bucket_start"] = booking_frame["start_at"].dt.floor(f"{bucket_minutes}min")
+        booking_counts = (
+            booking_frame.groupby(["zone_id", "bucket_start"], as_index=False)
+            .size()
+            .rename(columns={"size": "booking_count"})
+        )
+        buckets = buckets.merge(booking_counts, on=["zone_id", "bucket_start"], how="left")
+    else:
+        buckets["booking_count"] = 0
+
+    completed_sessions = [session for session in sessions if session["status"] == "completed"]
+    if completed_sessions:
+        session_frame = pd.DataFrame(completed_sessions)
+        session_frame["zone_id"] = session_frame["port_id"].map(port_zone)
+        session_frame["bucket_start"] = session_frame["charging_started_at"].dt.floor(
+            f"{bucket_minutes}min"
+        )
+        session_counts = (
+            session_frame.groupby(["zone_id", "bucket_start"], as_index=False)
+            .size()
+            .rename(columns={"size": "completed_session_count"})
+        )
+        buckets = buckets.merge(session_counts, on=["zone_id", "bucket_start"], how="left")
+    else:
+        buckets["completed_session_count"] = 0
+
+    listed = (
+        ports.groupby("zone_id", as_index=False)
+        .size()
+        .rename(columns={"size": "compatible_ports_listed"})
+    )
+    buckets = buckets.merge(listed, on="zone_id", how="left")
+    busy_intervals = [
+        {
+            "port_id": outage["port_id"],
+            "busy_start": outage["start_at"],
+            "busy_end": outage["end_at"],
+        }
+        for outage in _records(outages)
+    ] + [
+        {
+            "port_id": session["port_id"],
+            "busy_start": session["charging_started_at"],
+            "busy_end": session["charging_ended_at"],
+        }
+        for session in completed_sessions
+    ]
+    busy = _interval_counts(busy_intervals, port_zone, "busy_start", "busy_end", bucket_minutes)
+    if not busy.empty:
+        buckets = buckets.merge(busy, on=["zone_id", "bucket_start"], how="left")
+    else:
+        buckets["busy_port_count"] = 0
+    buckets["compatible_ports_available"] = (
+        buckets["compatible_ports_listed"] - buckets["busy_port_count"].fillna(0)
+    ).clip(lower=0)
+    buckets = buckets.drop(columns="busy_port_count")
+    buckets = buckets.merge(
+        listed.rename(columns={"compatible_ports_listed": "listed_copy"}),
+        on="zone_id",
+        how="left",
+    )
+    buckets = buckets.drop(columns="listed_copy")
+    count_columns = [
+        "request_count",
+        "served_request_count",
+        "no_candidate_count",
+        "booking_count",
+        "completed_session_count",
+    ]
+    for column in count_columns:
+        buckets[column] = buckets[column].fillna(0).astype("int64")
+    buckets["compatible_ports_listed"] = buckets["compatible_ports_listed"].astype("int64")
+    buckets["compatible_ports_available"] = buckets["compatible_ports_available"].astype("int64")
+    buckets["bucket_minutes"] = bucket_minutes
+    buckets["source_snapshot_id"] = snapshot_id
+    buckets["simulation_run_id"] = run_id
+    return buckets[
+        [
+            "zone_id",
+            "bucket_start",
+            "bucket_minutes",
+            "request_count",
+            "served_request_count",
+            "no_candidate_count",
+            "booking_count",
+            "completed_session_count",
+            "compatible_ports_listed",
+            "compatible_ports_available",
+            "source_snapshot_id",
+            "simulation_run_id",
+        ]
+    ]
+
+
+def generate_event_tables(
+    config: VoltEZConfig,
+    run_id: str,
+    snapshot_id: str,
+    static: dict[str, pd.DataFrame],
+) -> dict[str, pd.DataFrame]:
+    """Generate all mutable events in causal order and their first analytics projections."""
+
+    context_events, scenario_lookup = _scenario_tables(config, run_id, static["zones"])
+    outages, status_reports = _generate_outages_and_initial_reports(
+        config, run_id, static["charger_ports"], scenario_lookup
+    )
+    latent_grid = _latent_demand_grid(
+        config, run_id, static["zones"], static["qa_latent_zones"], scenario_lookup
+    )
+    requests = _generate_requests(
+        config,
+        run_id,
+        latent_grid,
+        static["vehicles"],
+        static["vehicle_connectors"],
+        static["driver_profiles"],
+    )
+    impressions, bookings, booking_events = _recommend_and_book(
+        config, run_id, requests, static, status_reports
+    )
+    sessions = _simulate_sessions(
+        config, run_id, bookings, booking_events, static, outages, status_reports
+    )
+    availability_observations, latent_availability = _availability_observations(
+        config,
+        run_id,
+        requests,
+        impressions,
+        bookings,
+        sessions,
+        outages,
+        static,
+        status_reports,
+        snapshot_id,
+    )
+    demand_buckets = _demand_buckets(
+        config,
+        run_id,
+        latent_grid,
+        requests,
+        bookings,
+        sessions,
+        outages,
+        static["charger_ports"],
+        snapshot_id,
+    )
+
+    public_booking_columns = [
+        "booking_id",
+        "training_user_id",
+        "vehicle_id",
+        "port_id",
+        "parking_space_id",
+        "request_id",
+        "start_at",
+        "end_at",
+        "status",
+        "expected_arrival_at",
+        "created_at",
+        "confirmed_at",
+        "cancelled_at",
+        "simulation_run_id",
+    ]
+    tables = {
+        "context_events": context_events,
+        "charging_requests": pd.DataFrame(requests),
+        "recommendation_impressions": pd.DataFrame(impressions),
+        "bookings": pd.DataFrame(bookings)[public_booking_columns]
+        if bookings
+        else pd.DataFrame(columns=public_booking_columns),
+        "booking_events": pd.DataFrame(booking_events),
+        "charging_sessions": pd.DataFrame(sessions),
+        "charger_status_events": pd.DataFrame(status_reports),
+        "demand_buckets": demand_buckets,
+        "availability_observations": availability_observations,
+        "qa_latent_demand": latent_grid,
+        "qa_latent_outages": outages,
+        "qa_latent_availability": latent_availability,
+    }
+    return {name: frame.reset_index(drop=True) for name, frame in tables.items()}

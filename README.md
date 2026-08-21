@@ -12,7 +12,7 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Application database blueprint: complete as a design document
 - ML data contract: complete as a design document
 - Python project foundation: installed, locked, and verified on Apple M4
-- Synthetic generator: not implemented yet
+- Synthetic generator: implemented and verified on the small Pune profile
 - Model training: not implemented yet
 
 ## Local environment
@@ -26,6 +26,12 @@ uv run pytest
 
 These commands install dependencies and run tests. Do not run training until the generator,
 data validation, and chronological split logic have been reviewed.
+
+Generate the small review dataset:
+
+```bash
+uv run voltez-generate --environment test --profile pune_test
+```
 
 ## Project structure
 
@@ -41,3 +47,4 @@ reports/                 Local generated reports; ignored by Git
 
 See `docs/project_foundation.md` for the purpose and logic of each foundation file.
 See `docs/local_environment.md` for the verified Apple M4 environment and validation results.
+See `docs/synthetic_generator.md` for every Step 5 rule, parameter effect, and knowledge check.

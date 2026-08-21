@@ -1,12 +1,12 @@
 synthetic:
-  profile_name: pune_v1
+  profile_name: pune_test
   generator_version: v1
   start_date: 2026-01-01
-  days: 90
-  zone_count: 24
-  business_count: 180
-  charger_count: 240
-  driver_count: 6000
+  days: 2
+  zone_count: 4
+  business_count: 8
+  charger_count: 10
+  driver_count: 80
   scenario_mix:
     normal_weekday: 0.58
     weekend_retail: 0.20
@@ -16,27 +16,28 @@ synthetic:
     stale_status_reports: 0.04
 
   demand:
-    average_requests_per_zone_per_day: 18.0
+    average_requests_per_zone_per_day: 10.0
     negative_binomial_dispersion: 4.0
     spatial_spillover_weight: 0.15
 
   availability:
-    base_operational_probability: 0.96
+    # Deliberately stressful so tests exercise failure labels; pune_v1 remains 0.96.
+    base_operational_probability: 0.70
     owner_report_error_probability: 0.08
     user_report_error_probability: 0.04
     median_status_ttl_minutes: 30
 
   supply:
     minimum_ports_per_charger: 1
-    maximum_ports_per_charger: 3
+    maximum_ports_per_charger: 2
 
   behaviour:
-    recommendations_per_request: 5
+    recommendations_per_request: 3
     selection_probability: 0.78
     cancellation_probability: 0.08
     no_show_probability: 0.07
 
   safeguards:
-    maximum_generated_rows: 5000000
+    maximum_generated_rows: 100000
     require_reproducible_manifest: true
     keep_latent_variables_out_of_features: true

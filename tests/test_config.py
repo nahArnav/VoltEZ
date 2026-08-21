@@ -81,3 +81,23 @@ def test_availability_eta_buckets_must_be_sorted_and_unique() -> None:
 
     with pytest.raises(ValidationError, match="unique and sorted"):
         VoltEZConfig.model_validate(values)
+
+
+def test_supply_port_range_must_be_ordered() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    values = config.model_dump()
+    values["synthetic"]["supply"]["minimum_ports_per_charger"] = 4
+    values["synthetic"]["supply"]["maximum_ports_per_charger"] = 2
+
+    with pytest.raises(ValidationError, match="cannot be smaller"):
+        VoltEZConfig.model_validate(values)
+
+
+def test_cancellation_and_no_show_probabilities_leave_room_for_attendance() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    values = config.model_dump()
+    values["synthetic"]["behaviour"]["cancellation_probability"] = 0.60
+    values["synthetic"]["behaviour"]["no_show_probability"] = 0.40
+
+    with pytest.raises(ValidationError, match="must sum to less than 1"):
+        VoltEZConfig.model_validate(values)

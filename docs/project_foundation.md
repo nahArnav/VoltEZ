@@ -116,6 +116,10 @@ test settings small and deterministic.
 | `base_operational_probability` | Prior chance a port is technically operational | Higher values create fewer technical-unavailability labels |
 | report error probabilities | Chance a reported state disagrees with truth | Higher values make status freshness/source features more important |
 | `median_status_ttl_minutes` | Typical lifetime of a status report | Higher values keep reports active longer and risk more stale information |
+| `minimum_ports_per_charger`, `maximum_ports_per_charger` | Range of independently bookable ports | Higher values add capacity and expand dated availability rows |
+| `recommendations_per_request` | Maximum candidates shown and logged | Higher values reduce selection bias but add impression/label rows |
+| `selection_probability` | Chance a request with candidates proceeds | Higher values create more bookings and fewer abandonments |
+| cancellation/no-show probabilities | Chance a booking does not produce a charging attempt | Higher values reduce trustworthy availability outcomes |
 | `maximum_generated_rows` | Safety ceiling | Higher values permit larger runs but increase memory and disk risk |
 
 The dispersion parameter is deliberately not over-explained yet because libraries use different
@@ -171,7 +175,7 @@ These are behavior tests, not tests that merely duplicate implementation lines.
 
 ## 10. What comes next
 
-Step 4 installed and locked the environment, ran lint/type/test checks, and recorded the actual
-Apple M4 environment report. The next approved step can begin the synthetic generator in small,
-independently tested modules. It should start with deterministic simulation identity, Pune zones,
-and static supply entities before generating demand or availability outcomes.
+Step 5 implements the synthetic generator in small, independently tested modules. It starts with
+deterministic identity and static supply, then creates causal requests, recommendations, bookings,
+sessions, reports, analytics, and evidence-aware labels. The next approved step should review the
+small dataset and build point-in-time feature tables; model training must still wait.

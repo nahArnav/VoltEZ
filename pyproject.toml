@@ -15,12 +15,16 @@ dependencies = [
     "scikit-learn>=1.6,<2",
 ]
 
+[project.scripts]
+voltez-generate = "voltez_ml.synthetic.cli:main"
+
 [dependency-groups]
 dev = [
     "mypy>=1.14,<2",
     "pytest>=8.3,<9",
     "pytest-cov>=6,<8",
     "ruff>=0.9,<1",
+    "pandas-stubs>=2.3,<3",
     "types-pyyaml>=6.0,<7",
 ]
 
