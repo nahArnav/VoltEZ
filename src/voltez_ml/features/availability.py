@@ -29,11 +29,12 @@ def _clock_minute(value: str) -> int:
 
 
 def _open_and_minutes_to_close(
+    run_id: str,
     business_id: str,
     target: pd.Timestamp,
-    hours: dict[tuple[str, int], dict[str, Any]],
+    hours: dict[tuple[str, str, int], dict[str, Any]],
 ) -> tuple[bool, int]:
-    row = hours[(business_id, target.weekday())]
+    row = hours[(run_id, business_id, target.weekday())]
     target_minute = target.hour * 60 + target.minute
     opens = _clock_minute(str(row["opens_at"]))
     closes = _clock_minute(str(row["closes_at"]))
@@ -42,9 +43,11 @@ def _open_and_minutes_to_close(
 
 
 def _enrich_ports(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    run_key = "simulation_run_id"
     ports = tables["charger_ports"].merge(
         tables["chargers"][
             [
+                run_key,
                 "charger_id",
                 "business_id",
                 "zone_id",
@@ -52,19 +55,25 @@ def _enrich_ports(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
                 "status",
             ]
         ],
-        on="charger_id",
+        on=[run_key, "charger_id"],
         validate="many_to_one",
     )
     ports = ports.merge(
-        tables["businesses"][["business_id", "category", "verification_status"]],
-        on="business_id",
+        tables["businesses"][
+            [run_key, "business_id", "category", "verification_status"]
+        ],
+        on=[run_key, "business_id"],
         validate="many_to_one",
     ).merge(
-        tables["connector_types"][["connector_type_id", "code", "charging_type"]],
-        on="connector_type_id",
+        tables["connector_types"][
+            [run_key, "connector_type_id", "code", "charging_type"]
+        ],
+        on=[run_key, "connector_type_id"],
         validate="many_to_one",
     )
-    ports["site_port_count"] = ports.groupby("charger_id")["port_id"].transform("size")
+    ports["site_port_count"] = ports.groupby([run_key, "charger_id"])["port_id"].transform(
+        "size"
+    )
     return ports
 
 
@@ -127,26 +136,42 @@ def build_availability_features(
     """Build Model 2 rows using only evidence ingested by each prediction origin."""
 
     ports = _enrich_ports(tables)
-    port_lookup = {str(row["port_id"]): row for row in _records(ports)}
+    port_lookup = {
+        (str(row["simulation_run_id"]), str(row["port_id"])): row
+        for row in _records(ports)
+    }
     hours_lookup = {
-        (str(row["business_id"]), int(row["day_of_week"])): row
+        (
+            str(row["simulation_run_id"]),
+            str(row["business_id"]),
+            int(row["day_of_week"]),
+        ): row
         for row in _records(tables["business_hours"])
     }
-    bookings_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    bookings_by_port: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in _records(tables["bookings"]):
-        bookings_by_port[str(row["port_id"])].append(row)
-    sessions_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        key = (str(row["simulation_run_id"]), str(row["port_id"]))
+        bookings_by_port[key].append(row)
+    sessions_by_port: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in _records(tables["charging_sessions"]):
-        sessions_by_port[str(row["port_id"])].append(row)
-    status_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    status_ingestion_times: dict[str, list[pd.Timestamp]] = {}
+        key = (str(row["simulation_run_id"]), str(row["port_id"]))
+        sessions_by_port[key].append(row)
+    status_by_port: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    status_ingestion_times: dict[tuple[str, str], list[pd.Timestamp]] = {}
     for row in _records(tables["charger_status_events"]):
-        status_by_port[str(row["port_id"])].append(row)
-    for port_id, status_rows in status_by_port.items():
+        key = (str(row["simulation_run_id"]), str(row["port_id"]))
+        status_by_port[key].append(row)
+    for port_key, status_rows in status_by_port.items():
         status_rows.sort(key=lambda row: pd.Timestamp(row["ingested_at"]))
-        status_ingestion_times[port_id] = [pd.Timestamp(row["ingested_at"]) for row in status_rows]
+        status_ingestion_times[port_key] = [
+            pd.Timestamp(row["ingested_at"]) for row in status_rows
+        ]
     own_booking_lookup = {
-        (str(row["request_id"]), str(row["port_id"])): str(row["booking_id"])
+        (
+            str(row["simulation_run_id"]),
+            str(row["request_id"]),
+            str(row["port_id"]),
+        ): str(row["booking_id"])
         for row in _records(tables["recommendation_impressions"])
         if row.get("booking_id") is not None and not pd.isna(row["booking_id"])
     }
@@ -159,13 +184,17 @@ def build_availability_features(
         origin = pd.Timestamp(observation["prediction_origin"])
         target = pd.Timestamp(observation["target_arrival_at"])
         port_id = str(observation["port_id"])
-        port = port_lookup[port_id]
-        own_booking_id = own_booking_lookup.get((str(observation["request_id"]), port_id))
+        run_id = str(observation["simulation_run_id"])
+        port_key = (run_id, port_id)
+        port = port_lookup[port_key]
+        own_booking_id = own_booking_lookup.get(
+            (run_id, str(observation["request_id"]), port_id)
+        )
 
         known_conflicts = 0
         known_nearby_bookings = 0
         latest_booking_event: pd.Timestamp | None = None
-        for booking in bookings_by_port[port_id]:
+        for booking in bookings_by_port[port_key]:
             if str(booking["booking_id"]) == own_booking_id:
                 continue
             confirmed_at = _timestamp(booking.get("confirmed_at"))
@@ -197,7 +226,7 @@ def build_availability_features(
         reliability_charger_failures = 0
         reliability_congestion_failures = 0
         latest_session_event: pd.Timestamp | None = None
-        for session in sessions_by_port[port_id]:
+        for session in sessions_by_port[port_key]:
             start_at = _timestamp(session.get("start_at"))
             end_at = _timestamp(session.get("end_at"))
             check_in_at = _timestamp(session.get("check_in_at"))
@@ -251,9 +280,9 @@ def build_availability_features(
         )
 
         latest_status: dict[str, Any] | None = None
-        known_status_rows = status_by_port.get(port_id, [])
+        known_status_rows = status_by_port.get(port_key, [])
         if known_status_rows:
-            status_index = bisect_right(status_ingestion_times[port_id], origin) - 1
+            status_index = bisect_right(status_ingestion_times[port_key], origin) - 1
             if status_index >= 0:
                 latest_status = known_status_rows[status_index]
         status_ingested_at = (
@@ -271,7 +300,7 @@ def build_availability_features(
             demand_prefixes[(str(observation["simulation_run_id"]), str(port["zone_id"]))],
         )
         business_open, minutes_to_close = _open_and_minutes_to_close(
-            str(port["business_id"]), target, hours_lookup
+            run_id, str(port["business_id"]), target, hours_lookup
         )
         eta_minutes = (target - origin).total_seconds() / 60
         target_hour = target.hour + target.minute / 60

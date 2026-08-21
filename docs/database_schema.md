@@ -140,6 +140,7 @@ Purpose: stable geographic unit for demand forecasting, aggregation, privacy, an
 | `boundary` | PostGIS polygon or multipolygon |
 | `centroid` | PostGIS point |
 | `timezone` | Defaults to `Asia/Kolkata` |
+| `zone_type` | Controlled land-use category such as residential, office, retail, transit, or mixed |
 | `active` | Whether new records may reference the zone |
 
 Do not choose the final H3 resolution until Pune map density and privacy requirements are tested. Store the chosen resolution in configuration and dataset manifests.

@@ -1,0 +1,8 @@
+project:
+  # Deliberately changes the physical Pune network; never use for headline metrics.
+  structural_seed: 20270821
+  seed: 20270822
+
+experiment:
+  name: structural_shift_seed_01
+  evaluation_role: stress_test

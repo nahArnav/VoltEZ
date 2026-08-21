@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from voltez_ml.config import VoltEZConfig, load_config
+from voltez_ml.synthetic.entities import generate_static_entities
 from voltez_ml.synthetic.generator import GeneratedDataset, generate_dataset
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +26,10 @@ def generated_pair(
 
 def _read(result: GeneratedDataset, table: str) -> pd.DataFrame:
     return pd.read_parquet(result.table_paths[table])
+
+
+def _without_run_lineage(frame: pd.DataFrame) -> pd.DataFrame:
+    return frame.drop(columns="simulation_run_id").reset_index(drop=True)
 
 
 def test_test_profile_builds_complete_fifteen_minute_grid(
@@ -75,6 +80,9 @@ def test_schema_v1_1_normalized_relationships_are_materialized(
         "name": "development",
         "evaluation_role": "development",
     }
+    assert manifest["seed"] == manifest["dynamic_seed"]
+    assert manifest["structural_seed"] == 20260821
+    assert manifest["structural_namespace"].startswith("structure:pune:")
 
     assert {
         "users",
@@ -224,6 +232,77 @@ def test_same_seed_and_configuration_produce_identical_content(
     assert first.snapshot_id == second.snapshot_id
     assert first.row_counts == second.row_counts
     assert first.reproducibility_fingerprint == second.reproducibility_fingerprint
+
+
+def test_dynamic_seeds_share_one_physical_pune_network() -> None:
+    train_config = load_config(
+        environment="test",
+        synthetic_profile="pune_test",
+        experiment_profile="train_seed_01",
+        project_root=PROJECT_ROOT,
+    )
+    validation_config = load_config(
+        environment="test",
+        synthetic_profile="pune_test",
+        experiment_profile="validation_seed_01",
+        project_root=PROJECT_ROOT,
+    )
+    train = generate_static_entities(train_config, "train-run")
+    validation = generate_static_entities(validation_config, "validation-run")
+
+    structural_tables = (
+        "zones",
+        "qa_latent_zones",
+        "connector_types",
+        "businesses",
+        "business_hours",
+        "amenities",
+        "business_amenities",
+        "business_offers",
+        "chargers",
+        "charger_ports",
+        "qa_latent_port_profiles",
+        "parking_spaces",
+        "availability_windows",
+        "tariffs",
+    )
+    for table_name in structural_tables:
+        pd.testing.assert_frame_equal(
+            _without_run_lineage(train[table_name]),
+            _without_run_lineage(validation[table_name]),
+        )
+
+    train_drivers = train["users"].query("role == 'driver'")
+    validation_drivers = validation["users"].query("role == 'driver'")
+    assert set(train_drivers["user_id"]).isdisjoint(validation_drivers["user_id"])
+    assert set(train["vehicles"]["vehicle_id"]).isdisjoint(
+        validation["vehicles"]["vehicle_id"]
+    )
+
+
+def test_structural_shift_profile_creates_a_different_network() -> None:
+    baseline_config = load_config(
+        environment="test",
+        synthetic_profile="pune_test",
+        experiment_profile="validation_seed_01",
+        project_root=PROJECT_ROOT,
+    )
+    shifted_config = load_config(
+        environment="test",
+        synthetic_profile="pune_test",
+        experiment_profile="structural_shift_seed_01",
+        project_root=PROJECT_ROOT,
+    )
+    baseline = generate_static_entities(baseline_config, "baseline-run")
+    shifted = generate_static_entities(shifted_config, "shifted-run")
+
+    assert set(baseline["zones"]["zone_id"]).isdisjoint(shifted["zones"]["zone_id"])
+    assert set(baseline["charger_ports"]["port_id"]).isdisjoint(
+        shifted["charger_ports"]["port_id"]
+    )
+    assert not baseline["qa_latent_zones"]["base_demand_multiplier"].equals(
+        shifted["qa_latent_zones"]["base_demand_multiplier"]
+    )
 
 
 def test_declared_experiment_role_is_immutable_manifest_lineage(tmp_path: Path) -> None:

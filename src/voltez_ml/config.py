@@ -23,6 +23,7 @@ class StrictConfigModel(BaseModel):
 
 class ProjectSettings(StrictConfigModel):
     name: str = "voltez-ml"
+    structural_seed: int = Field(ge=0)
     seed: int = Field(ge=0)
     timezone: str
     city: str

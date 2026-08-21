@@ -14,14 +14,15 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Application database blueprint: complete as a design document
 - ML data contract: complete as a design document
 - Python project foundation: installed, locked, and verified on Apple M4
-- Schema v1.1 synthetic generator: implemented and verified on the small Pune profile
-- Point-in-time feature builder: implemented with chronological purging and leakage audits
+- Synthetic generator v1.2: stable Pune structure plus independent dynamic worlds implemented
+- Point-in-time feature view v3: target-aligned history, known context, purging, and leakage audits
 - Multi-seed experiment readiness gate: implemented and passed on the final suite
 - Five-world 90-day Pune dataset: generated and ready for all four model tracks
 - Model 3/4 synthetic labels and leakage-safe feature views: implemented and smoke-tested
 - Memory-safe five-world feature-suite builder: implemented
 - Model 1 point-demand baseline: trained, validated, and published with the test still locked
-- Step 10B evaluator and causal 60-minute rolling-demand experiment: implemented locally
+- Step 10B evaluator and causal 60-minute rolling-demand experiment: published
+- Step 10C structural/world and context-feature correction: implemented locally, verification in progress
 
 ## Local environment
 

@@ -1,5 +1,8 @@
 project:
   name: voltez-ml
+  # Freezes Pune's geography, hosts, chargers, tariffs, and inherent port health.
+  structural_seed: 20260821
+  # Varies demand, drivers, disruptions, requests, bookings, sessions, and reports.
   seed: 20260821
   timezone: Asia/Kolkata
   city: Pune
@@ -28,7 +31,7 @@ data:
   source: synthetic
   output_format: parquet
   include_personal_data: false
-  feature_view_version: v2
+  feature_view_version: v3
   label_definition_version: v1.2
 
 features:

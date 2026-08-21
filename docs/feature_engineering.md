@@ -1,6 +1,6 @@
 # VoltEZ Step 6 — Point-in-time feature engineering
 
-Status: implemented, awaiting builder approval to commit
+Status: v3 implemented locally; Step 10C source awaits approval to commit
 Models: Demand Forecasting and Charger Availability Prediction
 Schema input: v1.1
 
@@ -58,9 +58,14 @@ part of the current bucket.
 - request sums over the configured previous 15, 30, 60, and 360 minutes;
 - rolling mean, standard deviation, and exponentially weighted demand;
 - same time yesterday and last week, with explicit missing flags;
+- target-slot-aligned yesterday and last-week demand, so a 60-minute-ahead forecast compares the
+  exact future clock slot rather than the origin's clock slot;
 - previous-hour no-candidate rate;
 - previous demand from the two geographically nearest Pune zone centroids;
-- target hour/day encoded cyclically, weekend flag, horizon, and zone centroid.
+- target hour/day encoded cyclically, weekend flag, horizon, and zone centroid;
+- numeric one-hot zone-type features from public application metadata;
+- scheduled event type/count/impact when the event covers the target and its publication and
+  ingestion timestamps are both at or before the prediction origin.
 
 The current bucket's `request_count` and all target-bucket facts are removed from the feature
 output. `target_request_count` is the only future count.
@@ -144,8 +149,10 @@ The report warns for:
 - a one-class or severely imbalanced availability label set;
 - missing and constant columns that require review.
 
-Automated mutation tests deliberately change future demand and add a delayed status event. They
-prove that features at the earlier origin do not change even though future labels may change.
+Automated mutation tests deliberately change future demand, add a delayed status event, and add a
+context event ingested after the origin. They prove that features at the earlier origin do not
+change even though future labels or later-known context may change. A separate exact-slot test
+verifies every target-aligned yesterday value against its raw historical bucket.
 
 ## 7. Configuration effects
 

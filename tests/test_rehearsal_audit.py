@@ -56,6 +56,8 @@ def test_rehearsal_audit_verifies_role_isolation_and_lineage(rehearsal_root: Pat
         "train",
         "validation",
     }
+    assert {run["structural_seed"] for run in report["source_runs"]} == {20260821}
+    assert len({run["dynamic_seed"] for run in report["source_runs"]}) == 5
 
 
 def test_rehearsal_report_is_written_once(rehearsal_root: Path) -> None:

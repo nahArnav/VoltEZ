@@ -17,7 +17,7 @@ def test_named_random_streams_repeat_without_affecting_each_other() -> None:
     assert not np.array_equal(first_demand, supply)
 
 
-def test_stable_ids_depend_on_run_entity_and_natural_key() -> None:
+def test_stable_ids_depend_on_namespace_entity_and_natural_key() -> None:
     identifier = stable_id("run-a", "port", "charger-1:0")
 
     assert identifier == stable_id("run-a", "port", "charger-1:0")

@@ -4,7 +4,7 @@ This step protects VoltEZ from reporting an impressive score that came from memo
 synthetic world. It creates experiment definitions and a no-write preflight report. It does not
 generate the 90-day datasets and it does not train either model.
 
-## 1. The five independent worlds
+## 1. Five dynamic worlds in one stable Pune network
 
 | Profile | Role | Seed | May fit a model? | Purpose |
 |---|---|---:|---|---|
@@ -14,9 +14,11 @@ generate the 90-day datasets and it does not train either model.
 | `test_seed_01` | test | 20261109 | No | Locked final baseline score, inspected once |
 | `stress_seed_01` | stress test | 20261205 | No | Robustness under more disruptions; never a headline metric |
 
-A seed is the starting state of the pseudo-random generator. Changing it changes individual
-drivers, requests, outages, bookings, and labels while keeping the same causal rules. Two training
-seeds therefore teach the model the rules rather than one exact list of simulated events.
+Every canonical row above uses structural seed `20260821`. Its listed seed is the independent
+dynamic seed: changing it changes drivers, requests, outages, bookings, sessions, context, and
+labels while retaining the same zone, business, charger, port, tariff, and inherent health
+profiles. Two training seeds therefore teach the model varying histories inside one deployable
+Pune network instead of five unrelated artificial cities.
 
 Train, validation, and test use the exact same baseline parameters. Only their seeds differ. This
 makes their scores comparable. The stress run intentionally raises monsoon, event, outage, and
@@ -29,6 +31,10 @@ Every experiment overlay changes two fields:
 
 - `project.seed` controls the random realization;
 - `experiment.evaluation_role` controls the legal use of that realization.
+
+`project.structural_seed` normally remains fixed. The optional
+`structural_shift_seed_01` profile changes it and exists only for a separate out-of-distribution
+robustness run. It must not replace `stress_seed_01` in the canonical five-world suite.
 
 The generator includes both values in the run identity and `manifest.json`. The feature builder
 reads the declared role from the manifest. It does not infer roles from filenames or lexical
@@ -58,10 +64,11 @@ uv run voltez-plan-data --profile pune_v1
 
 The command checks:
 
-1. all seeds and experiment names are unique;
+1. all dynamic seeds and experiment names are unique;
 2. at least two training seeds exist;
 3. exactly one validation seed and one test seed exist;
-4. baseline train/validation/test generator distributions are identical;
+4. all canonical roles share one structural seed and baseline train/validation/test generator
+   distributions are identical;
 5. each planned run is below its configured row safety ceiling;
 6. the stress distribution is separate from headline evaluation;
 7. conservative memory estimates respect the Apple M4 budget.

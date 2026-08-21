@@ -45,6 +45,14 @@ def _source_manifests(source_root: Path) -> list[tuple[Path, dict[str, Any]]]:
     commits = {manifest.get("code_commit") for _, manifest in loaded}
     if len(commits) != 1 or None in commits:
         raise ValueError("all final source worlds must come from one clean code commit")
+    structural_namespaces = {
+        manifest.get("structural_namespace") for _, manifest in loaded
+    }
+    if len(structural_namespaces) != 1 or None in structural_namespaces:
+        raise ValueError("canonical source worlds must share one declared structural namespace")
+    dynamic_seeds = {manifest.get("dynamic_seed") for _, manifest in loaded}
+    if len(dynamic_seeds) != len(loaded) or None in dynamic_seeds:
+        raise ValueError("canonical source worlds must declare unique dynamic seeds")
     return loaded
 
 

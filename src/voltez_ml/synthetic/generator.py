@@ -19,7 +19,7 @@ from voltez_ml.synthetic.io import (
     write_manifest,
     write_tables,
 )
-from voltez_ml.synthetic.randomness import config_fingerprint
+from voltez_ml.synthetic.randomness import config_fingerprint, structural_namespace
 from voltez_ml.synthetic.validation import (
     DatasetValidationError,
     estimate_planned_rows,
@@ -133,6 +133,7 @@ def _generator_source_fingerprint(project_root: Path) -> str:
 
 def _simulation_identity(config: VoltEZConfig, generator_source_hash: str) -> tuple[str, str, str]:
     identity_values = {
+        "structural_seed": config.project.structural_seed,
         "project_seed": config.project.seed,
         "experiment": config.experiment.model_dump(mode="json"),
         "city": config.project.city,
@@ -195,7 +196,15 @@ def generate_dataset(
         "snapshot_id": snapshot_id,
         "source_type": "synthetic",
         "generator_version": config.synthetic.generator_version,
+        # ``seed`` remains as a backwards-compatible alias for the dynamic seed.
         "seed": config.project.seed,
+        "dynamic_seed": config.project.seed,
+        "structural_seed": config.project.structural_seed,
+        "structural_namespace": structural_namespace(
+            config.project.city,
+            config.synthetic.generator_version,
+            config.project.structural_seed,
+        ),
         "experiment": config.experiment.model_dump(mode="json"),
         "configuration_hash": configuration_hash,
         "generator_source_hash": generator_source_hash,

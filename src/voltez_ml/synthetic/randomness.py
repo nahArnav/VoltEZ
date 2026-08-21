@@ -37,11 +37,22 @@ def named_rng(seed: int, stream_name: str) -> Generator:
     return np.random.default_rng(sequence)
 
 
-def stable_id(run_id: str, entity: str, natural_key: str | int) -> str:
+def stable_id(namespace_id: str, entity: str, natural_key: str | int) -> str:
     """Create a UUID-shaped deterministic identifier without exposing personal data."""
 
-    value = f"voltez:{run_id}:{entity}:{natural_key}"
+    value = f"voltez:{namespace_id}:{entity}:{natural_key}"
     return str(uuid.uuid5(uuid.NAMESPACE_URL, value))
+
+
+def structural_namespace(city: str, generator_version: str, structural_seed: int) -> str:
+    """Return the identity namespace for one stable synthetic charging network.
+
+    Dynamic simulation runs intentionally receive different run IDs. Physical entities instead
+    use this namespace so the same Pune zones, hosts, chargers, and ports can be followed across
+    independent train/validation/test histories.
+    """
+
+    return f"structure:{city.casefold()}:{generator_version}:{structural_seed}"
 
 
 def negative_binomial_parameters(mean: float, dispersion: float) -> tuple[float, float]:

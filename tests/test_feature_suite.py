@@ -84,6 +84,8 @@ def test_source_manifest_gate_requires_canonical_clean_worlds(tmp_path: Path) ->
                     "experiment": {"evaluation_role": role},
                     "code_is_dirty": False,
                     "code_commit": "abc123",
+                    "structural_namespace": "structure:pune:v1.2:20260821",
+                    "dynamic_seed": index,
                 }
             ),
             encoding="utf-8",
@@ -140,6 +142,8 @@ def test_suite_manifest_uses_portable_relative_paths(
                 "run_id": f"sim-{index}",
                 "code_commit": "abc123",
                 "experiment": {"evaluation_role": role, "name": f"seed-{index}"},
+                "structural_namespace": "structure:pune:v1.2:20260821",
+                "dynamic_seed": index,
             },
         )
         for index, role in enumerate(roles)

@@ -100,6 +100,126 @@ def test_future_demand_mutation_changes_label_but_not_origin_features(
     )
 
 
+def test_target_aligned_demand_lags_reference_the_exact_future_slot() -> None:
+    config = load_config(
+        environment="test", synthetic_profile="pune_test", project_root=PROJECT_ROOT
+    )
+    raw = pd.DataFrame(
+        {
+            "simulation_run_id": "run",
+            "zone_id": "zone",
+            "bucket_start": pd.date_range(
+                "2026-01-01", periods=8 * 96, freq="15min", tz="Asia/Kolkata"
+            ),
+        }
+    )
+    raw["bucket_minutes"] = 15
+    raw["request_count"] = range(len(raw))
+    for column in (
+        "search_count",
+        "served_request_count",
+        "no_candidate_count",
+        "unserved_count",
+        "booking_count",
+        "session_count",
+        "compatible_ports_listed",
+        "compatible_ports_available",
+    ):
+        raw[column] = 0
+    raw["occupancy_rate"] = 0.0
+    zones = pd.DataFrame(
+        {
+            "simulation_run_id": ["run"],
+            "zone_id": ["zone"],
+            "centroid_latitude": [18.5204],
+            "centroid_longitude": [73.8567],
+            "zone_type": ["mixed"],
+        }
+    )
+
+    features = build_demand_features(config, raw, zones)
+    checked = features[
+        features["request_lag_target_time_yesterday"].notna()
+    ].copy()
+    checked["expected_time"] = checked["target_time"] - pd.Timedelta(1, unit="D")
+    expected = raw[["bucket_start", "request_count"]].rename(
+        columns={"bucket_start": "expected_time", "request_count": "expected_request_count"}
+    )
+    checked = checked.merge(expected, on="expected_time", validate="many_to_one")
+
+    assert bool(
+        (
+            checked["request_lag_target_time_yesterday"]
+            == checked["expected_request_count"]
+        ).all()
+    )
+
+
+def test_context_event_ingested_after_origin_cannot_change_that_prediction(
+    feature_fixture: tuple[GeneratedDataset, FeatureDataset, FeatureDataset],
+) -> None:
+    generated, _, _ = feature_fixture
+    config = load_config(
+        environment="test", synthetic_profile="pune_test", project_root=PROJECT_ROOT
+    )
+    demand = _read_generated(generated, "demand_buckets")
+    zones = _read_generated(generated, "zones")
+    context = _read_generated(generated, "context_events")
+    baseline = build_demand_features(config, demand, zones, context)
+    sample = baseline.iloc[len(baseline) // 2]
+    fake = context.iloc[0].copy()
+    fake["context_event_id"] = "late-context-test"
+    fake["simulation_run_id"] = sample["simulation_run_id"]
+    fake["zone_id"] = sample["zone_id"]
+    fake["event_type"] = "local_event_spike"
+    fake["starts_at"] = sample["target_time"].normalize()
+    fake["ends_at"] = fake["starts_at"] + pd.Timedelta(1, unit="D")
+    fake["expected_impact"] = 9.0
+    fake["published_at"] = sample["prediction_origin"] - pd.Timedelta(1, unit="D")
+    fake["ingested_at"] = sample["prediction_origin"] + pd.Timedelta(1, unit="m")
+    changed_context = pd.concat([context, fake.to_frame().T], ignore_index=True)
+    changed = build_demand_features(config, demand, zones, changed_context)
+    key = [
+        "simulation_run_id",
+        "zone_id",
+        "prediction_origin",
+        "horizon_minutes",
+    ]
+    selector = pd.Series(True, index=baseline.index)
+    for column in key:
+        selector &= baseline[column].eq(sample[column])
+    changed_selector = pd.Series(True, index=changed.index)
+    for column in key:
+        changed_selector &= changed[column].eq(sample[column])
+
+    pd.testing.assert_frame_equal(
+        baseline.loc[selector].reset_index(drop=True),
+        changed.loc[changed_selector].reset_index(drop=True),
+    )
+
+    fake["ingested_at"] = sample["prediction_origin"]
+    known_context = pd.concat([context, fake.to_frame().T], ignore_index=True)
+    known = build_demand_features(config, demand, zones, known_context)
+    known_selector = pd.Series(True, index=known.index)
+    for column in key:
+        known_selector &= known[column].eq(sample[column])
+    assert int(known.loc[known_selector, "context_event_count"].iloc[0]) == (
+        int(baseline.loc[selector, "context_event_count"].iloc[0]) + 1
+    )
+
+
+def test_zone_type_is_exposed_only_as_numeric_model_features(
+    feature_fixture: tuple[GeneratedDataset, FeatureDataset, FeatureDataset],
+) -> None:
+    _, features, _ = feature_fixture
+    demand = pd.read_parquet(features.table_paths["demand_features"])
+
+    assert "zone_type" not in demand.columns
+    assert "zone_type_mixed" in demand.columns
+    assert "zone_type_unknown" in demand.columns
+    assert set(demand["zone_type_mixed"].unique()).issubset({0, 1})
+
+
 def test_status_ingested_after_origin_cannot_change_that_prediction(
     feature_fixture: tuple[GeneratedDataset, FeatureDataset, FeatureDataset],
 ) -> None:

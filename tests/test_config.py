@@ -12,6 +12,7 @@ def test_development_config_loads_expected_project_defaults() -> None:
     config = load_config(project_root=PROJECT_ROOT)
 
     assert config.project.city == "Pune"
+    assert config.project.structural_seed == 20260821
     assert config.project.timezone == "Asia/Kolkata"
     assert config.time.bucket_minutes == 15
     assert config.time.demand_horizons_minutes == [15, 30, 60, 120, 360]
@@ -138,5 +139,6 @@ def test_experiment_overlay_changes_seed_and_declares_role() -> None:
     )
 
     assert config.project.seed == 20261013
+    assert config.project.structural_seed == 20260821
     assert config.experiment.name == "validation_seed_01"
     assert config.experiment.evaluation_role == "validation"

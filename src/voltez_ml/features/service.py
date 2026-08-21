@@ -28,12 +28,14 @@ def _waiting_history(
     frame: pd.DataFrame,
     observations: pd.DataFrame,
 ) -> pd.DataFrame:
-    history: dict[str, tuple[list[pd.Timestamp], list[float]]] = {}
+    history: dict[tuple[str, str], tuple[list[pd.Timestamp], list[float]]] = {}
     known = observations[
         (observations["label_known"] == 1) & observations["label_observed_at"].notna()
     ]
-    for port_id, group in known.sort_values("label_observed_at").groupby("port_id", sort=False):
-        history[str(port_id)] = (
+    for (run_id, port_id), group in known.sort_values("label_observed_at").groupby(
+        ["simulation_run_id", "port_id"], sort=False
+    ):
+        history[(str(run_id), str(port_id))] = (
             [pd.Timestamp(value) for value in group["label_observed_at"]],
             [float(value) for value in group["label_wait_minutes"]],
         )
@@ -45,7 +47,8 @@ def _waiting_history(
     latest_times: list[pd.Timestamp | None] = []
     for row in _records(frame):
         origin = pd.Timestamp(row["prediction_origin"])
-        times, values = history.get(str(row["port_id"]), ([], []))
+        key = (str(row["simulation_run_id"]), str(row["port_id"]))
+        times, values = history.get(key, ([], []))
         lower = bisect_left(times, origin - window)
         upper = bisect_right(times, origin)
         prior = values[lower:upper]

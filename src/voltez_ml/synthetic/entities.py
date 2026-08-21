@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from voltez_ml.config import VoltEZConfig
-from voltez_ml.synthetic.randomness import named_rng, stable_id
+from voltez_ml.synthetic.randomness import named_rng, stable_id, structural_namespace
 
 PUNE_AREAS: tuple[tuple[str, float, float, str], ...] = (
     ("Shivajinagar", 18.5308, 73.8475, "commercial"),
@@ -99,9 +99,15 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
     """Generate normalized v1.1 geography, hosts, supply, users, and vehicles."""
 
     settings = config.synthetic
-    zone_rng = named_rng(config.project.seed, "static-zones")
-    supply_rng = named_rng(config.project.seed, "static-supply")
-    port_health_rng = named_rng(config.project.seed, "latent-port-health")
+    structure_seed = config.project.structural_seed
+    structure_id = structural_namespace(
+        config.project.city,
+        settings.generator_version,
+        structure_seed,
+    )
+    zone_rng = named_rng(structure_seed, "static-zones")
+    supply_rng = named_rng(structure_seed, "static-supply")
+    port_health_rng = named_rng(structure_seed, "latent-port-health")
     driver_rng = named_rng(config.project.seed, "static-drivers")
     dataset_start = pd.Timestamp(settings.start_date, tz=config.project.timezone)
     dataset_end = dataset_start + timedelta(days=settings.days)
@@ -110,7 +116,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
     zone_latent: list[dict[str, Any]] = []
     for index in range(settings.zone_count):
         name, latitude, longitude, zone_type = _zone_source(index)
-        zone_id = stable_id(run_id, "zone", index)
+        zone_id = stable_id(structure_id, "zone", index)
         zones.append(
             {
                 "zone_id": zone_id,
@@ -120,6 +126,8 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
                 "centroid_latitude": latitude,
                 "centroid_longitude": longitude,
                 "timezone": config.project.timezone,
+                # Public land-use metadata useful to maps, analytics, and cold-start ML features.
+                "zone_type": zone_type,
                 "active": True,
                 "simulation_run_id": run_id,
             }
@@ -127,7 +135,6 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
         zone_latent.append(
             {
                 "zone_id": zone_id,
-                "zone_type": zone_type,
                 "base_demand_multiplier": float(zone_rng.lognormal(mean=0.0, sigma=0.28)),
                 "price_sensitivity": float(zone_rng.beta(2.5, 2.5)),
                 "traffic_multiplier": float(zone_rng.uniform(0.8, 1.35)),
@@ -138,7 +145,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
     connector_types = pd.DataFrame(
         [
             {
-                "connector_type_id": stable_id(run_id, "connector", code),
+                "connector_type_id": stable_id(structure_id, "connector", code),
                 "code": code,
                 "display_name": display_name,
                 "charging_type": charging_type,
@@ -159,8 +166,8 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
             else zones[int(supply_rng.integers(len(zones)))]
         )
         category = str(supply_rng.choice(BUSINESS_CATEGORIES))
-        owner_id = stable_id(run_id, "host-user", index)
-        business_id = stable_id(run_id, "business", index)
+        owner_id = stable_id(structure_id, "host-user", index)
+        business_id = stable_id(structure_id, "business", index)
         latitude = float(zone["centroid_latitude"] + supply_rng.normal(0, 0.004))
         longitude = float(zone["centroid_longitude"] + supply_rng.normal(0, 0.004))
         users.append(
@@ -203,7 +210,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
             business_hours.append(
                 {
                     "business_hours_id": stable_id(
-                        run_id, "business-hours", f"{index}:{day_of_week}"
+                        structure_id, "business-hours", f"{index}:{day_of_week}"
                     ),
                     "business_id": business_id,
                     "day_of_week": day_of_week,
@@ -227,7 +234,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
     amenities = pd.DataFrame(
         [
             {
-                "amenity_id": stable_id(run_id, "amenity", code),
+                "amenity_id": stable_id(structure_id, "amenity", code),
                 "name": name,
                 "category": category,
                 "simulation_run_id": run_id,
@@ -255,7 +262,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
         if supply_rng.random() < 0.35:
             business_offers.append(
                 {
-                    "business_offer_id": stable_id(run_id, "business-offer", index),
+                    "business_offer_id": stable_id(structure_id, "business-offer", index),
                     "business_id": business["business_id"],
                     "title": "Synthetic charging-visit offer",
                     "description": "Fixture-only offer for recommendation pipeline testing",
@@ -282,7 +289,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
             else str(supply_rng.choice(business_ids))
         )
         business = business_by_id[business_id]
-        charger_id = stable_id(run_id, "charger", index)
+        charger_id = stable_id(structure_id, "charger", index)
         chargers.append(
             {
                 "charger_id": charger_id,
@@ -308,7 +315,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
             )
         )
         for port_number in range(1, number_of_ports + 1):
-            port_id = stable_id(run_id, "port", f"{index}:{port_number}")
+            port_id = stable_id(structure_id, "port", f"{index}:{port_number}")
             connector_code = str(supply_rng.choice(connector_codes, p=connector_probabilities))
             charging_type = next(item[2] for item in CONNECTORS if item[0] == connector_code)
             power_options = (
@@ -346,7 +353,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
             parking_spaces.append(
                 {
                     "parking_space_id": stable_id(
-                        run_id, "parking-space", f"{index}:{port_number}"
+                        structure_id, "parking-space", f"{index}:{port_number}"
                     ),
                     "charger_id": charger_id,
                     "label": f"EV-{index + 1}-{port_number}",
@@ -357,7 +364,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
             )
             tariffs.append(
                 {
-                    "tariff_id": stable_id(run_id, "tariff", port_id),
+                    "tariff_id": stable_id(structure_id, "tariff", port_id),
                     "charger_id": charger_id,
                     "port_id": port_id,
                     "price_per_kwh": round(float(supply_rng.uniform(12, 28)), 2),
@@ -392,7 +399,9 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
             availability_windows.append(
                 {
                     "availability_window_id": stable_id(
-                        run_id, "availability-window", f"{port['port_id']}:{local_date.isoformat()}"
+                        structure_id,
+                        "availability-window",
+                        f"{port['port_id']}:{local_date.isoformat()}",
                     ),
                     "port_id": port["port_id"],
                     "start_at": start_at,

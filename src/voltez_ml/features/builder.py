@@ -32,6 +32,7 @@ REQUIRED_TABLES = {
     "chargers",
     "charger_ports",
     "connector_types",
+    "context_events",
     "bookings",
     "charging_sessions",
     "charger_status_events",
@@ -154,7 +155,12 @@ def build_feature_dataset(
         raise ValueError("at least one source run directory is required")
     tables, source_manifests = _combine_runs(source_run_dirs)
     run_roles = _manifest_run_roles(source_manifests)
-    demand = build_demand_features(config, tables["demand_buckets"], tables["zones"])
+    demand = build_demand_features(
+        config,
+        tables["demand_buckets"],
+        tables["zones"],
+        tables["context_events"],
+    )
     availability = build_availability_features(config, tables)
     waiting_time = build_waiting_time_features(
         config,

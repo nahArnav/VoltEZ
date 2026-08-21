@@ -45,9 +45,12 @@ The order is causal. A future session cannot influence a recommendation that hap
 The project does not use one global random generator. It creates deterministic streams with names
 such as `static-supply`, `demand-counts`, `sessions`, and `user-status-reports`.
 
-The stream seed is derived from:
+The project uses two independent seed families:
 
-`project seed + SHA-256(stream name)`
+- `project.structural_seed + SHA-256(structural stream name)` freezes geography, businesses,
+  chargers, ports, tariffs, and inherent port-health profiles;
+- `project.seed + SHA-256(dynamic stream name)` varies drivers, demand, context, outages,
+  requests, bookings, sessions, and reports.
 
 Therefore:
 
@@ -55,14 +58,19 @@ Therefore:
 - supply and demand use independent random sequences;
 - adding a new driver-status draw does not unexpectedly change every charger ID.
 
-Changing the project seed creates a different artificial city. Keeping the seed reproduces the
-same city when configuration and generator source are unchanged.
+Changing only `project.seed` creates another history inside the same city. Changing
+`project.structural_seed` deliberately creates a different artificial charging network and is
+reserved for out-of-distribution robustness.
 
 ### Stable identifiers
 
-Synthetic IDs use UUID5 over:
+Physical synthetic IDs use UUID5 over:
 
-`run ID + entity type + natural synthetic key`
+`structural namespace + entity type + natural synthetic key`
+
+Drivers and event IDs instead use the dynamic run ID. This lets the same charger be followed
+across ordinary train, validation, and test worlds without pretending the same drivers or
+bookings occurred in all of them.
 
 They look like normal UUIDs but contain no email, phone, name, or other personal information.
 
@@ -70,7 +78,7 @@ They look like normal UUIDs but contain no email, phone, name, or other personal
 
 The run ID includes hashes of:
 
-- seed and city;
+- structural seed, dynamic seed, and city;
 - time buckets and model horizons;
 - every synthetic profile parameter;
 - feature and label versions;
@@ -87,8 +95,10 @@ The first 24 zone names and centroids use recognizable Pune areas. These are coa
 centers, not addresses or live user locations. Each zone receives hidden QA-only parameters such
 as a demand multiplier and price sensitivity.
 
-`qa_latent_zones` contains those hidden parameters, including the simulation-only zone type.
-Public tables never expose the variable that directly generated demand.
+The controlled `zone_type` is public because maps, analytics, and cold-start behavior may safely
+know whether an area is residential, office, retail, transit, or mixed. `qa_latent_zones` keeps
+only the hidden numerical multipliers that directly generate demand; those remain forbidden as
+model features.
 
 ### Businesses and access hours
 

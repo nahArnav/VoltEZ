@@ -112,8 +112,18 @@ def _feature_columns(frame: pd.DataFrame) -> list[str]:
 
 
 def _seasonal_naive(frame: pd.DataFrame) -> NDArray[np.float64]:
-    prediction = frame["request_lag_same_time_last_week"].copy()
-    prediction = prediction.fillna(frame["request_lag_same_time_yesterday"])
+    last_week_column = (
+        "request_lag_target_time_last_week"
+        if "request_lag_target_time_last_week" in frame
+        else "request_lag_same_time_last_week"
+    )
+    yesterday_column = (
+        "request_lag_target_time_yesterday"
+        if "request_lag_target_time_yesterday" in frame
+        else "request_lag_same_time_yesterday"
+    )
+    prediction = frame[last_week_column].copy()
+    prediction = prediction.fillna(frame[yesterday_column])
     prediction = prediction.fillna(frame["request_ewm_prior"])
     return cast(
         NDArray[np.float64],

@@ -120,19 +120,21 @@ Parameter logic:
 | `max-leaf-nodes` | interaction complexity | zone/time quirks may be memorized |
 | `l2-regularization` | shrinkage of extreme leaf values | too much produces underfit averages |
 
-## What should happen next
+## Step 10C source status
 
 The 60-minute experiment is a better operational forecast target, but time-of-day still dominates
-permutation importance. Step 10C should correct the synthetic-world structure before adding a more
-complex model:
+permutation importance. Step 10C now corrects the data-generating and feature contracts before a
+more complex model is considered:
 
-1. Keep Pune zone identities and structural baseline profiles fixed across ordinary train,
-   validation, and test worlds.
-2. Vary dynamic demand noise, users, events, weather, outages, and reporting delays by seed.
-3. Reserve a separate structural-shift world for out-of-distribution robustness.
-4. Add cutoff-safe context features and stable zone/category features.
-5. Then compare the Poisson baseline with a hurdle model for nonzero probability plus conditional
-   count, while keeping test locked.
+1. A structural seed now fixes Pune zone identities, hosts, supply, tariffs, and inherent health
+   across ordinary train, validation, test, and scenario-stress worlds.
+2. The dynamic seed independently varies demand noise, users, context, outages, sessions, and
+   reporting delays.
+3. `structural_shift_seed_01` is isolated for out-of-distribution robustness.
+4. Feature view v3 adds public zone categories, exact target-slot yesterday/week lags, and
+   cutoff-safe scheduled context.
+5. After source approval, a newly versioned five-world suite must be generated; only then should
+   Poisson and hurdle candidates be compared on validation and scenario stress. Test stays locked.
 
 ## Knowledge check
 

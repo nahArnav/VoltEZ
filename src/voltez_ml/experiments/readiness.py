@@ -29,6 +29,7 @@ def _baseline_distribution_fingerprint(config: VoltEZConfig) -> str:
     values = {
         "city": config.project.city,
         "timezone": config.project.timezone,
+        "structural_seed": config.project.structural_seed,
         "time": config.time.model_dump(mode="json"),
         "feature_view_version": config.data.feature_view_version,
         "label_definition_version": config.data.label_definition_version,
@@ -79,6 +80,17 @@ def build_data_readiness_report(
     seeds = [config.project.seed for config in configs]
     if len(seeds) != len(set(seeds)):
         failures.append("every experiment profile must use an independent seed")
+
+    canonical_structural_seeds = {
+        config.project.structural_seed
+        for config in configs
+        if config.experiment.evaluation_role in {"train", "validation", "test", "stress_test"}
+    }
+    if len(canonical_structural_seeds) > 1:
+        failures.append(
+            "canonical train, validation, test, and scenario-stress runs must share one "
+            "structural seed"
+        )
 
     role_counts = Counter(config.experiment.evaluation_role for config in configs)
     if role_counts["train"] < 2:
@@ -134,6 +146,8 @@ def build_data_readiness_report(
                 "experiment_name": config.experiment.name,
                 "evaluation_role": config.experiment.evaluation_role,
                 "seed": config.project.seed,
+                "dynamic_seed": config.project.seed,
+                "structural_seed": config.project.structural_seed,
                 "days": config.synthetic.days,
                 "estimated_rows": estimated_rows,
                 "row_safety_ceiling": maximum_rows,

@@ -144,6 +144,14 @@ def audit_rehearsal(rehearsal_root: Path) -> dict[str, Any]:
         )
     if any(bool(manifest.get("code_is_dirty")) for manifest in source_manifests):
         warnings.append("at least one source run was generated from an uncommitted worktree")
+    structural_namespaces = {
+        manifest.get("structural_namespace") for manifest in source_manifests
+    }
+    if len(structural_namespaces) != 1 or None in structural_namespaces:
+        failures.append("canonical rehearsal worlds do not share one structural namespace")
+    dynamic_seeds = {manifest.get("dynamic_seed") for manifest in source_manifests}
+    if len(dynamic_seeds) != len(source_manifests) or None in dynamic_seeds:
+        failures.append("canonical rehearsal worlds do not declare unique dynamic seeds")
 
     listed_sources = {
         str(source["run_id"]): source for source in feature_manifest.get("source_runs", [])
@@ -241,6 +249,9 @@ def audit_rehearsal(rehearsal_root: Path) -> dict[str, Any]:
                 "run_id": manifest["run_id"],
                 "experiment": manifest["experiment"],
                 "seed": manifest["seed"],
+                "dynamic_seed": manifest["dynamic_seed"],
+                "structural_seed": manifest["structural_seed"],
+                "structural_namespace": manifest["structural_namespace"],
                 "row_counts": manifest["row_counts"],
                 "reproducibility_fingerprint": manifest[
                     "reproducibility_fingerprint"
