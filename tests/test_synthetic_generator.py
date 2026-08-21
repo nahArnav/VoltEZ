@@ -46,11 +46,11 @@ def test_requests_not_bookings_are_the_primary_demand_truth(
     bookings = _read(result, "bookings")
 
     assert len(requests) > len(bookings)
-    assert "pending" not in set(requests["request_status"])
-    assert {"served", "no_candidate"}.issubset(set(requests["request_status"]))
+    assert "pending" not in set(requests["result_status"])
+    assert {"served", "no_candidate"}.issubset(set(requests["result_status"]))
 
 
-def test_unknown_availability_remains_null_and_is_not_false(
+def test_unknown_availability_remains_explicit_and_is_not_unavailable(
     generated_pair: tuple[GeneratedDataset, GeneratedDataset],
 ) -> None:
     result, _ = generated_pair
@@ -58,10 +58,93 @@ def test_unknown_availability_remains_null_and_is_not_false(
     latent = _read(result, "qa_latent_availability")
     joined = observations.merge(latent[["observation_id", "latent_available"]], on="observation_id")
 
-    unknown = joined[joined["availability_label"].isna()]
+    unknown = joined[joined["label"] == "unknown"]
     assert not unknown.empty
     assert bool(unknown["latent_available"].any())
-    assert set(observations["availability_label"].dropna().astype(bool)) == {True, False}
+    assert set(observations["label"]) == {"available", "unavailable", "unknown"}
+
+
+def test_schema_v1_1_normalized_relationships_are_materialized(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    manifest = json.loads(result.manifest_path.read_text("utf-8"))
+    table_names = set(manifest["tables"])
+
+    assert {
+        "users",
+        "connector_types",
+        "business_hour_exceptions",
+        "amenities",
+        "business_amenities",
+        "business_offers",
+        "tariffs",
+        "trips",
+        "trip_charger_options",
+    }.issubset(table_names)
+    ports = _read(result, "charger_ports")
+    parking = _read(result, "parking_spaces")
+    assert {"charger_id", "connector_type_id", "port_number", "current_status"}.issubset(
+        ports.columns
+    )
+    assert "parking_space_id" not in ports.columns
+    assert "charger_id" in parking.columns
+
+
+def test_route_requests_are_linked_to_trips_and_options(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    requests = _read(result, "charging_requests")
+    trips = _read(result, "trips")
+    options = _read(result, "trip_charger_options")
+    route_requests = requests[requests["request_type"] == "route_planning"]
+
+    assert not route_requests.empty
+    assert set(route_requests["trip_id"]) == set(trips["trip_id"])
+    assert set(options["trip_id"]).issubset(set(trips["trip_id"]))
+    assert bool((options["estimated_detour_km"] >= 0).all())
+    assert bool((options["estimated_total_cost"] >= 0).all())
+
+
+def test_session_energy_matches_meter_delta(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    sessions = _read(result, "charging_sessions")
+    completed = sessions[sessions["status"] == "completed"]
+    meter_delta = completed["meter_end_kwh"] - completed["meter_start_kwh"]
+
+    assert bool(((meter_delta - completed["energy_kwh"]).abs() <= 0.002).all())
+    assert bool((completed["final_amount"] >= 0).all())
+
+
+def test_demand_buckets_reconcile_without_double_counting_searches(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    demand = _read(result, "demand_buckets")
+    requests = _read(result, "charging_requests")
+
+    assert int(demand["request_count"].sum()) == len(requests)
+    assert bool((demand["search_count"] <= demand["request_count"]).all())
+    assert bool((demand["unserved_count"] <= demand["request_count"]).all())
+    assert bool(demand["occupancy_rate"].between(0, 1).all())
+
+
+def test_known_availability_labels_match_exact_target_truth(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    observations = _read(result, "availability_observations")
+    latent = _read(result, "qa_latent_availability")
+    known = observations[observations["label"] != "unknown"].merge(
+        latent[["observation_id", "latent_available"]], on="observation_id"
+    )
+    expected = known["latent_available"].map({True: "available", False: "unavailable"})
+
+    assert not known.empty
+    assert bool((known["label"] == expected).all())
 
 
 def test_latent_truth_never_appears_in_public_tables(

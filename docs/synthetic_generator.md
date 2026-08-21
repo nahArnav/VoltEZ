@@ -9,16 +9,18 @@ Prediction. It does not train either model.
 The simulator behaves like a small artificial VoltEZ marketplace:
 
 1. Create Pune zones with different hidden demand tendencies.
-2. Place businesses, chargers, ports, parking spaces, drivers, and vehicles into that city.
+2. Place users, businesses, schedules, amenities, offers, chargers, normalized ports, parking
+   spaces, tariffs, and vehicles into that city.
 3. Move through 15-minute time buckets and decide how many genuine charging requests occur.
-4. Find compatible ports in the requested zone and its two synthetic neighbors.
+4. Find compatible ports in the requested zone and its two geographically nearest Pune zones.
 5. Apply application rules before showing candidates: connector compatibility, access hours, known
    faults, and confirmed booking conflicts.
-6. Record every recommendation impression, not only the selected result.
+6. Record trips, trip charger options, and every recommendation impression, not only the
+   selected result.
 7. Simulate selection, booking, cancellation, no-show, arrival, failure, and completed charging.
 8. Produce noisy owner/driver reports separately from trustworthy check-in/session evidence.
 9. Aggregate the raw events into complete demand buckets.
-10. Reconstruct availability as true, false, or unknown according to evidence quality.
+10. Reconstruct availability as available, unavailable, or unknown according to evidence quality.
 11. Validate the result and write versioned Parquet files plus a manifest.
 
 The order is causal. A future session cannot influence a recommendation that happened earlier.
@@ -29,7 +31,7 @@ The order is causal. A future session cannot influence a recommendation that hap
 | --- | --- | --- |
 | `config.py` | Typed settings and parameter bounds | Bad settings fail before expensive work begins |
 | `synthetic/randomness.py` | Named random streams, stable IDs, count-distribution math | Reproducibility rules stay independent of business logic |
-| `synthetic/entities.py` | Zones, hosts, ports, parking, drivers, vehicles | Static supply is created before mutable events |
+| `synthetic/entities.py` | Schema v1.1 identity, geography, hosts, schedules, supply, tariffs, and vehicles | Static application state is created before mutable events |
 | `synthetic/events.py` | Demand, requests, recommendations, bookings, sessions, reports, labels | Preserves causal event order in one visible pipeline |
 | `synthetic/validation.py` | Memory preflight and post-generation invariants | A bad dataset is rejected before training can read it |
 | `synthetic/io.py` | Parquet files, schema hashes, content hashes | Storage mechanics cannot silently change model logic |
@@ -85,8 +87,8 @@ The first 24 zone names and centroids use recognizable Pune areas. These are coa
 centers, not addresses or live user locations. Each zone receives hidden QA-only parameters such
 as a demand multiplier and price sensitivity.
 
-`qa_latent_zones` contains those hidden parameters. Public tables may keep safe descriptive values
-such as `zone_type`, but never the hidden variable that directly generated demand.
+`qa_latent_zones` contains those hidden parameters, including the simulation-only zone type.
+Public tables never expose the variable that directly generated demand.
 
 ### Businesses and access hours
 
@@ -100,17 +102,21 @@ know them at prediction time.
 ### Chargers, ports, and parking
 
 A charger is a physical unit. A port is an independently bookable connector. A parking space is
-the physical resource promised to the driver. Every generated port currently maps to one parking
-space, and a booking stores both IDs.
+the physical resource promised to the driver. Ports and parking spaces independently reference
+their charger, and a booking stores both selected resource IDs.
+
+Prices come from a time-bounded port tariff and are copied into an immutable booking quote. A
+later tariff edit therefore cannot rewrite what the driver accepted.
 
 Connector and power choices vary between AC and DC. A booking is impossible unless the vehicle's
 connector matches the port's connector.
 
 ### Drivers and vehicles
 
-Driver profiles contain only a synthetic training ID and a coarse home zone. Vehicles store
-battery, range, efficiency, maximum AC/DC power, class, and connector compatibility. The request
-generator joins the two through `training_user_id`; home zone is not duplicated into the vehicle.
+Synthetic users and vehicles follow the v1.1 ownership relationship. The simulator keeps coarse
+home zone only in `qa_latent_driver_profiles` to create origins; it is not a public model feature.
+Vehicles store battery, range, efficiency, maximum AC/DC power, class, and normalized connector
+compatibility.
 
 ## 5. Demand generation logic
 
@@ -174,9 +180,9 @@ These are application truths, not predictions. Model 2 must never override them.
 
 ### Candidate area
 
-Candidates come from the destination zone and two adjacent synthetic zones. The simplified ring is
-a controlled stand-in for a future map/route service. Google Maps can later replace this adapter
-with actual travel time without changing label-generation rules.
+Candidates come from the destination zone and its two nearest zone centroids using haversine
+distance. Google Maps can later replace this adapter with actual route time without changing
+label-generation rules.
 
 ### Initial recommendation score
 
@@ -226,10 +232,12 @@ That hidden truth goes only to `qa_latent_availability`.
 
 The public training label follows evidence:
 
-- `true`: the selected driver successfully began charging, or strong independent evidence supports
+- `available`: the selected driver successfully began charging at a target-consistent time, or
+  strong independent evidence supports
   availability;
-- `false`: a verified check-in failure shows the charger could not be used;
-- `unknown/null`: the driver cancelled, did not arrive, or the unselected candidate lacks strong
+- `unavailable`: a verified check-in failure shows the charger could not be used;
+- `unknown`: the driver cancelled, did not arrive, arrived after the target state changed, or the
+  unselected candidate lacks strong
   evidence.
 
 This intentionally creates cases where QA truth is available but the public label remains unknown.
@@ -238,8 +246,11 @@ That is correct: the real application would not know the hidden truth.
 ## 9. Demand buckets
 
 `demand_buckets` contains every zone/time combination, including zeros. Missing rows are never
-silently interpreted as zero. Each bucket includes requests, served requests, no-candidate events,
-bookings, completed sessions, listed ports, and ports not occupied or faulted at that time.
+silently interpreted as zero. Each bucket includes search-subset count, total requests, served and
+unserved requests, bookings, sessions, occupancy rate, listed ports, and available ports.
+
+`search_count` is not added to `request_count`: one intent can create both records, so addition
+would double-count demand. Model 1's primary target remains the deduplicated request count.
 
 This table is the raw chronological input for the next feature-engineering step. Future targets and
 lags have not yet been created, preventing accidental leakage at this stage.
@@ -262,6 +273,10 @@ Validation checks:
 - booking state transitions;
 - positive time intervals;
 - session timestamps, energy, and SOC bounds;
+- meter-energy and non-negative price reconciliation;
+- route request/trip linkage and non-negative option estimates;
+- user/vehicle ownership and charger/parking alignment;
+- status observation-versus-ingestion timing and confidence bounds;
 - availability cutoff timing;
 - complete demand grid;
 - one simulation lineage ID;
@@ -282,9 +297,11 @@ version, and label version.
 
 Public operational/analytics tables include:
 
-- zones, businesses, business hours, chargers, ports, parking, and availability windows;
-- driver profiles, vehicles, and connector compatibility;
-- requests, impressions, bookings, booking events, sessions, and status events;
+- users, zones, businesses, schedules, amenities, offers, chargers, normalized ports, parking,
+  availability windows, and tariffs;
+- vehicles and normalized connector compatibility;
+- requests, trips, trip charger options, impressions, bookings, booking events, sessions, and
+  status events;
 - context events, demand buckets, and availability observations.
 
 Files prefixed `qa_latent_` are simulator testing truth. Training code must reject them as features.

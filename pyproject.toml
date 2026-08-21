@@ -17,6 +17,7 @@ dependencies = [
 
 [project.scripts]
 voltez-generate = "voltez_ml.synthetic.cli:main"
+voltez-build-features = "voltez_ml.features.cli:main"
 
 [dependency-groups]
 dev = [

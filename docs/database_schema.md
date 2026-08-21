@@ -1,9 +1,13 @@
-# VoltEZ Application Database Blueprint
+# VoltEZ Application Database Blueprint v1.1
 
 Status: design only
 Branch: `ML-Arnav`
 Database target: PostgreSQL with PostGIS
 Primary objective: support the complete VoltEZ application while producing trustworthy data for demand forecasting and charger availability prediction.
+
+The backend diagram `VoltEZ_Database_Schema_v1_1.png` is the current source design. See
+[`schema_reconciliation_v1_1.md`](schema_reconciliation_v1_1.md) for the exact ML-generator
+mapping, the duplicate status-table clarification, and two additive relationship fixes.
 
 ## 1. Design decisions
 
@@ -111,7 +115,7 @@ Connector compatibility is many-to-many and should not be stored as an unvalidat
 
 Purpose: controlled connector vocabulary.
 
-Fields: `id`, `code`, `display_name`, `current_type`, `created_at`.
+Fields: `id`, `code`, `display_name`, `charging_type`, `created_at`.
 
 Example codes may include CCS2, Type 2, CHAdeMO, Bharat AC-001, or Bharat DC-001. The final vocabulary must be verified before implementation.
 
@@ -197,10 +201,8 @@ Purpose: physical charging unit located at a business.
 | `name` | Display label |
 | `location` | PostGIS point; may inherit business location |
 | `access_type` | Public, customer-only, residents-only, or controlled |
-| `base_price_per_kwh` | Non-negative numeric value |
-| `currency` | Initially INR |
-| `listing_status` | Draft, active, paused, suspended, or retired |
-| `verification_status` | Unverified, pending, verified, rejected |
+| `status` | Draft, active, paused, suspended, or retired |
+| `reliability_score` | Nullable application projection; never direct Model 2 training truth |
 | `created_at`, `updated_at`, `deleted_at` | Audit fields |
 
 Do not store predicted reliability as permanent charger truth. Reliability is a versioned derived value.
@@ -214,19 +216,19 @@ Purpose: independently bookable connector and capacity unit.
 | `id` | UUID primary key |
 | `charger_id` | Parent charger |
 | `connector_type_id` | Physical connector |
+| `port_number` | Unique within a charger |
 | `max_power_kw` | Positive power limit |
-| `current_type` | AC or DC if not implied by connector |
-| `operational_status` | Available, occupied, faulted, offline, maintenance, or unknown |
-| `status_updated_at` | Freshness of denormalized status |
+| `current_status` | Available, occupied, faulted, offline, maintenance, or unknown |
+| `last_seen_at` | Freshness of denormalized status |
 | `created_at`, `updated_at`, `deleted_at` | Audit fields |
 
-`operational_status` is a fast-read projection. `charger_status_events` remains the historical evidence.
+`current_status` is a fast-read projection. `charger_status_events` remains the historical evidence.
 
 ### 4.11.1 `app.parking_spaces`
 
 Purpose: reserve the physical parking resource promised by VoltEZ's smart-reservation feature.
 
-Fields: `id`, `business_id`, `label`, `accessibility_type`, `vehicle_class_limit`, `status`, `created_at`, `updated_at`, `deleted_at`.
+Fields: `id`, `charger_id`, `label`, `accessibility_type`, `status`, `created_at`, `updated_at`, `deleted_at`.
 
 A port may be permanently mapped to one parking space or a booking may choose an eligible space dynamically. Parking availability is deterministic application state and must not be inferred from charger availability alone.
 
@@ -250,11 +252,12 @@ Purpose: append-only evidence for the no-IoT status and future availability mode
 | Field | Notes |
 | --- | --- |
 | `id` | UUID primary key |
-| `port_id` | Always references one physical port; never an ambiguous charger/port field |
+| `charger_id`, `port_id` | Parent charger and physical port; both must agree |
 | `status` | Available, occupied, faulted, offline, maintenance, or unknown |
 | `source` | Owner, driver check-in, driver check-out, booking, support, system, or future IoT |
 | `reporter_user_id` | Nullable actor |
-| `event_time` | When the status was observed |
+| `confidence` | Source confidence from zero to one |
+| `observed_at` | When the status was observed |
 | `ingested_at` | When VoltEZ received the observation |
 | `expires_at` | Time after which the observation should not be treated as current |
 | `evidence_type` | QR, GPS, owner declaration, booking-derived, support verification, or IoT |
@@ -270,23 +273,37 @@ Purpose: measure total driver demand, including demand that does not become a bo
 | --- | --- |
 | `id` | UUID primary key |
 | `user_id`, `vehicle_id` | Nullable for permitted anonymous exploration |
-| `origin_zone_id`, `destination_zone_id` | Coarse zones for analytics |
+| `origin_zone_id`, `zone_id` | Coarse origin and requested charging zone |
 | `origin_point`, `destination_point` | Restricted operational coordinates with retention policy |
 | `requested_at` | Prediction origin time |
-| `desired_arrival_at` | Nullable requested charging time |
+| `desired_start_at` | Nullable requested charging time |
 | `current_soc`, `reserve_soc`, `target_soc` | Nullable but validated when supplied |
 | `required_connector_type_id` | Nullable until vehicle is known |
 | `request_type` | Nearby search, route planning, or scheduled search |
-| `request_status` | Served, no_candidate, abandoned, or error |
+| `result_status` | Served, no_candidate, abandoned, or error |
+| `trip_id` | Nullable v1.1 extension linking route-planning demand to a journey |
 | `created_at` | Audit field |
 
 This table is the primary source for Model 1's demand label. Exact coordinates must not enter training exports directly.
 
-### 4.15 `app.recommendation_impressions`
+### 4.15 `app.trips` and `app.trip_charger_options`
+
+Purpose: represent a driver's journey and the charger alternatives considered along it.
+
+`trips` fields: `id`, `user_id`, `vehicle_id`, `start_location`, `destination_location`,
+`started_at`, `ended_at`, `distance_km`, `status`.
+
+`trip_charger_options` fields: `trip_id`, `charger_id`, `rank`, `estimated_detour_km`,
+`estimated_arrival_at`, `estimated_charge_time_min`, `estimated_total_cost`.
+
+Route-planning requests use the additive `charging_requests.trip_id` foreign key so the trip is
+not matched heuristically by user and timestamp.
+
+### 4.16 `app.recommendation_impressions`
 
 Purpose: record all candidates shown, not only the selected charger.
 
-Fields: `id`, `request_id`, `charger_id`, `port_id`, `rank`, `score_components`, `model_versions`, `shown_at`, `selected_at`, `booking_id`.
+Fields: `id`, `user_id`, `request_id`, `charger_id`, `port_id`, `rank`, `score_components`, `model_versions`, `shown_at`, `selected`, `selected_at`, `booking_id`.
 
 This prevents future ranking models from learning only from winners and supports explainable replay.
 
@@ -314,7 +331,7 @@ Critical integrity rule: overlapping active booking intervals for one port must 
 
 Purpose: append-only booking state history.
 
-Fields: `id`, `booking_id`, `old_status`, `new_status`, `actor_type`, `actor_id`, `event_time`, `ingested_at`, `metadata`.
+Fields: `id`, `booking_id`, `old_status`, `new_status`, `actor_type`, `actor_id`, `metadata`, `created_at`, `ingested_at`.
 
 Every booking status transition creates exactly one event. Invalid transitions are rejected by the service layer and tested.
 
@@ -328,9 +345,10 @@ Purpose: actual arrival, access, charging, and completion outcome.
 | `booking_id` | Nullable only for explicitly supported walk-ins |
 | `port_id`, `vehicle_id`, `user_id` | Explicit references |
 | `arrived_at`, `check_in_at` | Physical arrival and application check-in |
-| `charging_started_at`, `charging_ended_at`, `check_out_at` | Actual service timeline |
+| `start_at`, `end_at` | Actual charging timeline |
 | `start_soc`, `end_soc` | Nullable validated percentages |
 | `energy_kwh` | Non-negative delivered energy |
+| `meter_start_kwh`, `meter_end_kwh` | Auditable cumulative meter readings |
 | `final_amount`, `currency` | Final session price |
 | `status` | Arrived, checked_in, charging, completed, abandoned, or failed |
 | `failure_reason` | Charger fault, access denied, metadata mismatch, payment, driver, or other controlled reason |
@@ -384,17 +402,20 @@ Sensitive values, credentials, raw payment data, and unnecessary location data m
 
 ### 4.22 `app.tariffs`
 
-Purpose: time-bounded electricity or platform cost context.
+Purpose: time-bounded charger or port pricing used for quotes and final billing.
 
-Fields: `id`, `zone_id`, `provider`, `start_at`, `end_at`, `price_per_kwh`, `currency`, `source_url`, `retrieved_at`, `verified_at`.
+Fields: `id`, `charger_id`, `port_id`, `price_per_kwh`, `price_per_minute`, `booking_fee`,
+`starts_at`, `ends_at`.
 
-Tavily may later discover source documents, but a tariff becomes an application value only after parsing, provenance capture, and validation.
+The applicable tariff is copied into `bookings.quote_snapshot`; later tariff edits never rewrite
+the price the driver accepted.
 
-### 4.23 `app.context_events`
+### 4.23 `analytics.context_events`
 
 Purpose: optional zone/time context such as festivals, stadium events, severe weather, road disruption, or holidays.
 
-Fields: `id`, `zone_id`, `event_type`, `start_at`, `end_at`, `severity`, `source`, `source_url`, `retrieved_at`, `verified_at`.
+Fields: `id`, `zone_id`, `event_type`, `starts_at`, `ends_at`, `expected_impact`, `source`,
+`published_at`, `ingested_at`.
 
 Model 1 must retain a fallback path that works when contextual sources are unavailable.
 
@@ -409,11 +430,14 @@ Fields:
 - `zone_id`
 - `bucket_start`
 - `bucket_minutes`
+- `search_count`
 - `request_count`
 - `served_request_count`
 - `no_candidate_count`
+- `unserved_count`
 - `booking_count`
-- `completed_session_count`
+- `session_count`
+- `occupancy_rate`
 - `compatible_ports_listed`
 - `compatible_ports_available`
 - `generated_at`
@@ -434,17 +458,20 @@ Fields:
 - `port_id`
 - `prediction_origin`
 - `target_arrival_at`
+- `observed_at`
 - `feature_cutoff`
 - `eligible_at_origin`
-- `availability_label`: true, false, or null/unknown
+- `label`: available, unavailable, or unknown
 - `label_source`
+- `confidence`
+- `booking_state`, `port_status`: target-time label context, forbidden as origin-time features
 - `label_observed_at`
 - `censoring_reason`
 - `source_snapshot_id`
 
 Unknown outcomes remain unknown and are excluded or handled explicitly. They are never silently converted to unavailable.
 
-### 5.3 `analytics.feature_snapshots`
+### 5.3 `ml_lab.feature_snapshots`
 
 Purpose: immutable, reproducible model input rows.
 
@@ -452,7 +479,7 @@ Fields: `id`, `model_name`, `entity_type`, `entity_id`, `prediction_origin`, `ta
 
 JSONB may be used during the first prototype, but stable high-value features should eventually become typed columns or a versioned Parquet dataset.
 
-### 5.4 `analytics.ml_predictions`
+### 5.4 `ml_lab.ml_predictions`
 
 Purpose: audit every model or fallback result used by the application.
 
@@ -470,7 +497,7 @@ Fields:
 - `top_factors`
 - `latency_ms`
 
-### 5.5 `analytics.model_registry`
+### 5.5 `ml_lab.model_registry`
 
 Purpose: track champion, challenger, artifact identity, and rollback.
 
@@ -493,7 +520,7 @@ Synthetic operational tables should live under `ml_lab` or in versioned Parquet 
 3. Availability windows must not have non-positive duration.
 4. `battery_kwh`, `max_power_kw`, `energy_kwh`, prices, and amounts cannot be negative.
 5. SOC values remain between 0 and 100.
-6. `charging_ended_at` cannot precede `charging_started_at`.
+6. Session `end_at` cannot precede session `start_at`.
 7. Completed sessions require a charging start and end.
 8. A port connector must exist in the connector vocabulary.
 9. Booking events must follow the allowed state machine.
@@ -503,6 +530,9 @@ Synthetic operational tables should live under `ml_lab` or in versioned Parquet 
 13. A parking space cannot be assigned to overlapping active bookings.
 14. Refund totals cannot exceed the captured payment amount after accounting for previous refunds.
 15. Host settlement line items may reference only completed, financially settled sessions.
+16. Completed-session `energy_kwh` must reconcile to `meter_end_kwh - meter_start_kwh` within a documented meter tolerance.
+17. `charging_requests.trip_id` is required for route-planning requests and absent for other request types.
+18. A status event's `charger_id` must be the parent of its `port_id`, and `ingested_at` cannot precede `observed_at`.
 
 ## 7. Required indexes
 
@@ -514,10 +544,10 @@ Synthetic operational tables should live under `ml_lab` or in versioned Parquet 
 | `availability_windows` | Index on `port_id`, `start_at`, `end_at` |
 | `bookings` | Index on `port_id`, interval, and status; database-level overlap protection |
 | `bookings` | Index on `parking_space_id`, interval, and status; parking overlap protection |
-| `booking_events` | Index on `booking_id`, `event_time` |
+| `booking_events` | Index on `booking_id`, `created_at` |
 | `charging_sessions` | Index on `port_id`, `arrived_at`, and status |
-| `charger_status_events` | Index on `port_id`, `event_time desc` |
-| `charging_requests` | Index on `origin_zone_id`, `requested_at` |
+| `charger_status_events` | Index on `port_id`, `observed_at desc` |
+| `charging_requests` | Index on `zone_id`, `requested_at` |
 | `demand_buckets` | Primary key on zone, bucket start, and bucket size |
 | `ml_predictions` | Index on model, entity, prediction time, and generated time |
 

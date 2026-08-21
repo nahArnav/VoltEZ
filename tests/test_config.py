@@ -101,3 +101,31 @@ def test_cancellation_and_no_show_probabilities_leave_room_for_attendance() -> N
 
     with pytest.raises(ValidationError, match="must sum to less than 1"):
         VoltEZConfig.model_validate(values)
+
+
+def test_feature_split_fractions_must_sum_to_one() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    values = config.model_dump()
+    values["features"]["split"]["test_fraction"] = 0.20
+
+    with pytest.raises(ValidationError, match="split fractions must sum to 1.0"):
+        VoltEZConfig.model_validate(values)
+
+
+def test_demand_feature_windows_must_be_positive_sorted_and_unique() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    values = config.model_dump()
+    values["features"]["demand_recent_windows_buckets"] = [1, 4, 2, 4]
+
+    with pytest.raises(ValidationError, match="positive, unique, and sorted"):
+        VoltEZConfig.model_validate(values)
+
+
+def test_minimum_history_cannot_be_shorter_than_smallest_window() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    values = config.model_dump()
+    values["features"]["demand_recent_windows_buckets"] = [4, 8]
+    values["features"]["demand_minimum_history_buckets"] = 2
+
+    with pytest.raises(ValidationError, match="cannot be shorter"):
+        VoltEZConfig.model_validate(values)

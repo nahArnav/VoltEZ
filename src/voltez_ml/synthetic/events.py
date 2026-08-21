@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from collections import defaultdict
 from datetime import date, timedelta
@@ -11,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from voltez_ml.config import VoltEZConfig
+from voltez_ml.geography import haversine_km, nearest_neighbor_ids
 from voltez_ml.synthetic.randomness import (
     named_rng,
     negative_binomial_parameters,
@@ -42,6 +44,54 @@ def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     return cast(list[dict[str, Any]], frame.to_dict("records"))
 
 
+def _clock_minute(value: str) -> int:
+    """Convert a local `HH:MM:SS` business-hour value to minutes after midnight."""
+
+    hour, minute, _ = (int(part) for part in value.split(":"))
+    return hour * 60 + minute
+
+
+def _enriched_ports(static: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Join normalized v1.1 supply tables for simulator calculations only.
+
+    The returned frame is never written as an application table. Keeping this join local lets
+    the public `charger_ports` fixture remain normalized while the simulator can still reason
+    about host, zone, connector, parking, and current tariff.
+    """
+
+    parking = static["parking_spaces"].sort_values(["charger_id", "label"], kind="mergesort").copy()
+    parking["port_number"] = parking.groupby("charger_id").cumcount() + 1
+    return (
+        static["charger_ports"]
+        .merge(
+            static["chargers"][
+                [
+                    "charger_id",
+                    "business_id",
+                    "zone_id",
+                    "latitude",
+                    "longitude",
+                    "access_type",
+                    "status",
+                ]
+            ],
+            on="charger_id",
+        )
+        .merge(
+            static["connector_types"][["connector_type_id", "code", "charging_type"]],
+            on="connector_type_id",
+        )
+        .merge(
+            static["tariffs"][["port_id", "price_per_kwh", "price_per_minute", "booking_fee"]],
+            on="port_id",
+        )
+        .merge(
+            parking[["charger_id", "port_number", "parking_space_id"]],
+            on=["charger_id", "port_number"],
+        )
+    )
+
+
 def _intervals_overlap(
     first_start: pd.Timestamp,
     first_end: pd.Timestamp,
@@ -59,8 +109,9 @@ def _is_business_open(
     hours = hours_lookup[(business_id, moment.weekday())]
     local_minute = moment.hour * 60 + moment.minute
     return bool(
-        not hours["is_closed"]
-        and int(hours["open_minute"]) <= local_minute < int(hours["close_minute"])
+        _clock_minute(str(hours["opens_at"]))
+        <= local_minute
+        < _clock_minute(str(hours["closes_at"]))
     )
 
 
@@ -98,10 +149,12 @@ def _scenario_tables(
                     ),
                     "zone_id": zone_id,
                     "event_type": scenario,
-                    "start_at": start_at,
-                    "end_at": start_at + timedelta(days=1),
-                    "severity": SCENARIO_SEVERITY[scenario],
+                    "starts_at": start_at,
+                    "ends_at": start_at + timedelta(days=1),
+                    "expected_impact": SCENARIO_SEVERITY[scenario],
                     "source": "synthetic_scenario",
+                    "published_at": start_at - timedelta(days=7),
+                    "ingested_at": start_at - timedelta(days=7) + timedelta(minutes=1),
                     "simulation_run_id": run_id,
                 }
             )
@@ -109,10 +162,12 @@ def _scenario_tables(
         "context_event_id",
         "zone_id",
         "event_type",
-        "start_at",
-        "end_at",
-        "severity",
+        "starts_at",
+        "ends_at",
+        "expected_impact",
         "source",
+        "published_at",
+        "ingested_at",
         "simulation_run_id",
     ]
     return pd.DataFrame(rows, columns=columns), lookup
@@ -137,10 +192,12 @@ def _generate_outages_and_initial_reports(
         reports.append(
             {
                 "status_event_id": stable_id(run_id, "status", f"initial:{port['port_id']}"),
+                "charger_id": port["charger_id"],
                 "port_id": port["port_id"],
                 "status": "unknown" if initial_error else "available",
                 "source": "owner",
-                "event_time": dataset_start,
+                "confidence": 0.25 if initial_error else 0.75,
+                "observed_at": dataset_start,
                 "ingested_at": dataset_start + timedelta(minutes=int(report_rng.integers(1, 8))),
                 "expires_at": dataset_start
                 + timedelta(minutes=config.synthetic.availability.median_status_ttl_minutes),
@@ -190,10 +247,12 @@ def _generate_outages_and_initial_reports(
                         "status_event_id": stable_id(
                             run_id, "status", f"outage:{outage_id}:{marker}"
                         ),
+                        "charger_id": port["charger_id"],
                         "port_id": port["port_id"],
                         "status": reported_status,
                         "source": "owner",
-                        "event_time": event_time,
+                        "confidence": 0.35 if error else 0.75,
+                        "observed_at": event_time,
                         "ingested_at": event_time + timedelta(minutes=delay),
                         "expires_at": event_time
                         + timedelta(
@@ -227,18 +286,33 @@ def _latent_demand_grid(
     rng = named_rng(config.project.seed, "demand-counts")
     buckets_per_day = 24 * 60 // config.time.bucket_minutes
     profile = _daily_profile(buckets_per_day)
-    zone_multipliers = latent_zones.set_index("zone_id")["base_demand_multiplier"].to_dict()
-    neighbor_values = np.array([zone_multipliers[zone_id] for zone_id in zones["zone_id"]])
-    neighbor_mean = (np.roll(neighbor_values, 1) + np.roll(neighbor_values, -1)) / 2
+    zone_multipliers = cast(
+        dict[str, float],
+        latent_zones.set_index("zone_id")["base_demand_multiplier"].astype(float).to_dict(),
+    )
+    zone_records = _records(zones)
+    neighbor_map = nearest_neighbor_ids(
+        zone_records,
+        identifier_key="zone_id",
+        latitude_key="centroid_latitude",
+        longitude_key="centroid_longitude",
+    )
     spillover = config.synthetic.demand.spatial_spillover_weight
-    blended_multipliers = (1 - spillover) * neighbor_values + spillover * neighbor_mean
+    blended_multipliers = {
+        zone_id: (1 - spillover) * zone_multipliers[zone_id]
+        + spillover
+        * float(np.mean([zone_multipliers[neighbor] for neighbor in neighbor_map[zone_id]]))
+        if neighbor_map[zone_id]
+        else zone_multipliers[zone_id]
+        for zone_id in zone_multipliers
+    }
 
     rows: list[dict[str, Any]] = []
     for day_offset in range(config.synthetic.days):
         local_date = config.synthetic.start_date + timedelta(days=day_offset)
         weekend_factor = 1.12 if local_date.weekday() >= 5 else 1.0
         day_start = pd.Timestamp(local_date, tz=config.project.timezone)
-        for zone_index, zone_id in enumerate(zones["zone_id"].astype(str)):
+        for zone_id in zones["zone_id"].astype(str):
             scenario = scenario_lookup[(zone_id, local_date)]
             scenario_factor = SCENARIO_DEMAND_MULTIPLIERS[scenario]
             for bucket_index in range(buckets_per_day):
@@ -248,7 +322,7 @@ def _latent_demand_grid(
                 mean = (
                     config.synthetic.demand.average_requests_per_zone_per_day
                     * profile[bucket_index]
-                    * blended_multipliers[zone_index]
+                    * blended_multipliers[zone_id]
                     * weekend_factor
                     * scenario_factor
                 )
@@ -281,8 +355,8 @@ def _generate_requests(
     vehicle_records = vehicles.merge(
         vehicle_connectors, on=["vehicle_id", "simulation_run_id"]
     ).merge(
-        driver_profiles[["training_user_id", "home_zone_id", "simulation_run_id"]],
-        on=["training_user_id", "simulation_run_id"],
+        driver_profiles[["user_id", "home_zone_id", "simulation_run_id"]],
+        on=["user_id", "simulation_run_id"],
     )
     vehicle_rows = _records(vehicle_records)
     rows: list[dict[str, Any]] = []
@@ -299,28 +373,32 @@ def _generate_requests(
             current_soc = float(rng.uniform(8, 58))
             reserve_soc = float(rng.uniform(5, min(20, current_soc)))
             target_soc = float(rng.uniform(max(70, current_soc + 15), 95))
+            request_id = stable_id(run_id, "request", request_index)
+            request_type = str(
+                rng.choice(
+                    ("nearby_search", "route_planning", "scheduled_search"),
+                    p=(0.63, 0.25, 0.12),
+                )
+            )
             rows.append(
                 {
-                    "request_id": stable_id(run_id, "request", request_index),
-                    "training_user_id": vehicle["training_user_id"],
+                    "request_id": request_id,
+                    "user_id": vehicle["user_id"],
                     "vehicle_id": vehicle["vehicle_id"],
                     "origin_zone_id": vehicle["home_zone_id"],
-                    "destination_zone_id": bucket["zone_id"],
+                    "zone_id": bucket["zone_id"],
                     "requested_at": requested_at,
-                    "desired_arrival_at": requested_at + timedelta(minutes=eta_minutes),
+                    "desired_start_at": requested_at + timedelta(minutes=eta_minutes),
                     "eta_minutes": eta_minutes,
                     "current_soc": round(current_soc, 2),
                     "reserve_soc": round(reserve_soc, 2),
                     "target_soc": round(target_soc, 2),
                     "required_connector_type_id": vehicle["connector_type_id"],
-                    "connector_code": vehicle["connector_code"],
-                    "request_type": str(
-                        rng.choice(
-                            ("nearby_search", "route_planning", "scheduled_search"),
-                            p=(0.63, 0.25, 0.12),
-                        )
-                    ),
-                    "request_status": "pending",
+                    "request_type": request_type,
+                    "trip_id": stable_id(run_id, "trip", request_id)
+                    if request_type == "route_planning"
+                    else None,
+                    "result_status": "pending",
                     "simulation_run_id": run_id,
                 }
             )
@@ -367,21 +445,16 @@ def _recommend_and_book(
     status_reports: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     rng = named_rng(config.project.seed, "recommendations-and-bookings")
-    ports = static["charger_ports"].merge(
-        static["chargers"][["charger_id", "base_price_per_kwh"]], on="charger_id"
-    )
+    ports = _enriched_ports(static)
     ports_by_zone_connector: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for port in _records(ports):
         ports_by_zone_connector[(str(port["zone_id"]), str(port["connector_type_id"]))].append(port)
-    ordered_zone_ids = [str(value) for value in static["zones"]["zone_id"]]
-    neighboring_zones: dict[str, list[str]] = {}
-    for index, zone_id in enumerate(ordered_zone_ids):
-        candidates = (
-            zone_id,
-            ordered_zone_ids[(index - 1) % len(ordered_zone_ids)],
-            ordered_zone_ids[(index + 1) % len(ordered_zone_ids)],
-        )
-        neighboring_zones[zone_id] = list(dict.fromkeys(candidates))
+    nearest_zones = nearest_neighbor_ids(
+        _records(static["zones"]),
+        identifier_key="zone_id",
+        latitude_key="centroid_latitude",
+        longitude_key="centroid_longitude",
+    )
     hours_lookup = {
         (str(row["business_id"]), int(row["day_of_week"])): row
         for row in _records(static["business_hours"])
@@ -396,17 +469,17 @@ def _recommend_and_book(
     booking_events: list[dict[str, Any]] = []
 
     for request in sorted(requests, key=lambda row: row["requested_at"]):
-        arrival = request["desired_arrival_at"]
+        arrival = request["desired_start_at"]
         vehicle = vehicle_lookup[str(request["vehicle_id"])]
         required_energy = (
             float(vehicle["battery_kwh"])
             * (float(request["target_soc"]) - float(request["current_soc"]))
             / 100
         )
-        destination_zone_id = str(request["destination_zone_id"])
+        destination_zone_id = str(request["zone_id"])
         candidate_ports = [
             port
-            for candidate_zone_id in neighboring_zones[destination_zone_id]
+            for candidate_zone_id in [destination_zone_id, *nearest_zones[destination_zone_id]]
             for port in ports_by_zone_connector.get(
                 (candidate_zone_id, str(request["required_connector_type_id"])), []
             )
@@ -415,7 +488,7 @@ def _recommend_and_book(
         for port in candidate_ports:
             max_vehicle_power = (
                 float(vehicle["max_ac_kw"])
-                if port["current_type"] == "AC"
+                if port["charging_type"] == "AC"
                 else float(vehicle["max_dc_kw"])
             )
             effective_power = max(1.0, min(float(port["max_power_kw"]), max_vehicle_power))
@@ -434,7 +507,7 @@ def _recommend_and_book(
             ):
                 continue
             power_score = math.log1p(float(port["max_power_kw"])) / math.log1p(60)
-            price_score = 1 - min(float(port["base_price_per_kwh"]), 35) / 35
+            price_score = 1 - min(float(port["price_per_kwh"]), 35) / 35
             proximity_score = 1.0 if str(port["zone_id"]) == destination_zone_id else 0.65
             score = (
                 0.45 * power_score
@@ -446,16 +519,16 @@ def _recommend_and_book(
         scored.sort(key=lambda item: item[0], reverse=True)
         shown = scored[: config.synthetic.behaviour.recommendations_per_request]
         if not shown:
-            request["request_status"] = "no_candidate"
+            request["result_status"] = "no_candidate"
             continue
 
         selected_index: int | None = None
         if rng.random() < config.synthetic.behaviour.selection_probability:
             weights = np.exp(np.array([item[0] for item in shown]) * 3)
             selected_index = int(rng.choice(len(shown), p=weights / weights.sum()))
-            request["request_status"] = "served"
+            request["result_status"] = "served"
         else:
-            request["request_status"] = "abandoned"
+            request["result_status"] = "abandoned"
 
         selected_booking_id: str | None = None
         if selected_index is not None:
@@ -481,7 +554,7 @@ def _recommend_and_book(
                 cancelled_at = None
             booking = {
                 "booking_id": selected_booking_id,
-                "training_user_id": request["training_user_id"],
+                "user_id": request["user_id"],
                 "vehicle_id": request["vehicle_id"],
                 "port_id": selected_port["port_id"],
                 "parking_space_id": selected_port["parking_space_id"],
@@ -489,6 +562,17 @@ def _recommend_and_book(
                 "start_at": arrival,
                 "end_at": end_at,
                 "status": "confirmed",
+                "hold_expires_at": pd.NaT,
+                "quote_snapshot": json.dumps(
+                    {
+                        "currency": "INR",
+                        "price_per_kwh": float(selected_port["price_per_kwh"]),
+                        "price_per_minute": float(selected_port["price_per_minute"]),
+                        "booking_fee": float(selected_port["booking_fee"]),
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
                 "expected_arrival_at": arrival,
                 "created_at": request["requested_at"],
                 "confirmed_at": request["requested_at"] + timedelta(seconds=30),
@@ -507,7 +591,8 @@ def _recommend_and_book(
                     "old_status": "pending",
                     "new_status": "confirmed",
                     "actor_type": "system",
-                    "event_time": booking["confirmed_at"],
+                    "metadata": "{}",
+                    "created_at": booking["confirmed_at"],
                     "ingested_at": booking["confirmed_at"],
                     "simulation_run_id": run_id,
                 }
@@ -520,12 +605,14 @@ def _recommend_and_book(
                     "impression_id": stable_id(
                         run_id, "impression", f"{request['request_id']}:{port['port_id']}"
                     ),
+                    "user_id": request["user_id"],
                     "request_id": request["request_id"],
                     "charger_id": port["charger_id"],
                     "port_id": port["port_id"],
                     "rank": rank,
                     "recommendation_score": round(float(score), 6),
                     "shown_at": request["requested_at"] + timedelta(seconds=2),
+                    "selected": is_selected,
                     "selected_at": request["requested_at"] + timedelta(seconds=20)
                     if is_selected
                     else pd.NaT,
@@ -561,7 +648,7 @@ def _simulate_sessions(
     outages_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for outage in _records(outages):
         outages_by_port[str(outage["port_id"])].append(outage)
-    port_lookup = {str(row["port_id"]): row for row in _records(static["charger_ports"])}
+    port_lookup = {str(row["port_id"]): row for row in _records(_enriched_ports(static))}
     vehicle_lookup = {str(row["vehicle_id"]): row for row in _records(static["vehicles"])}
     sessions_by_port: dict[str, list[dict[str, Any]]] = defaultdict(list)
     sessions: list[dict[str, Any]] = []
@@ -577,7 +664,8 @@ def _simulate_sessions(
                     "old_status": "confirmed",
                     "new_status": "cancelled",
                     "actor_type": "driver",
-                    "event_time": booking["cancelled_at"],
+                    "metadata": "{}",
+                    "created_at": booking["cancelled_at"],
                     "ingested_at": booking["cancelled_at"],
                     "simulation_run_id": run_id,
                 }
@@ -593,7 +681,8 @@ def _simulate_sessions(
                     "old_status": "confirmed",
                     "new_status": "no_show",
                     "actor_type": "system",
-                    "event_time": event_time,
+                    "metadata": "{}",
+                    "created_at": event_time,
                     "ingested_at": event_time,
                     "simulation_run_id": run_id,
                 }
@@ -603,7 +692,7 @@ def _simulate_sessions(
         port_id = str(booking["port_id"])
         arrival = booking["start_at"] + timedelta(minutes=int(rng.integers(-3, 9)))
         prior_session_conflict = any(
-            session["charging_started_at"] <= arrival < session["charging_ended_at"]
+            session["start_at"] <= arrival < session["end_at"]
             for session in sessions_by_port[port_id]
         )
         outage_conflict = _is_in_outage(port_id, arrival, outages_by_port)
@@ -619,7 +708,8 @@ def _simulate_sessions(
                     "old_status": "confirmed",
                     "new_status": "cancelled",
                     "actor_type": "system",
-                    "event_time": arrival,
+                    "metadata": json.dumps({"reason": reason}, sort_keys=True),
+                    "created_at": arrival,
                     "ingested_at": arrival,
                     "simulation_run_id": run_id,
                 }
@@ -630,14 +720,17 @@ def _simulate_sessions(
                     "booking_id": booking_id,
                     "port_id": port_id,
                     "vehicle_id": booking["vehicle_id"],
-                    "training_user_id": booking["training_user_id"],
+                    "user_id": booking["user_id"],
                     "arrived_at": arrival,
                     "check_in_at": arrival,
-                    "charging_started_at": pd.NaT,
-                    "charging_ended_at": pd.NaT,
+                    "start_at": pd.NaT,
+                    "end_at": pd.NaT,
                     "start_soc": pd.NA,
                     "end_soc": pd.NA,
                     "energy_kwh": 0.0,
+                    "meter_start_kwh": pd.NA,
+                    "meter_end_kwh": pd.NA,
+                    "final_amount": 0.0,
                     "status": "failed",
                     "failure_reason": reason,
                     "simulation_run_id": run_id,
@@ -653,7 +746,7 @@ def _simulate_sessions(
         end = start + timedelta(minutes=actual_minutes)
         max_vehicle_power = (
             float(vehicle["max_ac_kw"])
-            if port["current_type"] == "AC"
+            if port["charging_type"] == "AC"
             else float(vehicle["max_dc_kw"])
         )
         effective_power = max(1.0, min(float(port["max_power_kw"]), max_vehicle_power))
@@ -663,19 +756,29 @@ def _simulate_sessions(
         )
         start_soc = float(rng.uniform(8, 58))
         end_soc = min(100.0, start_soc + energy_kwh / float(vehicle["battery_kwh"]) * 100)
+        meter_start_kwh = float(rng.uniform(5_000, 50_000))
+        meter_end_kwh = meter_start_kwh + energy_kwh
+        final_amount = (
+            energy_kwh * float(port["price_per_kwh"])
+            + actual_minutes * float(port["price_per_minute"])
+            + float(port["booking_fee"])
+        )
         session = {
             "session_id": session_id,
             "booking_id": booking_id,
             "port_id": port_id,
             "vehicle_id": booking["vehicle_id"],
-            "training_user_id": booking["training_user_id"],
+            "user_id": booking["user_id"],
             "arrived_at": arrival,
             "check_in_at": arrival,
-            "charging_started_at": start,
-            "charging_ended_at": end,
+            "start_at": start,
+            "end_at": end,
             "start_soc": round(start_soc, 2),
             "end_soc": round(end_soc, 2),
             "energy_kwh": round(energy_kwh, 3),
+            "meter_start_kwh": round(meter_start_kwh, 3),
+            "meter_end_kwh": round(meter_end_kwh, 3),
+            "final_amount": round(final_amount, 2),
             "status": "completed",
             "failure_reason": None,
             "simulation_run_id": run_id,
@@ -700,7 +803,8 @@ def _simulate_sessions(
                     "old_status": old_status,
                     "new_status": new_status,
                     "actor_type": "system",
-                    "event_time": event_time,
+                    "metadata": "{}",
+                    "created_at": event_time,
                     "ingested_at": event_time,
                     "simulation_run_id": run_id,
                 }
@@ -714,10 +818,12 @@ def _simulate_sessions(
                     "status_event_id": stable_id(
                         run_id, "status", f"session:{session_id}:{marker}"
                     ),
+                    "charger_id": port["charger_id"],
                     "port_id": port_id,
                     "status": status,
                     "source": source,
-                    "event_time": event_time,
+                    "confidence": 0.98,
+                    "observed_at": event_time,
                     "ingested_at": event_time + timedelta(seconds=30),
                     "expires_at": event_time
                     + timedelta(minutes=config.synthetic.availability.median_status_ttl_minutes),
@@ -734,10 +840,12 @@ def _simulate_sessions(
                 "status_event_id": stable_id(
                     run_id, "status", f"session:{session_id}:voluntary-report"
                 ),
+                "charger_id": port["charger_id"],
                 "port_id": port_id,
                 "status": "available" if user_report_is_wrong else "occupied",
                 "source": "driver_report",
-                "event_time": user_report_time,
+                "confidence": 0.45 if user_report_is_wrong else 0.70,
+                "observed_at": user_report_time,
                 "ingested_at": user_report_time + timedelta(minutes=1),
                 "expires_at": user_report_time
                 + timedelta(minutes=config.synthetic.availability.median_status_ttl_minutes),
@@ -746,6 +854,135 @@ def _simulate_sessions(
             }
         )
     return sessions
+
+
+def _generate_trips_and_options(
+    run_id: str,
+    requests: list[dict[str, Any]],
+    impressions: list[dict[str, Any]],
+    static: dict[str, pd.DataFrame],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Create journey rows and charger-level route options for route-planning requests."""
+
+    zone_lookup = {str(row["zone_id"]): row for row in _records(static["zones"])}
+    vehicle_lookup = {str(row["vehicle_id"]): row for row in _records(static["vehicles"])}
+    port_lookup = {str(row["port_id"]): row for row in _records(_enriched_ports(static))}
+    impressions_by_request: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for impression in impressions:
+        impressions_by_request[str(impression["request_id"])].append(impression)
+
+    trips: list[dict[str, Any]] = []
+    options: list[dict[str, Any]] = []
+    for request in requests:
+        if not request.get("trip_id"):
+            continue
+        origin = zone_lookup[str(request["origin_zone_id"])]
+        destination = zone_lookup[str(request["zone_id"])]
+        direct_distance = haversine_km(
+            float(origin["centroid_latitude"]),
+            float(origin["centroid_longitude"]),
+            float(destination["centroid_latitude"]),
+            float(destination["centroid_longitude"]),
+        )
+        road_distance = max(1.0, direct_distance * 1.25)
+        trips.append(
+            {
+                "trip_id": request["trip_id"],
+                "user_id": request["user_id"],
+                "vehicle_id": request["vehicle_id"],
+                "start_latitude": origin["centroid_latitude"],
+                "start_longitude": origin["centroid_longitude"],
+                "destination_latitude": destination["centroid_latitude"],
+                "destination_longitude": destination["centroid_longitude"],
+                "started_at": pd.NaT,
+                "ended_at": pd.NaT,
+                "distance_km": round(road_distance, 3),
+                "status": "planned",
+                "simulation_run_id": run_id,
+            }
+        )
+
+        vehicle = vehicle_lookup[str(request["vehicle_id"])]
+        required_energy = (
+            float(vehicle["battery_kwh"])
+            * (float(request["target_soc"]) - float(request["current_soc"]))
+            / 100
+        )
+        seen_chargers: set[str] = set()
+        for impression in sorted(
+            impressions_by_request[str(request["request_id"])],
+            key=lambda row: int(row["rank"]),
+        ):
+            port = port_lookup[str(impression["port_id"])]
+            charger_id = str(port["charger_id"])
+            if charger_id in seen_chargers:
+                continue
+            seen_chargers.add(charger_id)
+            via_distance = 1.25 * (
+                haversine_km(
+                    float(origin["centroid_latitude"]),
+                    float(origin["centroid_longitude"]),
+                    float(port["latitude"]),
+                    float(port["longitude"]),
+                )
+                + haversine_km(
+                    float(port["latitude"]),
+                    float(port["longitude"]),
+                    float(destination["centroid_latitude"]),
+                    float(destination["centroid_longitude"]),
+                )
+            )
+            max_vehicle_power = (
+                float(vehicle["max_ac_kw"])
+                if port["charging_type"] == "AC"
+                else float(vehicle["max_dc_kw"])
+            )
+            effective_power = max(1.0, min(float(port["max_power_kw"]), max_vehicle_power))
+            estimated_charge_minutes = int(
+                np.clip(math.ceil(required_energy / effective_power * 60), 15, 180)
+            )
+            estimated_total_cost = (
+                required_energy * float(port["price_per_kwh"])
+                + estimated_charge_minutes * float(port["price_per_minute"])
+                + float(port["booking_fee"])
+            )
+            options.append(
+                {
+                    "trip_id": request["trip_id"],
+                    "charger_id": charger_id,
+                    "rank": len(seen_chargers),
+                    "estimated_detour_km": round(max(0.0, via_distance - road_distance), 3),
+                    "estimated_arrival_at": request["desired_start_at"],
+                    "estimated_charge_time_min": estimated_charge_minutes,
+                    "estimated_total_cost": round(estimated_total_cost, 2),
+                    "simulation_run_id": run_id,
+                }
+            )
+    trip_columns = [
+        "trip_id",
+        "user_id",
+        "vehicle_id",
+        "start_latitude",
+        "start_longitude",
+        "destination_latitude",
+        "destination_longitude",
+        "started_at",
+        "ended_at",
+        "distance_km",
+        "status",
+        "simulation_run_id",
+    ]
+    option_columns = [
+        "trip_id",
+        "charger_id",
+        "rank",
+        "estimated_detour_km",
+        "estimated_arrival_at",
+        "estimated_charge_time_min",
+        "estimated_total_cost",
+        "simulation_run_id",
+    ]
+    return pd.DataFrame(trips, columns=trip_columns), pd.DataFrame(options, columns=option_columns)
 
 
 def _availability_observations(
@@ -762,7 +999,7 @@ def _availability_observations(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     request_lookup = {str(row["request_id"]): row for row in requests}
     booking_lookup = {str(row["booking_id"]): row for row in bookings}
-    port_lookup = {str(row["port_id"]): row for row in _records(static["charger_ports"])}
+    port_lookup = {str(row["port_id"]): row for row in _records(_enriched_ports(static))}
     hours_lookup = {
         (str(row["business_id"]), int(row["day_of_week"])): row
         for row in _records(static["business_hours"])
@@ -788,14 +1025,14 @@ def _availability_observations(
         request = request_lookup[str(impression["request_id"])]
         port_id = str(impression["port_id"])
         port = port_lookup[port_id]
-        target = request["desired_arrival_at"]
+        target = request["desired_start_at"]
         own_booking_id = impression.get("booking_id")
         open_at_target = _is_business_open(str(port["business_id"]), target, hours_lookup)
         outage_at_target = _is_in_outage(port_id, target, outages_by_port)
         conflicting_session = any(
-            not pd.isna(session["charging_started_at"])
+            not pd.isna(session["start_at"])
             and session["booking_id"] != own_booking_id
-            and session["charging_started_at"] <= target < session["charging_ended_at"]
+            and session["start_at"] <= target < session["end_at"]
             for session in sessions_by_port[port_id]
         )
         conflicting_booking = any(
@@ -815,23 +1052,30 @@ def _availability_observations(
             and not conflicting_session
             and not conflicting_booking
         )
-        label: bool | None = None
+        label = "unknown"
         label_source: str | None = None
         label_observed_at: pd.Timestamp | None = None
+        label_confidence = 0.0
         censoring_reason: str | None = "unobserved_candidate"
         if own_booking_id:
             own_booking = booking_lookup[str(own_booking_id)]
             selected_session = sessions_by_booking.get(str(own_booking_id))
-            if selected_session and selected_session["status"] == "completed":
-                label = True
+            if selected_session and selected_session["status"] == "completed" and latent_available:
+                label = "available"
                 label_source = "charging_session_start"
-                label_observed_at = selected_session["charging_started_at"]
+                label_observed_at = selected_session["start_at"]
+                label_confidence = 0.99
                 censoring_reason = None
-            elif selected_session and selected_session["status"] == "failed":
-                label = False
+            elif (
+                selected_session and selected_session["status"] == "failed" and not latent_available
+            ):
+                label = "unavailable"
                 label_source = "verified_check_in_failure"
                 label_observed_at = selected_session["check_in_at"]
+                label_confidence = 0.98
                 censoring_reason = None
+            elif selected_session:
+                censoring_reason = "outcome_not_aligned_to_target_time"
             elif own_booking["status"] == "no_show":
                 censoring_reason = "driver_no_show"
             elif own_booking["status"] == "cancelled":
@@ -841,17 +1085,35 @@ def _availability_observations(
                 report
                 for report in reports_by_port[port_id]
                 if report["source"] in {"driver_check_in", "driver_check_out", "support", "system"}
-                and abs((report["event_time"] - target).total_seconds()) <= 15 * 60
+                and abs((report["observed_at"] - target).total_seconds()) <= 15 * 60
             ]
             if strong_reports:
                 strongest = min(
                     strong_reports,
-                    key=lambda report: abs((report["event_time"] - target).total_seconds()),
+                    key=lambda report: abs((report["observed_at"] - target).total_seconds()),
                 )
-                label = latent_available
+                label = "available" if latent_available else "unavailable"
                 label_source = "independent_status_evidence"
                 label_observed_at = strongest["ingested_at"]
+                label_confidence = float(strongest["confidence"])
                 censoring_reason = None
+
+        booking_state = (
+            "conflicting_booking"
+            if conflicting_booking
+            else "own_booking"
+            if own_booking_id
+            else "none"
+        )
+        port_status = (
+            "faulted"
+            if outage_at_target
+            else "occupied"
+            if conflicting_session or conflicting_booking
+            else "available"
+            if open_at_target
+            else "offline"
+        )
 
         observation_id = stable_id(run_id, "availability-observation", impression["impression_id"])
         observations.append(
@@ -861,10 +1123,14 @@ def _availability_observations(
                 "port_id": port_id,
                 "prediction_origin": request["requested_at"],
                 "target_arrival_at": target,
+                "observed_at": target,
                 "feature_cutoff": request["requested_at"],
                 "eligible_at_origin": True,
-                "availability_label": label,
+                "label": label,
                 "label_source": label_source,
+                "confidence": label_confidence,
+                "booking_state": booking_state,
+                "port_status": port_status,
                 "label_observed_at": label_observed_at,
                 "censoring_reason": censoring_reason,
                 "source_snapshot_id": snapshot_id,
@@ -925,17 +1191,21 @@ def _demand_buckets(
     buckets = latent_grid[["zone_id", "bucket_start"]].copy()
     request_frame = pd.DataFrame(requests)
     request_frame["bucket_start"] = request_frame["requested_at"].dt.floor(f"{bucket_minutes}min")
-    request_counts = (
-        request_frame.groupby(["destination_zone_id", "bucket_start"], as_index=False)
-        .agg(
-            request_count=("request_id", "size"),
-            served_request_count=("request_status", lambda values: int((values == "served").sum())),
-            no_candidate_count=(
-                "request_status",
-                lambda values: int((values == "no_candidate").sum()),
-            ),
-        )
-        .rename(columns={"destination_zone_id": "zone_id"})
+    request_counts = request_frame.groupby(["zone_id", "bucket_start"], as_index=False).agg(
+        search_count=(
+            "request_type",
+            lambda values: int(values.isin({"nearby_search", "route_planning"}).sum()),
+        ),
+        request_count=("request_id", "size"),
+        served_request_count=("result_status", lambda values: int((values == "served").sum())),
+        no_candidate_count=(
+            "result_status",
+            lambda values: int((values == "no_candidate").sum()),
+        ),
+        unserved_count=(
+            "result_status",
+            lambda values: int(values.isin({"no_candidate", "abandoned"}).sum()),
+        ),
     )
     buckets = buckets.merge(request_counts, on=["zone_id", "bucket_start"], how="left")
 
@@ -957,17 +1227,15 @@ def _demand_buckets(
     if completed_sessions:
         session_frame = pd.DataFrame(completed_sessions)
         session_frame["zone_id"] = session_frame["port_id"].map(port_zone)
-        session_frame["bucket_start"] = session_frame["charging_started_at"].dt.floor(
-            f"{bucket_minutes}min"
-        )
+        session_frame["bucket_start"] = session_frame["start_at"].dt.floor(f"{bucket_minutes}min")
         session_counts = (
             session_frame.groupby(["zone_id", "bucket_start"], as_index=False)
             .size()
-            .rename(columns={"size": "completed_session_count"})
+            .rename(columns={"size": "session_count"})
         )
         buckets = buckets.merge(session_counts, on=["zone_id", "bucket_start"], how="left")
     else:
-        buckets["completed_session_count"] = 0
+        buckets["session_count"] = 0
 
     listed = (
         ports.groupby("zone_id", as_index=False)
@@ -985,8 +1253,8 @@ def _demand_buckets(
     ] + [
         {
             "port_id": session["port_id"],
-            "busy_start": session["charging_started_at"],
-            "busy_end": session["charging_ended_at"],
+            "busy_start": session["start_at"],
+            "busy_end": session["end_at"],
         }
         for session in completed_sessions
     ]
@@ -998,6 +1266,9 @@ def _demand_buckets(
     buckets["compatible_ports_available"] = (
         buckets["compatible_ports_listed"] - buckets["busy_port_count"].fillna(0)
     ).clip(lower=0)
+    buckets["occupancy_rate"] = (
+        buckets["busy_port_count"].fillna(0) / buckets["compatible_ports_listed"].clip(lower=1)
+    ).clip(lower=0, upper=1)
     buckets = buckets.drop(columns="busy_port_count")
     buckets = buckets.merge(
         listed.rename(columns={"compatible_ports_listed": "listed_copy"}),
@@ -1006,11 +1277,13 @@ def _demand_buckets(
     )
     buckets = buckets.drop(columns="listed_copy")
     count_columns = [
+        "search_count",
         "request_count",
         "served_request_count",
         "no_candidate_count",
+        "unserved_count",
         "booking_count",
-        "completed_session_count",
+        "session_count",
     ]
     for column in count_columns:
         buckets[column] = buckets[column].fillna(0).astype("int64")
@@ -1024,11 +1297,14 @@ def _demand_buckets(
             "zone_id",
             "bucket_start",
             "bucket_minutes",
+            "search_count",
             "request_count",
             "served_request_count",
             "no_candidate_count",
+            "unserved_count",
             "booking_count",
-            "completed_session_count",
+            "session_count",
+            "occupancy_rate",
             "compatible_ports_listed",
             "compatible_ports_available",
             "source_snapshot_id",
@@ -1047,7 +1323,7 @@ def generate_event_tables(
 
     context_events, scenario_lookup = _scenario_tables(config, run_id, static["zones"])
     outages, status_reports = _generate_outages_and_initial_reports(
-        config, run_id, static["charger_ports"], scenario_lookup
+        config, run_id, _enriched_ports(static), scenario_lookup
     )
     latent_grid = _latent_demand_grid(
         config, run_id, static["zones"], static["qa_latent_zones"], scenario_lookup
@@ -1058,7 +1334,7 @@ def generate_event_tables(
         latent_grid,
         static["vehicles"],
         static["vehicle_connectors"],
-        static["driver_profiles"],
+        static["qa_latent_driver_profiles"],
     )
     impressions, bookings, booking_events = _recommend_and_book(
         config, run_id, requests, static, status_reports
@@ -1066,6 +1342,7 @@ def generate_event_tables(
     sessions = _simulate_sessions(
         config, run_id, bookings, booking_events, static, outages, status_reports
     )
+    trips, trip_charger_options = _generate_trips_and_options(run_id, requests, impressions, static)
     availability_observations, latent_availability = _availability_observations(
         config,
         run_id,
@@ -1086,13 +1363,13 @@ def generate_event_tables(
         bookings,
         sessions,
         outages,
-        static["charger_ports"],
+        _enriched_ports(static),
         snapshot_id,
     )
 
     public_booking_columns = [
         "booking_id",
-        "training_user_id",
+        "user_id",
         "vehicle_id",
         "port_id",
         "parking_space_id",
@@ -1100,6 +1377,8 @@ def generate_event_tables(
         "start_at",
         "end_at",
         "status",
+        "hold_expires_at",
+        "quote_snapshot",
         "expected_arrival_at",
         "created_at",
         "confirmed_at",
@@ -1109,6 +1388,8 @@ def generate_event_tables(
     tables = {
         "context_events": context_events,
         "charging_requests": pd.DataFrame(requests),
+        "trips": trips,
+        "trip_charger_options": trip_charger_options,
         "recommendation_impressions": pd.DataFrame(impressions),
         "bookings": pd.DataFrame(bookings)[public_booking_columns]
         if bookings

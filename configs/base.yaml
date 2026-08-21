@@ -25,4 +25,17 @@ data:
   output_format: parquet
   include_personal_data: false
   feature_view_version: v1
-  label_definition_version: v1
+  label_definition_version: v1.1
+
+features:
+  demand_recent_windows_buckets: [1, 2, 4, 24]
+  demand_ewm_span_buckets: 8
+  demand_minimum_history_buckets: 4
+  availability_history_hours: 24
+  reliability_prior_successes: 2.0
+  reliability_prior_failures: 2.0
+  cold_start_evidence_threshold: 5
+  split:
+    train_fraction: 0.70
+    validation_fraction: 0.15
+    test_fraction: 0.15

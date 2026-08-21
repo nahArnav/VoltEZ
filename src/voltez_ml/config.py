@@ -94,6 +94,39 @@ class DataSettings(StrictConfigModel):
     overwrite_existing_run: bool = False
 
 
+class SplitSettings(StrictConfigModel):
+    train_fraction: float = Field(default=0.70, gt=0, lt=1)
+    validation_fraction: float = Field(default=0.15, gt=0, lt=1)
+    test_fraction: float = Field(default=0.15, gt=0, lt=1)
+
+    @model_validator(mode="after")
+    def validate_fractions(self) -> SplitSettings:
+        total = self.train_fraction + self.validation_fraction + self.test_fraction
+        if abs(total - 1.0) > 1e-9:
+            raise ValueError(f"split fractions must sum to 1.0, received {total}")
+        return self
+
+
+class FeatureSettings(StrictConfigModel):
+    demand_recent_windows_buckets: list[int]
+    demand_ewm_span_buckets: int = Field(gt=1)
+    demand_minimum_history_buckets: int = Field(gt=0)
+    availability_history_hours: int = Field(gt=0)
+    reliability_prior_successes: float = Field(gt=0)
+    reliability_prior_failures: float = Field(gt=0)
+    cold_start_evidence_threshold: int = Field(gt=0)
+    split: SplitSettings
+
+    @model_validator(mode="after")
+    def validate_feature_windows(self) -> FeatureSettings:
+        windows = self.demand_recent_windows_buckets
+        if not windows or sorted(set(windows)) != windows or any(window <= 0 for window in windows):
+            raise ValueError("demand recent windows must be positive, unique, and sorted")
+        if self.demand_minimum_history_buckets < min(windows):
+            raise ValueError("minimum demand history cannot be shorter than the smallest window")
+        return self
+
+
 class EnvironmentSettings(StrictConfigModel):
     name: Literal["development", "test"]
     fail_on_validation_error: bool = True
@@ -178,6 +211,7 @@ class VoltEZConfig(StrictConfigModel):
     execution: ExecutionSettings
     time: TimeSettings
     data: DataSettings
+    features: FeatureSettings
     environment: EnvironmentSettings
     synthetic: SyntheticSettings
 

@@ -263,7 +263,7 @@ The ETA or scheduled arrival horizon is part of the model input because a port t
 
 ### 5.4 Label definition
 
-`availability_label = 1` when, at target arrival time:
+`label = available` when, at target arrival time:
 
 - the business is accessible;
 - the port is operational;
@@ -271,9 +271,9 @@ The ETA or scheduled arrival horizon is part of the model input because a port t
 - no valid booking or blocked interval prevents use;
 - observed evidence indicates the arriving driver could begin service within the defined availability tolerance.
 
-`availability_label = 0` when trustworthy reconstruction shows the port was unusable at target arrival.
+`label = unavailable` when trustworthy reconstruction shows the port was unusable at target arrival.
 
-`availability_label = unknown` when the real state cannot be reconstructed confidently.
+`label = unknown` when the real state cannot be reconstructed confidently.
 
 Unknown examples:
 
@@ -440,11 +440,12 @@ Use deterministic booking/access rules plus a freshness-decayed status score and
 The generator must create events in causal order:
 
 1. Pune zones and latent zone characteristics.
-2. Businesses, access hours, amenities, chargers, and ports.
+2. Businesses, recurring and exceptional access hours, amenities, offers, chargers, ports,
+   parking spaces, and time-bounded tariffs.
 3. Driver and vehicle profiles.
 4. Time-varying latent demand intensity.
 5. Charging requests.
-6. Compatible reachable candidates and recommendation impressions.
+6. Trips, compatible reachable candidates, trip charger options, and recommendation impressions.
 7. Driver selection and booking state transitions.
 8. Arrivals, queues, sessions, cancellations, no-shows, and outages.
 9. Status reports with source-dependent errors and staleness.

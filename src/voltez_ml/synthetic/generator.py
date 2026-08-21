@@ -41,29 +41,38 @@ class GeneratedDataset:
 
 
 SORT_KEYS: dict[str, list[str]] = {
+    "users": ["user_id"],
     "zones": ["zone_id"],
+    "connector_types": ["connector_type_id"],
+    "vehicle_connectors": ["vehicle_id", "connector_type_id"],
+    "vehicles": ["vehicle_id"],
     "businesses": ["business_id"],
     "business_hours": ["business_id", "day_of_week"],
+    "business_hour_exceptions": ["business_id", "date"],
+    "amenities": ["amenity_id"],
+    "business_amenities": ["business_id", "amenity_id"],
+    "business_offers": ["business_id", "starts_at"],
     "chargers": ["charger_id"],
     "charger_ports": ["port_id"],
     "parking_spaces": ["parking_space_id"],
     "availability_windows": ["port_id", "start_at"],
-    "driver_profiles": ["training_user_id"],
-    "vehicles": ["vehicle_id"],
-    "vehicle_connectors": ["vehicle_id", "connector_type_id"],
-    "context_events": ["start_at", "zone_id"],
+    "tariffs": ["port_id", "starts_at"],
+    "context_events": ["starts_at", "zone_id"],
     "charging_requests": ["requested_at", "request_id"],
+    "trips": ["trip_id"],
+    "trip_charger_options": ["trip_id", "rank"],
     "recommendation_impressions": ["shown_at", "request_id", "rank"],
     "bookings": ["created_at", "booking_id"],
-    "booking_events": ["event_time", "booking_event_id"],
+    "booking_events": ["created_at", "booking_event_id"],
     "charging_sessions": ["arrived_at", "session_id"],
-    "charger_status_events": ["event_time", "status_event_id"],
+    "charger_status_events": ["observed_at", "status_event_id"],
     "demand_buckets": ["bucket_start", "zone_id"],
     "availability_observations": ["prediction_origin", "observation_id"],
     "qa_latent_demand": ["bucket_start", "zone_id"],
     "qa_latent_outages": ["start_at", "port_id"],
     "qa_latent_availability": ["observation_id"],
     "qa_latent_zones": ["zone_id"],
+    "qa_latent_driver_profiles": ["user_id"],
 }
 
 
@@ -112,8 +121,9 @@ def _generator_source_fingerprint(project_root: Path) -> str:
 
     source_root = project_root / "src" / "voltez_ml" / "synthetic"
     digest = hashlib.sha256()
-    for path in sorted(source_root.glob("*.py")):
-        digest.update(path.name.encode("utf-8"))
+    source_paths = [*source_root.glob("*.py"), project_root / "src" / "voltez_ml" / "geography.py"]
+    for path in sorted(source_paths):
+        digest.update(str(path.relative_to(project_root)).encode("utf-8"))
         digest.update(path.read_bytes())
     return digest.hexdigest()
 
