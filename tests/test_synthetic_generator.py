@@ -86,6 +86,9 @@ def test_schema_v1_1_normalized_relationships_are_materialized(
         "tariffs",
         "trips",
         "trip_charger_options",
+        "waiting_time_observations",
+        "reliability_observations",
+        "qa_latent_port_profiles",
     }.issubset(table_names)
     ports = _read(result, "charger_ports")
     parking = _read(result, "parking_spaces")
@@ -150,6 +153,54 @@ def test_known_availability_labels_match_exact_target_truth(
 
     assert not known.empty
     assert bool((known["label"] == expected).all())
+
+
+def test_waiting_labels_reconcile_to_service_ready_evidence(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    waiting = _read(result, "waiting_time_observations")
+    sessions = _read(result, "charging_sessions")
+    known = waiting[waiting["label_known"] == 1].merge(
+        sessions[["session_id", "check_in_at", "service_ready_at"]],
+        on="session_id",
+        validate="one_to_one",
+    )
+    expected = (
+        known["service_ready_at"] - known["check_in_at"]
+    ).dt.total_seconds() / 60
+
+    assert not known.empty
+    assert bool((expected >= 0).all())
+    assert bool((known["label_wait_minutes"] - expected).abs().le(0.001).all())
+
+
+def test_reliability_truth_excludes_congestion_failures(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    reliability = _read(result, "reliability_observations")
+    sessions = _read(result, "charging_sessions")[["session_id", "status", "failure_reason"]]
+    checked = reliability.merge(
+        sessions,
+        on="session_id",
+        suffixes=("_observation", "_session"),
+        validate="one_to_one",
+    )
+    expected = checked.apply(
+        lambda row: (
+            "reliable"
+            if row["status"] == "completed"
+            else "unreliable"
+            if str(row["failure_reason_session"] or "").startswith("charger_fault")
+            else "unknown"
+        ),
+        axis=1,
+    )
+
+    assert bool((checked["label"] == expected).all())
+    congestion = checked[checked["failure_reason_session"] == "occupied_overrun"]
+    assert bool((congestion["label"] == "unknown").all())
 
 
 def test_latent_truth_never_appears_in_public_tables(

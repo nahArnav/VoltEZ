@@ -83,6 +83,7 @@ def _validate_booking_state_events(events: pd.DataFrame) -> None:
         ("confirmed", "checked_in"),
         ("checked_in", "charging"),
         ("charging", "completed"),
+        ("charging", "failed"),
     }
     transitions = set(zip(events["old_status"], events["new_status"], strict=False))
     invalid = transitions - allowed
@@ -120,9 +121,12 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         "charger_status_events",
         "demand_buckets",
         "availability_observations",
+        "waiting_time_observations",
+        "reliability_observations",
         "qa_latent_demand",
         "qa_latent_outages",
         "qa_latent_availability",
+        "qa_latent_port_profiles",
     }
     missing_tables = required_tables - set(tables)
     if missing_tables:
@@ -147,6 +151,9 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
     _require_foreign_keys(tables["chargers"], "business_id", tables["businesses"], "business_id")
     _require_foreign_keys(tables["chargers"], "zone_id", tables["zones"], "zone_id")
     _require_foreign_keys(tables["charger_ports"], "charger_id", tables["chargers"], "charger_id")
+    _require_foreign_keys(
+        tables["qa_latent_port_profiles"], "port_id", tables["charger_ports"], "port_id"
+    )
     _require_foreign_keys(
         tables["charger_ports"], "connector_type_id", tables["connector_types"], "connector_type_id"
     )
@@ -187,6 +194,16 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
     _require_foreign_keys(
         tables["charger_status_events"], "port_id", tables["charger_ports"], "port_id"
     )
+    for observation_table in ("waiting_time_observations", "reliability_observations"):
+        _require_foreign_keys(
+            tables[observation_table], "request_id", tables["charging_requests"], "request_id"
+        )
+        _require_foreign_keys(
+            tables[observation_table], "port_id", tables["charger_ports"], "port_id"
+        )
+        _require_foreign_keys(
+            tables[observation_table], "session_id", tables["charging_sessions"], "session_id"
+        )
 
     for table_name, identifier in (
         ("users", "user_id"),
@@ -201,6 +218,8 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         ("bookings", "booking_id"),
         ("charging_sessions", "session_id"),
         ("availability_observations", "observation_id"),
+        ("waiting_time_observations", "waiting_observation_id"),
+        ("reliability_observations", "reliability_observation_id"),
     ):
         _require_unique(tables[table_name], [identifier], table_name)
     _require_unique(tables["users"], ["email"], "users")
@@ -327,6 +346,11 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
     meter_delta = completed["meter_end_kwh"] - completed["meter_start_kwh"]
     if bool(((meter_delta - completed["energy_kwh"]).abs() > 0.002).any()):
         raise DatasetValidationError("session energy does not match auditable meter delta")
+    started = sessions[sessions["start_at"].notna()]
+    if bool(started["service_ready_at"].isna().any()):
+        raise DatasetValidationError("started sessions require a known service_ready_at")
+    if bool((started["start_at"] < started["service_ready_at"]).any()):
+        raise DatasetValidationError("charging cannot start before the port is service-ready")
     for soc_column in ("start_soc", "end_soc"):
         values = pd.to_numeric(sessions[soc_column], errors="coerce").dropna()
         if bool(((values < 0) | (values > 100)).any()):
@@ -356,6 +380,23 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         )
         if bool((latent_check["label"] != expected_labels).any()):
             raise DatasetValidationError("observed availability labels contradict latent QA truth")
+
+    waiting = tables["waiting_time_observations"]
+    known_waiting = waiting[waiting["label_known"] == 1]
+    if bool(known_waiting["label_wait_minutes"].isna().any()):
+        raise DatasetValidationError("known waiting labels cannot be null")
+    if bool((known_waiting["label_wait_minutes"] < 0).any()):
+        raise DatasetValidationError("waiting-time labels cannot be negative")
+    if bool((waiting["feature_cutoff"] > waiting["prediction_origin"]).any()):
+        raise DatasetValidationError("waiting-time features use future information")
+
+    reliability = tables["reliability_observations"]
+    if not set(reliability["label"].astype(str)).issubset(
+        {"reliable", "unreliable", "unknown"}
+    ):
+        raise DatasetValidationError("reliability label has an invalid state")
+    if bool((reliability["feature_cutoff"] > reliability["prediction_origin"]).any()):
+        raise DatasetValidationError("reliability features use future information")
 
     status_events = tables["charger_status_events"]
     if bool((status_events["ingested_at"] < status_events["observed_at"]).any()):

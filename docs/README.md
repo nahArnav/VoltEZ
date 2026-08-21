@@ -14,6 +14,7 @@ not belong in this directory.
 | Step 6 | `feature_engineering.md` | Point-in-time features and leakage prevention |
 | Step 7 | `experiment_readiness.md` | Independent seeds and evaluation-role isolation |
 | Step 8 | `rehearsal_results.md` | Five-world rehearsal measurements and next gates |
+| Step 9 | `model_training_handoff.md` | Models 3/4 data, final suite, and Model 1 training |
 
 The repository root `README.md` remains the short operational entry point. This index keeps the
 detailed engineering narrative discoverable without crowding the root.

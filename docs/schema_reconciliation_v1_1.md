@@ -2,7 +2,7 @@
 
 Status: approved design input, implementation contract for the ML branch
 Source: `VoltEZ_Database_Schema_v1_1.png`
-Applies from: synthetic generator v1.1 and feature view v1
+Applies from: synthetic generator v1.1, label definition v1.2, and feature view v2
 
 ## Why this reconciliation exists
 
@@ -30,6 +30,8 @@ contain `source_snapshot_id`. These are ML-lab lineage fields, not application c
 | Sessions | Add meter start/end readings and final amount | Allows energy and billing consistency checks |
 | Demand analytics | Add search, request, booking, session, unserved, and occupancy measures | Separates demand from fulfilled demand and capacity |
 | Availability labels | Use `available`, `unavailable`, or `unknown` explicitly | Unknown is a third state and is never coerced to unavailable |
+| Queue evidence | Add `queue_joined_at` and `service_ready_at` to charging sessions | Measures waiting without confusing setup delay or charger faults |
+| Service analytics | Add waiting-time and reliability observation tables | Keeps Models 3 and 4 labels explicit, auditable, and separate from availability |
 
 ## Two necessary additive application links
 
@@ -66,7 +68,7 @@ one physical append-only table viewed from two domains, not two database tables.
 
 ## ML-relevant v1.1 table groups
 
-The generator materializes the tables required to build and validate the first two models:
+The generator materializes the tables required to build and validate the first four models:
 
 - identity and compatibility: `users`, `vehicles`, `connector_types`, `vehicle_connectors`;
 - geography and hosts: `zones`, `businesses`, schedules, amenities, offers;
@@ -74,9 +76,10 @@ The generator materializes the tables required to build and validate the first t
 - demand and journey: `charging_requests`, `trips`, `trip_charger_options`,
   `recommendation_impressions`;
 - outcomes: `bookings`, `booking_events`, `charging_sessions`, `charger_status_events`;
-- analytics: `demand_buckets`, `availability_observations`, `context_events`;
+- analytics: `demand_buckets`, `availability_observations`, `waiting_time_observations`,
+  `reliability_observations`, `context_events`;
 - QA-only latent truth: tables prefixed `qa_latent_`.
 
 Payments, refunds, settlements, notifications, reviews, and audit events remain application
 tables but are not fabricated merely to increase row count. They can be added to a later
-end-to-end backend fixture generator and are not inputs to Models 1 or 2.
+end-to-end backend fixture generator and are not inputs to Models 1 through 4.

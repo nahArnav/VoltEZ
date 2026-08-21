@@ -345,6 +345,7 @@ Purpose: actual arrival, access, charging, and completion outcome.
 | `booking_id` | Nullable only for explicitly supported walk-ins |
 | `port_id`, `vehicle_id`, `user_id` | Explicit references |
 | `arrived_at`, `check_in_at` | Physical arrival and application check-in |
+| `queue_joined_at`, `service_ready_at` | Evidence for queue time without mixing in cable/setup delay |
 | `start_at`, `end_at` | Actual charging timeline |
 | `start_soc`, `end_soc` | Nullable validated percentages |
 | `energy_kwh` | Non-negative delivered energy |
@@ -354,7 +355,8 @@ Purpose: actual arrival, access, charging, and completion outcome.
 | `failure_reason` | Charger fault, access denied, metadata mismatch, payment, driver, or other controlled reason |
 | `created_at`, `updated_at` | Audit fields |
 
-These outcomes are essential for evaluating Model 2. Driver no-shows must not be counted as charger failures.
+These outcomes are essential for Models 2, 3, and 4. Driver no-shows must not be counted as
+charger failures, and congestion must not be presented as broken hardware.
 
 ### 4.19 `app.payments`
 
@@ -471,7 +473,31 @@ Fields:
 
 Unknown outcomes remain unknown and are excluded or handled explicitly. They are never silently converted to unavailable.
 
-### 5.3 `ml_lab.feature_snapshots`
+### 5.3 `analytics.waiting_time_observations`
+
+Purpose: observed queue outcomes for Model 3.
+
+Fields: `observation_id`, `request_id`, `booking_id`, `session_id`, `port_id`,
+`prediction_origin`, `feature_cutoff`, `target_arrival_at`, `actual_arrival_at`,
+`label_wait_minutes`, `label_known`, `label_source`, `label_observed_at`, `outcome`,
+`source_snapshot_id`.
+
+The label measures time until the port is service-ready. Charger faults remain unknown for the
+queue target rather than being converted into long waits.
+
+### 5.4 `analytics.reliability_observations`
+
+Purpose: verified service outcomes for Model 4.
+
+Fields: `observation_id`, `request_id`, `booking_id`, `session_id`, `port_id`,
+`prediction_origin`, `feature_cutoff`, `target_arrival_at`, `label`, `label_source`,
+`label_observed_at`, `failure_reason`, `source_snapshot_id`.
+
+Labels are reliable, unreliable, or unknown. Only completed charging and verified intrinsic
+charger failures become supervised truth. Queueing, driver behavior, and cancellations are not
+hardware-failure labels.
+
+### 5.5 `ml_lab.feature_snapshots`
 
 Purpose: immutable, reproducible model input rows.
 
@@ -479,7 +505,7 @@ Fields: `id`, `model_name`, `entity_type`, `entity_id`, `prediction_origin`, `ta
 
 JSONB may be used during the first prototype, but stable high-value features should eventually become typed columns or a versioned Parquet dataset.
 
-### 5.4 `ml_lab.ml_predictions`
+### 5.6 `ml_lab.ml_predictions`
 
 Purpose: audit every model or fallback result used by the application.
 
@@ -497,7 +523,7 @@ Fields:
 - `top_factors`
 - `latency_ms`
 
-### 5.5 `ml_lab.model_registry`
+### 5.7 `ml_lab.model_registry`
 
 Purpose: track champion, challenger, artifact identity, and rollback.
 
@@ -505,7 +531,7 @@ Fields: `model_name`, `version`, `stage`, `artifact_uri`, `artifact_sha256`, `fe
 
 Training a candidate never automatically changes the champion.
 
-### 5.6 `ml_lab.simulation_runs`
+### 5.8 `ml_lab.simulation_runs`
 
 Purpose: synthetic dataset lineage.
 

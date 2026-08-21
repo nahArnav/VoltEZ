@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import timedelta
 from typing import Any
 
@@ -100,6 +101,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
     settings = config.synthetic
     zone_rng = named_rng(config.project.seed, "static-zones")
     supply_rng = named_rng(config.project.seed, "static-supply")
+    port_health_rng = named_rng(config.project.seed, "latent-port-health")
     driver_rng = named_rng(config.project.seed, "static-drivers")
     dataset_start = pd.Timestamp(settings.start_date, tz=config.project.timezone)
     dataset_end = dataset_start + timedelta(days=settings.days)
@@ -266,6 +268,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
 
     chargers: list[dict[str, Any]] = []
     ports: list[dict[str, Any]] = []
+    latent_port_profiles: list[dict[str, Any]] = []
     parking_spaces: list[dict[str, Any]] = []
     tariffs: list[dict[str, Any]] = []
     business_by_id = {str(business["business_id"]): business for business in businesses}
@@ -320,6 +323,23 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
                     "max_power_kw": float(supply_rng.choice(power_options)),
                     "current_status": "unknown",
                     "last_seen_at": dataset_start,
+                    "simulation_run_id": run_id,
+                }
+            )
+            base_probability = float(
+                np.clip(config.synthetic.availability.base_operational_probability, 0.0001, 0.9999)
+            )
+            base_log_odds = math.log(base_probability / (1 - base_probability))
+            health_probability = 1 / (
+                1 + math.exp(-(base_log_odds + float(port_health_rng.normal(0, 0.75))))
+            )
+            latent_port_profiles.append(
+                {
+                    "port_id": port_id,
+                    "daily_operational_probability": round(health_probability, 6),
+                    "repair_duration_multiplier": round(
+                        float(port_health_rng.lognormal(mean=0.0, sigma=0.35)), 6
+                    ),
                     "simulation_run_id": run_id,
                 }
             )
@@ -473,6 +493,7 @@ def generate_static_entities(config: VoltEZConfig, run_id: str) -> dict[str, pd.
         "business_offers": pd.DataFrame(business_offers),
         "chargers": pd.DataFrame(chargers),
         "charger_ports": pd.DataFrame(ports),
+        "qa_latent_port_profiles": pd.DataFrame(latent_port_profiles),
         "parking_spaces": pd.DataFrame(parking_spaces),
         "availability_windows": pd.DataFrame(availability_windows),
         "tariffs": pd.DataFrame(tariffs),

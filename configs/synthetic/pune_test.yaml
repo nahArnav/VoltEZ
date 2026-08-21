@@ -36,6 +36,8 @@ synthetic:
     selection_probability: 0.78
     cancellation_probability: 0.08
     no_show_probability: 0.07
+    maximum_queue_wait_minutes: 25
+    session_duration_log_sigma: 0.35
 
   safeguards:
     maximum_generated_rows: 100000

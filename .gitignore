@@ -25,6 +25,7 @@ data/interim/
 data/processed/
 data/synthetic/
 data/rehearsals/
+data/final/
 artifacts/
 models/
 reports/figures/

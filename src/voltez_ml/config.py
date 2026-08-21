@@ -125,6 +125,8 @@ class FeatureSettings(StrictConfigModel):
     demand_ewm_span_buckets: int = Field(gt=1)
     demand_minimum_history_buckets: int = Field(gt=0)
     availability_history_hours: int = Field(gt=0)
+    waiting_history_hours: int = Field(gt=0)
+    reliability_history_days: int = Field(gt=0)
     reliability_prior_successes: float = Field(gt=0)
     reliability_prior_failures: float = Field(gt=0)
     cold_start_evidence_threshold: int = Field(gt=0)
@@ -174,6 +176,8 @@ class BehaviourSyntheticSettings(StrictConfigModel):
     selection_probability: float = Field(default=0.78, ge=0, le=1)
     cancellation_probability: float = Field(default=0.08, ge=0, le=1)
     no_show_probability: float = Field(default=0.07, ge=0, le=1)
+    maximum_queue_wait_minutes: int = Field(default=45, gt=0, le=180)
+    session_duration_log_sigma: float = Field(default=0.28, gt=0, le=1)
 
     @model_validator(mode="after")
     def validate_outcome_probabilities(self) -> BehaviourSyntheticSettings:

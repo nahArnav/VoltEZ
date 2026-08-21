@@ -157,12 +157,29 @@ def test_unknown_labels_are_retained_but_excluded_from_supervised_table(
     assert not bool((labeled["label"] == "unknown").any())
     assert len(labeled) == int((all_rows["label"] != "unknown").sum())
 
+    waiting_all = pd.read_parquet(features.table_paths["waiting_time_features_all"])
+    waiting_labeled = pd.read_parquet(features.table_paths["waiting_time_features_labeled"])
+    reliability_all = pd.read_parquet(features.table_paths["reliability_features_all"])
+    reliability_labeled = pd.read_parquet(
+        features.table_paths["reliability_features_labeled"]
+    )
+    assert len(waiting_labeled) == int((waiting_all["label_known"] == 1).sum())
+    assert not bool(waiting_labeled["label_wait_minutes"].isna().any())
+    assert bool((waiting_labeled["label_wait_minutes"] >= 0).all())
+    assert len(reliability_labeled) == int((reliability_all["label"] != "unknown").sum())
+    assert not bool((reliability_labeled["label"] == "unknown").any())
+
 
 def test_feature_sources_and_split_targets_are_strictly_causal(
     feature_fixture: tuple[GeneratedDataset, FeatureDataset, FeatureDataset],
 ) -> None:
     _, features, _ = feature_fixture
-    for table_name in ("demand_features", "availability_features_all"):
+    for table_name in (
+        "demand_features",
+        "availability_features_all",
+        "waiting_time_features_all",
+        "reliability_features_all",
+    ):
         frame = pd.read_parquet(features.table_paths[table_name])
         assert bool((frame["latest_source_time"] <= frame["prediction_origin"]).all())
         assert bool((frame["target_time"] > frame["prediction_origin"]).all())
@@ -186,6 +203,35 @@ def test_label_context_and_current_bucket_truth_are_not_features(
     assert "booking_state" not in availability.columns
     assert "port_status" not in availability.columns
     assert not any(column.startswith("latent_") for column in [*demand, *availability])
+
+
+def test_service_feature_labels_match_raw_observations(
+    feature_fixture: tuple[GeneratedDataset, FeatureDataset, FeatureDataset],
+) -> None:
+    generated, features, _ = feature_fixture
+    waiting = pd.read_parquet(features.table_paths["waiting_time_features_all"])
+    raw_waiting = _read_generated(generated, "waiting_time_observations")
+    checked_waiting = waiting.merge(
+        raw_waiting[["waiting_observation_id", "label_wait_minutes"]],
+        on="waiting_observation_id",
+        suffixes=("_feature", "_raw"),
+        validate="one_to_one",
+    )
+    pd.testing.assert_series_equal(
+        checked_waiting["label_wait_minutes_feature"],
+        checked_waiting["label_wait_minutes_raw"],
+        check_names=False,
+    )
+
+    reliability = pd.read_parquet(features.table_paths["reliability_features_all"])
+    raw_reliability = _read_generated(generated, "reliability_observations")
+    checked_reliability = reliability.merge(
+        raw_reliability[["reliability_observation_id", "label"]],
+        on="reliability_observation_id",
+        suffixes=("_feature", "_raw"),
+        validate="one_to_one",
+    )
+    assert bool((checked_reliability["label_feature"] == checked_reliability["label_raw"]).all())
 
 
 def test_feature_build_is_reproducible_and_reports_single_seed_limit(

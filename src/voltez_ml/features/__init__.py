@@ -1,4 +1,4 @@
-"""Point-in-time feature engineering for VoltEZ Models 1 and 2."""
+"""Point-in-time feature engineering for VoltEZ Models 1 through 4."""
 
 from voltez_ml.features.builder import FeatureDataset, build_feature_dataset
 

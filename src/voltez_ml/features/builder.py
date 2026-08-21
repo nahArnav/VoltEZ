@@ -15,6 +15,7 @@ from voltez_ml.config import VoltEZConfig
 from voltez_ml.features.audit import audit_feature_tables
 from voltez_ml.features.availability import build_availability_features
 from voltez_ml.features.demand import build_demand_features
+from voltez_ml.features.service import build_reliability_features, build_waiting_time_features
 from voltez_ml.features.splits import assign_purged_temporal_splits
 from voltez_ml.synthetic.io import (
     file_sha256,
@@ -37,6 +38,8 @@ REQUIRED_TABLES = {
     "recommendation_impressions",
     "demand_buckets",
     "availability_observations",
+    "waiting_time_observations",
+    "reliability_observations",
 }
 
 
@@ -153,19 +156,42 @@ def build_feature_dataset(
     run_roles = _manifest_run_roles(source_manifests)
     demand = build_demand_features(config, tables["demand_buckets"], tables["zones"])
     availability = build_availability_features(config, tables)
+    waiting_time = build_waiting_time_features(
+        config,
+        availability,
+        tables["waiting_time_observations"],
+    )
+    reliability = build_reliability_features(
+        availability,
+        tables["reliability_observations"],
+    )
     demand, demand_split_report = assign_purged_temporal_splits(
         demand, config.features.split, run_roles
     )
     availability, availability_split_report = assign_purged_temporal_splits(
         availability, config.features.split, run_roles
     )
+    waiting_time, waiting_split_report = assign_purged_temporal_splits(
+        waiting_time, config.features.split, run_roles
+    )
+    reliability, reliability_split_report = assign_purged_temporal_splits(
+        reliability, config.features.split, run_roles
+    )
     availability_labeled = availability[availability["label"] != "unknown"].reset_index(drop=True)
+    waiting_labeled = waiting_time[waiting_time["label_known"] == 1].reset_index(drop=True)
+    reliability_labeled = reliability[reliability["label"] != "unknown"].reset_index(drop=True)
     audit = audit_feature_tables(
         demand,
         availability,
         availability_labeled,
+        waiting_time,
+        waiting_labeled,
+        reliability,
+        reliability_labeled,
         demand_split_report,
         availability_split_report,
+        waiting_split_report,
+        reliability_split_report,
     )
     if audit["failures"]:
         raise FeatureAuditError("; ".join(str(value) for value in audit["failures"]))
@@ -192,6 +218,10 @@ def build_feature_dataset(
         "demand_features": demand,
         "availability_features_all": availability,
         "availability_features_labeled": availability_labeled,
+        "waiting_time_features_all": waiting_time,
+        "waiting_time_features_labeled": waiting_labeled,
+        "reliability_features_all": reliability,
+        "reliability_features_labeled": reliability_labeled,
     }
     table_metadata = write_tables(feature_tables, incomplete_dir)
     audit_path_incomplete = incomplete_dir / "audit_report.json"

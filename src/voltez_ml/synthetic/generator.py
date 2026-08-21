@@ -68,11 +68,14 @@ SORT_KEYS: dict[str, list[str]] = {
     "charger_status_events": ["observed_at", "status_event_id"],
     "demand_buckets": ["bucket_start", "zone_id"],
     "availability_observations": ["prediction_origin", "observation_id"],
+    "waiting_time_observations": ["prediction_origin", "waiting_observation_id"],
+    "reliability_observations": ["prediction_origin", "reliability_observation_id"],
     "qa_latent_demand": ["bucket_start", "zone_id"],
     "qa_latent_outages": ["start_at", "port_id"],
     "qa_latent_availability": ["observation_id"],
     "qa_latent_zones": ["zone_id"],
     "qa_latent_driver_profiles": ["user_id"],
+    "qa_latent_port_profiles": ["port_id"],
 }
 
 

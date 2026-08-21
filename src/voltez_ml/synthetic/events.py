@@ -177,6 +177,7 @@ def _generate_outages_and_initial_reports(
     config: VoltEZConfig,
     run_id: str,
     ports: pd.DataFrame,
+    latent_port_profiles: pd.DataFrame,
     scenario_lookup: dict[tuple[str, date], str],
 ) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     outage_rng = named_rng(config.project.seed, "outages")
@@ -184,8 +185,12 @@ def _generate_outages_and_initial_reports(
     outages: list[dict[str, Any]] = []
     reports: list[dict[str, Any]] = []
     dataset_start = pd.Timestamp(config.synthetic.start_date, tz=config.project.timezone)
+    health_lookup = {
+        str(row["port_id"]): row for row in _records(latent_port_profiles)
+    }
 
     for port in _records(ports):
+        health = health_lookup[str(port["port_id"])]
         initial_error = bool(
             report_rng.random() < config.synthetic.availability.owner_report_error_probability
         )
@@ -208,16 +213,19 @@ def _generate_outages_and_initial_reports(
         for day_offset in range(config.synthetic.days):
             local_date = config.synthetic.start_date + timedelta(days=day_offset)
             scenario = scenario_lookup[(str(port["zone_id"]), local_date)]
-            outage_probability = 1 - config.synthetic.availability.base_operational_probability
+            outage_probability = 1 - float(health["daily_operational_probability"])
             if scenario == "outage_cluster":
                 outage_probability = min(0.55, outage_probability + 0.35)
             if outage_rng.random() >= outage_probability:
                 continue
             day_start = pd.Timestamp(local_date, tz=config.project.timezone)
             outage_start = day_start + timedelta(minutes=int(outage_rng.integers(0, 24 * 60 - 30)))
+            repair_minutes = int(
+                outage_rng.integers(30, 241) * float(health["repair_duration_multiplier"])
+            )
             outage_end = min(
                 day_start + timedelta(days=1),
-                outage_start + timedelta(minutes=int(outage_rng.integers(30, 241))),
+                outage_start + timedelta(minutes=max(30, repair_minutes)),
             )
             outage_id = stable_id(run_id, "outage", f"{port['port_id']}:{local_date.isoformat()}")
             outages.append(
@@ -634,6 +642,20 @@ def _is_in_outage(
     )
 
 
+def _first_outage_start(
+    port_id: str,
+    start_at: pd.Timestamp,
+    end_at: pd.Timestamp,
+    outages_by_port: dict[str, list[dict[str, Any]]],
+) -> pd.Timestamp | None:
+    starts = [
+        pd.Timestamp(outage["start_at"])
+        for outage in outages_by_port.get(port_id, [])
+        if start_at < outage["start_at"] < end_at
+    ]
+    return min(starts) if starts else None
+
+
 def _simulate_sessions(
     config: VoltEZConfig,
     run_id: str,
@@ -691,14 +713,23 @@ def _simulate_sessions(
 
         port_id = str(booking["port_id"])
         arrival = booking["start_at"] + timedelta(minutes=int(rng.integers(-3, 9)))
-        prior_session_conflict = any(
-            session["start_at"] <= arrival < session["end_at"]
+        blocking_sessions = [
+            session
             for session in sessions_by_port[port_id]
+            if session["start_at"] <= arrival < session["end_at"]
+        ]
+        service_ready_at = max(
+            [arrival, *(pd.Timestamp(session["end_at"]) for session in blocking_sessions)]
         )
+        queue_wait_minutes = (service_ready_at - arrival).total_seconds() / 60
         outage_conflict = _is_in_outage(port_id, arrival, outages_by_port)
         session_id = stable_id(run_id, "session", len(sessions))
-        if prior_session_conflict or outage_conflict:
-            reason = "occupied_overrun" if prior_session_conflict else "charger_fault"
+        queue_too_long = (
+            bool(blocking_sessions)
+            and queue_wait_minutes > config.synthetic.behaviour.maximum_queue_wait_minutes
+        )
+        if outage_conflict or queue_too_long:
+            reason = "charger_fault" if outage_conflict else "occupied_overrun"
             booking["status"] = "cancelled"
             booking["cancelled_at"] = arrival
             booking_events.append(
@@ -723,6 +754,8 @@ def _simulate_sessions(
                     "user_id": booking["user_id"],
                     "arrived_at": arrival,
                     "check_in_at": arrival,
+                    "queue_joined_at": arrival,
+                    "service_ready_at": service_ready_at if queue_too_long else pd.NaT,
                     "start_at": pd.NaT,
                     "end_at": pd.NaT,
                     "start_soc": pd.NA,
@@ -740,10 +773,65 @@ def _simulate_sessions(
 
         port = port_lookup[port_id]
         vehicle = vehicle_lookup[str(booking["vehicle_id"])]
-        start = arrival + timedelta(minutes=int(rng.integers(1, 8)))
+        if _is_in_outage(port_id, service_ready_at, outages_by_port):
+            booking["status"] = "cancelled"
+            booking["cancelled_at"] = service_ready_at
+            booking_events.append(
+                {
+                    "booking_event_id": stable_id(run_id, "booking-event", f"{booking_id}:1"),
+                    "booking_id": booking_id,
+                    "old_status": "confirmed",
+                    "new_status": "cancelled",
+                    "actor_type": "system",
+                    "metadata": json.dumps({"reason": "charger_fault"}, sort_keys=True),
+                    "created_at": service_ready_at,
+                    "ingested_at": service_ready_at,
+                    "simulation_run_id": run_id,
+                }
+            )
+            sessions.append(
+                {
+                    "session_id": session_id,
+                    "booking_id": booking_id,
+                    "port_id": port_id,
+                    "vehicle_id": booking["vehicle_id"],
+                    "user_id": booking["user_id"],
+                    "arrived_at": arrival,
+                    "check_in_at": arrival,
+                    "queue_joined_at": arrival,
+                    "service_ready_at": service_ready_at,
+                    "start_at": pd.NaT,
+                    "end_at": pd.NaT,
+                    "start_soc": pd.NA,
+                    "end_soc": pd.NA,
+                    "energy_kwh": 0.0,
+                    "meter_start_kwh": pd.NA,
+                    "meter_end_kwh": pd.NA,
+                    "final_amount": 0.0,
+                    "status": "failed",
+                    "failure_reason": "charger_fault",
+                    "simulation_run_id": run_id,
+                }
+            )
+            continue
+
+        start = service_ready_at + timedelta(minutes=int(rng.integers(1, 8)))
         reserved_minutes = int((booking["end_at"] - booking["start_at"]).total_seconds() / 60)
-        actual_minutes = int(np.clip(reserved_minutes * rng.lognormal(-0.08, 0.22), 20, 210))
-        end = start + timedelta(minutes=actual_minutes)
+        planned_minutes = int(
+            np.clip(
+                reserved_minutes
+                * rng.lognormal(
+                    -0.08,
+                    config.synthetic.behaviour.session_duration_log_sigma,
+                ),
+                20,
+                210,
+            )
+        )
+        planned_end = start + timedelta(minutes=planned_minutes)
+        fault_at = _first_outage_start(port_id, start, planned_end, outages_by_port)
+        end = fault_at if fault_at is not None else planned_end
+        actual_minutes = max(1, int((end - start).total_seconds() / 60))
         max_vehicle_power = (
             float(vehicle["max_ac_kw"])
             if port["charging_type"] == "AC"
@@ -771,6 +859,8 @@ def _simulate_sessions(
             "user_id": booking["user_id"],
             "arrived_at": arrival,
             "check_in_at": arrival,
+            "queue_joined_at": arrival,
+            "service_ready_at": service_ready_at,
             "start_at": start,
             "end_at": end,
             "start_soc": round(start_soc, 2),
@@ -779,18 +869,19 @@ def _simulate_sessions(
             "meter_start_kwh": round(meter_start_kwh, 3),
             "meter_end_kwh": round(meter_end_kwh, 3),
             "final_amount": round(final_amount, 2),
-            "status": "completed",
-            "failure_reason": None,
+            "status": "failed" if fault_at is not None else "completed",
+            "failure_reason": "charger_fault_mid_session" if fault_at is not None else None,
             "simulation_run_id": run_id,
         }
         sessions.append(session)
         sessions_by_port[port_id].append(session)
-        booking["status"] = "completed"
+        booking["status"] = "failed" if fault_at is not None else "completed"
+        final_booking_state = "failed" if fault_at is not None else "completed"
         for sequence, (old_status, new_status, event_time) in enumerate(
             (
                 ("confirmed", "checked_in", arrival),
                 ("checked_in", "charging", start),
-                ("charging", "completed", end),
+                ("charging", final_booking_state, end),
             ),
             start=1,
         ):
@@ -809,10 +900,16 @@ def _simulate_sessions(
                     "simulation_run_id": run_id,
                 }
             )
-        for marker, event_time, status, source in (
+        session_status_events = [
             ("start", start, "occupied", "driver_check_in"),
-            ("end", end, "available", "driver_check_out"),
-        ):
+            (
+                "end",
+                end,
+                "faulted" if fault_at is not None else "available",
+                "system" if fault_at is not None else "driver_check_out",
+            ),
+        ]
+        for marker, event_time, status, source in session_status_events:
             status_reports.append(
                 {
                     "status_event_id": stable_id(
@@ -827,10 +924,18 @@ def _simulate_sessions(
                     "ingested_at": event_time + timedelta(seconds=30),
                     "expires_at": event_time
                     + timedelta(minutes=config.synthetic.availability.median_status_ttl_minutes),
-                    "evidence_type": "qr_check_in" if marker == "start" else "qr_check_out",
+                    "evidence_type": (
+                        "qr_check_in"
+                        if marker == "start"
+                        else "fault_diagnostic"
+                        if fault_at is not None
+                        else "qr_check_out"
+                    ),
                     "simulation_run_id": run_id,
                 }
             )
+        if fault_at is not None:
+            continue
         user_report_is_wrong = bool(
             report_rng.random() < config.synthetic.availability.user_report_error_probability
         )
@@ -1060,7 +1165,11 @@ def _availability_observations(
         if own_booking_id:
             own_booking = booking_lookup[str(own_booking_id)]
             selected_session = sessions_by_booking.get(str(own_booking_id))
-            if selected_session and selected_session["status"] == "completed" and latent_available:
+            if (
+                selected_session
+                and not pd.isna(selected_session["start_at"])
+                and latent_available
+            ):
                 label = "available"
                 label_source = "charging_session_start"
                 label_observed_at = selected_session["start_at"]
@@ -1151,6 +1260,108 @@ def _availability_observations(
     return pd.DataFrame(observations), pd.DataFrame(latent_rows)
 
 
+def _service_observations(
+    run_id: str,
+    snapshot_id: str,
+    requests: list[dict[str, Any]],
+    bookings: list[dict[str, Any]],
+    sessions: list[dict[str, Any]],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Create observed labels for queue waiting and intrinsic charger reliability."""
+
+    request_lookup = {str(row["request_id"]): row for row in requests}
+    booking_lookup = {str(row["booking_id"]): row for row in bookings}
+    waiting_rows: list[dict[str, Any]] = []
+    reliability_rows: list[dict[str, Any]] = []
+    for session in sessions:
+        booking = booking_lookup[str(session["booking_id"])]
+        request = request_lookup[str(booking["request_id"])]
+        origin = pd.Timestamp(request["requested_at"])
+        arrival = pd.Timestamp(session["check_in_at"])
+        ready_at = session.get("service_ready_at")
+        ready_timestamp = (
+            pd.Timestamp(ready_at) if ready_at is not None and not pd.isna(ready_at) else None
+        )
+        ready_known = ready_timestamp is not None
+        wait_minutes = (
+            max(0.0, (ready_timestamp - arrival).total_seconds() / 60)
+            if ready_timestamp is not None
+            else np.nan
+        )
+        waiting_rows.append(
+            {
+                "waiting_observation_id": stable_id(
+                    run_id, "waiting-observation", session["session_id"]
+                ),
+                "request_id": request["request_id"],
+                "booking_id": booking["booking_id"],
+                "session_id": session["session_id"],
+                "port_id": session["port_id"],
+                "prediction_origin": origin,
+                "feature_cutoff": origin,
+                "target_arrival_at": request["desired_start_at"],
+                "actual_arrival_at": arrival,
+                "label_wait_minutes": round(wait_minutes, 3) if ready_known else np.nan,
+                "label_known": int(ready_known),
+                "label_source": (
+                    "prior_session_checkout"
+                    if ready_known and wait_minutes > 0
+                    else "verified_arrival"
+                    if ready_known
+                    else None
+                ),
+                "label_observed_at": ready_timestamp if ready_timestamp is not None else pd.NaT,
+                "outcome": (
+                    "charging_started"
+                    if not pd.isna(session["start_at"])
+                    else "queue_abandoned"
+                    if session["failure_reason"] == "occupied_overrun"
+                    else "charger_fault"
+                ),
+                "source_snapshot_id": snapshot_id,
+                "simulation_run_id": run_id,
+            }
+        )
+
+        failure_reason = str(session.get("failure_reason") or "")
+        if session["status"] == "completed":
+            reliability_label = "reliable"
+            reliability_source = "completed_session"
+            reliability_observed_at = session["end_at"]
+        elif failure_reason.startswith("charger_fault"):
+            reliability_label = "unreliable"
+            reliability_source = "verified_charger_failure"
+            reliability_observed_at = (
+                session["end_at"] if not pd.isna(session["end_at"]) else session["check_in_at"]
+            )
+        else:
+            reliability_label = "unknown"
+            reliability_source = None
+            reliability_observed_at = session["check_in_at"]
+        reliability_rows.append(
+            {
+                "reliability_observation_id": stable_id(
+                    run_id, "reliability-observation", session["session_id"]
+                ),
+                "request_id": request["request_id"],
+                "booking_id": booking["booking_id"],
+                "session_id": session["session_id"],
+                "port_id": session["port_id"],
+                "prediction_origin": origin,
+                "feature_cutoff": origin,
+                "target_arrival_at": request["desired_start_at"],
+                "label": reliability_label,
+                "label_known": int(reliability_label != "unknown"),
+                "label_source": reliability_source,
+                "label_observed_at": reliability_observed_at,
+                "failure_reason": session.get("failure_reason"),
+                "source_snapshot_id": snapshot_id,
+                "simulation_run_id": run_id,
+            }
+        )
+    return pd.DataFrame(waiting_rows), pd.DataFrame(reliability_rows)
+
+
 def _interval_counts(
     intervals: list[dict[str, Any]],
     zone_by_port: dict[str, str],
@@ -1223,9 +1434,9 @@ def _demand_buckets(
     else:
         buckets["booking_count"] = 0
 
-    completed_sessions = [session for session in sessions if session["status"] == "completed"]
-    if completed_sessions:
-        session_frame = pd.DataFrame(completed_sessions)
+    started_sessions = [session for session in sessions if not pd.isna(session["start_at"])]
+    if started_sessions:
+        session_frame = pd.DataFrame(started_sessions)
         session_frame["zone_id"] = session_frame["port_id"].map(port_zone)
         session_frame["bucket_start"] = session_frame["start_at"].dt.floor(f"{bucket_minutes}min")
         session_counts = (
@@ -1256,7 +1467,7 @@ def _demand_buckets(
             "busy_start": session["start_at"],
             "busy_end": session["end_at"],
         }
-        for session in completed_sessions
+        for session in started_sessions
     ]
     busy = _interval_counts(busy_intervals, port_zone, "busy_start", "busy_end", bucket_minutes)
     if not busy.empty:
@@ -1323,7 +1534,11 @@ def generate_event_tables(
 
     context_events, scenario_lookup = _scenario_tables(config, run_id, static["zones"])
     outages, status_reports = _generate_outages_and_initial_reports(
-        config, run_id, _enriched_ports(static), scenario_lookup
+        config,
+        run_id,
+        _enriched_ports(static),
+        static["qa_latent_port_profiles"],
+        scenario_lookup,
     )
     latent_grid = _latent_demand_grid(
         config, run_id, static["zones"], static["qa_latent_zones"], scenario_lookup
@@ -1354,6 +1569,13 @@ def generate_event_tables(
         static,
         status_reports,
         snapshot_id,
+    )
+    waiting_time_observations, reliability_observations = _service_observations(
+        run_id,
+        snapshot_id,
+        requests,
+        bookings,
+        sessions,
     )
     demand_buckets = _demand_buckets(
         config,
@@ -1414,6 +1636,8 @@ def generate_event_tables(
         "charger_status_events": pd.DataFrame(status_reports),
         "demand_buckets": demand_buckets,
         "availability_observations": availability_observations,
+        "waiting_time_observations": waiting_time_observations,
+        "reliability_observations": reliability_observations,
         "qa_latent_demand": latent_grid,
         "qa_latent_outages": outages,
         "qa_latent_availability": latent_availability,

@@ -152,6 +152,7 @@ def build_availability_features(
     }
     demand_prefixes = _demand_prefixes(tables["demand_buckets"], config.time.bucket_minutes)
     history_window = pd.to_timedelta(config.features.availability_history_hours, unit="h")
+    reliability_window = pd.to_timedelta(config.features.reliability_history_days, unit="D")
 
     rows: list[dict[str, Any]] = []
     for observation in _records(tables["availability_observations"]):
@@ -192,6 +193,9 @@ def build_availability_features(
         active_elapsed_minutes = 0.0
         prior_successes = 0
         prior_failures = 0
+        reliability_successes = 0
+        reliability_charger_failures = 0
+        reliability_congestion_failures = 0
         latest_session_event: pd.Timestamp | None = None
         for session in sessions_by_port[port_id]:
             start_at = _timestamp(session.get("start_at"))
@@ -219,9 +223,29 @@ def build_availability_features(
                 prior_failures += 1
                 latest_session_event = max(latest_session_event or check_in_at, check_in_at)
 
+            outcome_at = end_at if end_at is not None else check_in_at
+            if outcome_at is not None and origin - reliability_window <= outcome_at <= origin:
+                latest_session_event = max(latest_session_event or outcome_at, outcome_at)
+                if session["status"] == "completed":
+                    reliability_successes += 1
+                elif session["status"] == "failed":
+                    failure_reason = str(session.get("failure_reason") or "")
+                    if failure_reason.startswith("charger_fault"):
+                        reliability_charger_failures += 1
+                    elif failure_reason == "occupied_overrun":
+                        reliability_congestion_failures += 1
+
         evidence_count = prior_successes + prior_failures
         smoothed_reliability = (prior_successes + config.features.reliability_prior_successes) / (
             evidence_count
+            + config.features.reliability_prior_successes
+            + config.features.reliability_prior_failures
+        )
+        charger_reliability_evidence = reliability_successes + reliability_charger_failures
+        smoothed_charger_reliability = (
+            reliability_successes + config.features.reliability_prior_successes
+        ) / (
+            charger_reliability_evidence
             + config.features.reliability_prior_successes
             + config.features.reliability_prior_failures
         )
@@ -291,6 +315,15 @@ def build_availability_features(
                 "reliability_evidence_count": evidence_count,
                 "smoothed_reliability": smoothed_reliability,
                 "cold_start": int(evidence_count < config.features.cold_start_evidence_threshold),
+                "prior_reliable_session_count": reliability_successes,
+                "prior_charger_failure_count": reliability_charger_failures,
+                "prior_congestion_failure_count": reliability_congestion_failures,
+                "charger_reliability_evidence_count": charger_reliability_evidence,
+                "smoothed_charger_reliability": smoothed_charger_reliability,
+                "reliability_cold_start": int(
+                    charger_reliability_evidence
+                    < config.features.cold_start_evidence_threshold
+                ),
                 "latest_status": str(latest_status["status"])
                 if latest_status is not None
                 else "unknown",

@@ -6,6 +6,8 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 
 1. Demand Forecasting
 2. Charger Availability Prediction
+3. Waiting-Time Prediction
+4. Charger Reliability Prediction
 
 ## Current stage
 
@@ -16,7 +18,10 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Point-in-time feature builder: implemented with chronological purging and leakage audits
 - Multi-seed experiment readiness gate: implemented; full data generation awaits approval
 - Five-world two-day rehearsal: passed; full-scale memory and class-support gates remain
-- Model training: not implemented yet
+- Model 3/4 synthetic labels and leakage-safe feature views: implemented and smoke-tested
+- Memory-safe five-world feature-suite builder: implemented
+- Model 1 local training/evaluation command: implemented; no production model has been fitted
+- Final 90-day data generation: requires a clean commit before materialization
 
 ## Local environment
 
@@ -57,6 +62,21 @@ Audit an approved five-world rehearsal without training:
 uv run voltez-audit-rehearsal --rehearsal-root data/rehearsals/step_08
 ```
 
+Build the canonical feature partitions sequentially after the five final source worlds exist:
+
+```bash
+uv run voltez-build-feature-suite \
+  --source-root data/final/pune_v1/raw \
+  --output-root data/final/pune_v1/features
+```
+
+Train Model 1 locally without unlocking the final test world:
+
+```bash
+uv run voltez-train-demand \
+  --feature-suite-manifest data/final/pune_v1/features/feature_suite_manifest.json
+```
+
 ## Project structure
 
 ```text
@@ -77,3 +97,4 @@ See `docs/feature_engineering.md` for every Step 6 leakage rule, feature, split,
 See `docs/experiment_readiness.md` for Step 7 seeds, evaluation isolation, M4 safeguards, and
 sponsor boundaries.
 See `docs/README.md` for the ordered documentation map and `docs/rehearsal_results.md` for Step 8.
+See `docs/model_training_handoff.md` for the final dataset, teammate handoff, and Model 1 commands.

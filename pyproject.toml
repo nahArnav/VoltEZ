@@ -1,7 +1,7 @@
 [project]
 name = "voltez-ml"
 version = "0.1.0"
-description = "VoltEZ demand forecasting and charger availability ML package"
+description = "VoltEZ demand, availability, waiting-time, and reliability ML package"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -20,6 +20,8 @@ voltez-generate = "voltez_ml.synthetic.cli:main"
 voltez-build-features = "voltez_ml.features.cli:main"
 voltez-plan-data = "voltez_ml.experiments.cli:main"
 voltez-audit-rehearsal = "voltez_ml.experiments.rehearsal_cli:main"
+voltez-build-feature-suite = "voltez_ml.features.suite_cli:main"
+voltez-train-demand = "voltez_ml.training.demand_cli:main"
 
 [dependency-groups]
 dev = [

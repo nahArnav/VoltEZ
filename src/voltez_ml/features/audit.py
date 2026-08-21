@@ -62,21 +62,31 @@ def audit_feature_tables(
     demand: pd.DataFrame,
     availability_all: pd.DataFrame,
     availability_labeled: pd.DataFrame,
+    waiting_all: pd.DataFrame,
+    waiting_labeled: pd.DataFrame,
+    reliability_all: pd.DataFrame,
+    reliability_labeled: pd.DataFrame,
     demand_split_report: dict[str, Any],
     availability_split_report: dict[str, Any],
+    waiting_split_report: dict[str, Any],
+    reliability_split_report: dict[str, Any],
 ) -> dict[str, Any]:
     """Return a JSON-ready audit and fail callers when a hard invariant is violated."""
 
     failures = [
         *_time_failures(demand, "demand_features"),
         *_time_failures(availability_all, "availability_features"),
+        *_time_failures(waiting_all, "waiting_time_features"),
+        *_time_failures(reliability_all, "reliability_features"),
         *_split_failures(demand, "demand_features"),
         *_split_failures(availability_labeled, "availability_features_labeled"),
+        *_split_failures(waiting_labeled, "waiting_time_features_labeled"),
+        *_split_failures(reliability_labeled, "reliability_features_labeled"),
     ]
     warnings: list[str] = []
     forbidden_columns = [
         column
-        for frame in (demand, availability_all)
+        for frame in (demand, availability_all, waiting_all, reliability_all)
         for column in frame.columns
         if column.startswith("latent_") or column.startswith("qa_latent_")
     ]
@@ -90,10 +100,16 @@ def audit_feature_tables(
         "horizon_minutes",
     ]
     availability_key = ["simulation_run_id", "observation_id"]
+    waiting_key = ["simulation_run_id", "waiting_observation_id"]
+    reliability_key = ["simulation_run_id", "reliability_observation_id"]
     if bool(demand.duplicated(demand_key).any()):
         failures.append("demand feature keys are not unique")
     if bool(availability_all.duplicated(availability_key).any()):
         failures.append("availability feature keys are not unique")
+    if bool(waiting_all.duplicated(waiting_key).any()):
+        failures.append("waiting-time feature keys are not unique")
+    if bool(reliability_all.duplicated(reliability_key).any()):
+        failures.append("reliability feature keys are not unique")
     if bool((demand["target_request_count"] < 0).any()):
         failures.append("demand target contains negative counts")
     if set(availability_all["label"].astype(str)) - {
@@ -107,6 +123,24 @@ def audit_feature_tables(
     expected_labeled = int((availability_all["label"] != "unknown").sum())
     if len(availability_labeled) != expected_labeled:
         failures.append("labeled availability output does not match known-label count")
+    if bool(waiting_labeled["label_wait_minutes"].isna().any()):
+        failures.append("known waiting-time rows contain null targets")
+    if bool((waiting_labeled["label_wait_minutes"] < 0).any()):
+        failures.append("waiting-time target contains negative minutes")
+    expected_waiting_labeled = int((waiting_all["label_known"] == 1).sum())
+    if len(waiting_labeled) != expected_waiting_labeled:
+        failures.append("labeled waiting-time output does not match known-label count")
+    if set(reliability_all["label"].astype(str)) - {
+        "reliable",
+        "unreliable",
+        "unknown",
+    }:
+        failures.append("reliability feature labels have an invalid state")
+    if bool((reliability_labeled["label"] == "unknown").any()):
+        failures.append("unknown reliability leaked into supervised rows")
+    expected_reliability_labeled = int((reliability_all["label"] != "unknown").sum())
+    if len(reliability_labeled) != expected_reliability_labeled:
+        failures.append("labeled reliability output does not match known-label count")
     for source_column in (
         "latest_booking_event_at",
         "latest_session_event_at",
@@ -138,11 +172,29 @@ def audit_feature_tables(
             "availability cross-seed holdout is unavailable; explicit train, validation, and "
             "test seed roles are required"
         )
+    if not waiting_split_report["cross_seed"]["available"]:
+        warnings.append(
+            "waiting-time cross-seed holdout is unavailable; explicit independent roles are "
+            "required"
+        )
+    if not reliability_split_report["cross_seed"]["available"]:
+        warnings.append(
+            "reliability cross-seed holdout is unavailable; explicit independent roles are "
+            "required"
+        )
     label_distribution = availability_labeled["label"].value_counts().to_dict()
     if len(label_distribution) < 2:
         warnings.append("availability supervised data contains only one class")
     elif min(label_distribution.values()) / sum(label_distribution.values()) < 0.05:
         warnings.append("availability minority class is below 5%; use class-aware evaluation")
+    reliability_distribution = reliability_labeled["label"].value_counts().to_dict()
+    if len(reliability_distribution) < 2:
+        warnings.append("reliability supervised data contains only one class")
+    elif min(reliability_distribution.values()) / sum(reliability_distribution.values()) < 0.05:
+        warnings.append("reliability minority class is below 5%; use class-aware evaluation")
+    positive_wait_rate = float((waiting_labeled["label_wait_minutes"] > 0).mean())
+    if positive_wait_rate < 0.01:
+        warnings.append("positive waiting-time labels are below 1%; the queue model is not ready")
 
     report = {
         "status": "failed" if failures else "passed_with_warnings" if warnings else "passed",
@@ -169,9 +221,32 @@ def audit_feature_tables(
             "missingness": _missingness(availability_all),
             "constant_columns": _constant_columns(availability_all),
         },
+        "waiting_time": {
+            "all_rows": len(waiting_all),
+            "labeled_rows": len(waiting_labeled),
+            "known_rate": float((waiting_all["label_known"] == 1).mean()),
+            "positive_wait_rate": positive_wait_rate,
+            "target_mean_minutes": float(waiting_labeled["label_wait_minutes"].mean()),
+            "target_p95_minutes": float(waiting_labeled["label_wait_minutes"].quantile(0.95)),
+            "rows_by_split": waiting_labeled["split"].value_counts().to_dict(),
+            "missingness": _missingness(waiting_all),
+            "constant_columns": _constant_columns(waiting_all),
+        },
+        "reliability": {
+            "all_rows": len(reliability_all),
+            "labeled_rows": len(reliability_labeled),
+            "unknown_rate": float((reliability_all["label"] == "unknown").mean()),
+            "label_distribution": reliability_distribution,
+            "rows_by_split": reliability_labeled["split"].value_counts().to_dict(),
+            "cold_start_rate": float(reliability_all["reliability_cold_start"].mean()),
+            "missingness": _missingness(reliability_all),
+            "constant_columns": _constant_columns(reliability_all),
+        },
         "splits": {
             "demand": demand_split_report,
             "availability": availability_split_report,
+            "waiting_time": waiting_split_report,
+            "reliability": reliability_split_report,
         },
     }
     return report

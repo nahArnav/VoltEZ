@@ -21,6 +21,10 @@ REQUIRED_FEATURE_TABLES = {
     "availability_features_all",
     "availability_features_labeled",
     "demand_features",
+    "waiting_time_features_all",
+    "waiting_time_features_labeled",
+    "reliability_features_all",
+    "reliability_features_labeled",
 }
 
 
@@ -169,8 +173,24 @@ def audit_rehearsal(rehearsal_root: Path) -> dict[str, Any]:
         failures.append("global supervised availability data must contain both classes")
     if bool((pd.to_numeric(demand["target_request_count"]) < 0).any()):
         failures.append("demand targets contain negative values")
-    if feature_audit.get("status") != "passed":
+    if feature_audit.get("status") not in {"passed", "passed_with_warnings"}:
         failures.append(f"feature builder audit status is {feature_audit.get('status')}")
+
+    waiting_all = tables["waiting_time_features_all"]
+    waiting_labeled = tables["waiting_time_features_labeled"]
+    reliability_all = tables["reliability_features_all"]
+    reliability_labeled = tables["reliability_features_labeled"]
+    if bool(waiting_labeled["label_wait_minutes"].isna().any()):
+        failures.append("known waiting-time rows contain null targets")
+    if bool((waiting_labeled["label_wait_minutes"] < 0).any()):
+        failures.append("waiting-time targets contain negative values")
+    if bool((reliability_labeled["label"] == "unknown").any()):
+        failures.append("unknown reliability labels entered the supervised table")
+    if float((waiting_labeled["label_wait_minutes"] > 0).mean()) < 0.01:
+        warnings.append("waiting-time positive queue support is below 1% in the rehearsal")
+    reliability_distribution = _value_counts(reliability_labeled["label"])
+    if len(reliability_distribution) < 2:
+        warnings.append("reliability rehearsal contains only one known class")
 
     unknown_rate = float((availability_all["label"] == "unknown").mean())
     cold_start_rate = float(availability_all["cold_start"].mean())
@@ -232,6 +252,17 @@ def audit_rehearsal(rehearsal_root: Path) -> dict[str, Any]:
         "availability_by_role": _availability_statistics(
             availability_all, availability_labeled
         ),
+        "waiting_time": {
+            "all_rows": len(waiting_all),
+            "labeled_rows": len(waiting_labeled),
+            "positive_wait_rate": float((waiting_labeled["label_wait_minutes"] > 0).mean()),
+            "mean_wait_minutes": float(waiting_labeled["label_wait_minutes"].mean()),
+        },
+        "reliability": {
+            "all_rows": len(reliability_all),
+            "labeled_rows": len(reliability_labeled),
+            "label_distribution": reliability_distribution,
+        },
     }
 
 
