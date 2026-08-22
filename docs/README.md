@@ -17,6 +17,8 @@ not belong in this directory.
 | Step 9 | `model_training_handoff.md` | Models 3/4 data, final suite, and Model 1 training |
 | Steps 10B–10C | `demand_evaluation.md` | 60-minute evaluation plus structural/context correction |
 | Steps 13B–13C | `demand_hurdle.md` | Poisson diagnosis and two-stage hurdle candidate |
+| Model 1 final | `model1_model_card.md` | Frozen champion, final metrics, limitations, and rollout |
+| Model 1 API | `model1_fastapi_integration.md` | Backend loading, request/response, fallback, and monitoring |
 
 The repository root `README.md` remains the short operational entry point. This index keeps the
 detailed engineering narrative discoverable without crowding the root.

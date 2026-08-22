@@ -20,11 +20,13 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Five-world 90-day Pune dataset: generated and ready for all four model tracks
 - Model 3/4 synthetic labels and leakage-safe feature views: implemented and smoke-tested
 - Memory-safe five-world feature-suite builder: implemented
-- Model 1 point-demand baseline: trained, validated, and published with the test still locked
+- Model 1 point-demand baseline: trained and published as a historical experiment
 - Step 10B evaluator and causal 60-minute rolling-demand experiment: published
 - Step 10C structural/world and context-feature correction: verified and published
-- Step 13B detailed Poisson evaluation: complete; final test world remains locked
-- Step 13C two-stage hurdle candidate: implemented and unit-tested, not trained on final data yet
+- Step 13B detailed pre-test Poisson evaluation: complete
+- Step 13C two-stage hurdle candidate: trained and evaluated as a challenger
+- Model 1 champion: selected, robustness-audited, locked-test evaluated once, and bundled for APIs
+- Model 1 deployment stage: synthetic-validated; real VoltEZ shadow monitoring is still required
 
 ## Local environment
 
@@ -107,6 +109,21 @@ uv run voltez-train-demand-hurdle-window \
   --forecast-lead-minutes 15
 ```
 
+Build and audit an application-facing feature contract without accessing the locked test:
+
+```bash
+uv run voltez-build-demand-contract \
+  --artifact-dir artifacts/demand_window_v3/<model-id> \
+  --feature-suite-manifest data/final/pune_v3/features/feature_suite_manifest.json \
+  --output reports/demand/v3/serving/feature_contract.json
+
+uv run voltez-audit-demand-serving \
+  --artifact-dir artifacts/demand_window_v3/<model-id> \
+  --feature-contract reports/demand/v3/serving/feature_contract.json \
+  --feature-suite-manifest data/final/pune_v3/features/feature_suite_manifest.json \
+  --output reports/demand/v3/serving/robustness_audit.json
+```
+
 ## Project structure
 
 ```text
@@ -116,6 +133,7 @@ src/voltez_ml/           Importable ML package
 tests/                   Automated tests
 data/                    Local generated data; ignored by Git
 artifacts/               Local model artifacts; ignored by Git
+models/                  Published immutable deployment bundles
 reports/                 Local generated reports; ignored by Git
 ```
 
@@ -130,3 +148,5 @@ See `docs/README.md` for the ordered documentation map and `docs/rehearsal_resul
 See `docs/model_training_handoff.md` for the final dataset, teammate handoff, and Model 1 commands.
 See `docs/demand_evaluation.md` for Step 10B evaluation logic and the 60-minute experiment.
 See `docs/demand_hurdle.md` for the Step 13C hurdle formula, parameter effects, and safeguards.
+See `docs/model1_model_card.md` for the frozen champion and honest real-world limitations.
+See `docs/model1_fastapi_integration.md` for the backend serving and monitoring contract.
