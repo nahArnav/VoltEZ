@@ -26,7 +26,7 @@ class AuthService:
         
         # 3. Swap the plain text password out for the hashed one
         user_data = user_in.model_dump(exclude={"password"})
-        user_data["hashed_password"] = hashed_pwd
+        user_data["password_hash"] = hashed_pwd
         
         # 4. Save to the database
         db_user = User(**user_data)
@@ -46,7 +46,7 @@ class AuthService:
             return None
             
         # 2. Verify the password matches the stored Argon2 hash
-        if not verify_password(password, user.hashed_password):
+        if not verify_password(password, user.password_hash):
             return None
             
         return user
