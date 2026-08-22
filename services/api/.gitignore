@@ -1,3 +1,15 @@
 venv/
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
 .env
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+*.db
+*.sqlite3
+alembic/versions/__pycache__/
