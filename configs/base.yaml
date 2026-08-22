@@ -32,7 +32,7 @@ data:
   output_format: parquet
   include_personal_data: false
   feature_view_version: v3
-  label_definition_version: v1.2
+  label_definition_version: v1.3
 
 features:
   demand_recent_windows_buckets: [1, 2, 4, 24]

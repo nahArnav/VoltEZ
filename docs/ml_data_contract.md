@@ -269,9 +269,12 @@ The ETA or scheduled arrival horizon is part of the model input because a port t
 - the port is operational;
 - the port is not occupied by an active session;
 - no valid booking or blocked interval prevents use;
-- observed evidence indicates the arriving driver could begin service within the defined availability tolerance.
+- observed evidence indicates the arriving driver could begin service within the configured
+  availability tolerance. The synthetic v1.3 default is 10 minutes, with the boundary included:
+  `service_ready_at <= target_arrival_at + 10 minutes`.
 
-`label = unavailable` when trustworthy reconstruction shows the port was unusable at target arrival.
+`label = unavailable` when trustworthy reconstruction shows the port could not become
+service-ready inside that tolerance.
 
 `label = unknown` when the real state cannot be reconstructed confidently.
 

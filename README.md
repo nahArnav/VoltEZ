@@ -14,7 +14,7 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Application database blueprint: complete as a design document
 - ML data contract: complete as a design document
 - Python project foundation: installed, locked, and verified on Apple M4
-- Synthetic generator v1.2: stable Pune structure plus independent dynamic worlds implemented
+- Synthetic generator v1.3: tolerance-aware availability truth plus independent worlds implemented
 - Point-in-time feature view v3: target-aligned history, known context, purging, and leakage audits
 - Multi-seed experiment readiness gate: implemented and passed on the final suite
 - Five-world 90-day Pune dataset: generated and ready for all four model tracks
@@ -27,6 +27,7 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Step 13C two-stage hurdle candidate: trained and evaluated as a challenger
 - Model 1 champion: selected, robustness-audited, locked-test evaluated once, and bundled for APIs
 - Model 1 deployment stage: synthetic-validated; real VoltEZ shadow monitoring is still required
+- Model 2 data stage: 10-minute service-readiness label correction in progress
 
 ## Model 1: Demand Forecasting
 

@@ -159,6 +159,7 @@ class AvailabilitySyntheticSettings(StrictConfigModel):
     owner_report_error_probability: float = Field(ge=0, le=1)
     user_report_error_probability: float = Field(ge=0, le=1)
     median_status_ttl_minutes: int = Field(gt=0)
+    availability_tolerance_minutes: int = Field(default=10, ge=0, le=60)
 
 
 class SupplySyntheticSettings(StrictConfigModel):

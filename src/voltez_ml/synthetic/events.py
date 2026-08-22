@@ -1090,6 +1090,55 @@ def _generate_trips_and_options(
     return pd.DataFrame(trips, columns=trip_columns), pd.DataFrame(options, columns=option_columns)
 
 
+def _verified_session_availability(
+    target: pd.Timestamp,
+    session: dict[str, Any],
+    tolerance_minutes: int,
+) -> tuple[str, str, pd.Timestamp, float] | None:
+    """Convert trustworthy session evidence into availability within the product tolerance."""
+
+    tolerance_end = target + timedelta(minutes=tolerance_minutes)
+    arrived_at = session.get("arrived_at")
+    if arrived_at is None or pd.isna(arrived_at):
+        raise ValueError("a session availability outcome requires actual arrival time")
+    if pd.Timestamp(arrived_at) > tolerance_end:
+        # A late driver cannot establish whether the port was usable near the promised ETA.
+        return None
+
+    start_at = session.get("start_at")
+    if start_at is not None and not pd.isna(start_at):
+        service_ready_at = session.get("service_ready_at")
+        if service_ready_at is None or pd.isna(service_ready_at):
+            raise ValueError("a started session must record when the port became service-ready")
+        within_tolerance = pd.Timestamp(service_ready_at) <= tolerance_end
+        return (
+            "available" if within_tolerance else "unavailable",
+            (
+                "verified_service_ready_within_tolerance"
+                if within_tolerance
+                else "verified_service_ready_after_tolerance"
+            ),
+            pd.Timestamp(start_at),
+            0.99,
+        )
+
+    if session.get("status") == "failed" and session.get("failure_reason") in {
+        "charger_fault",
+        "occupied_overrun",
+    }:
+        check_in_at = session.get("check_in_at")
+        if check_in_at is None or pd.isna(check_in_at):
+            raise ValueError("a verified pre-service failure must record check-in time")
+        return (
+            "unavailable",
+            "verified_check_in_failure",
+            pd.Timestamp(check_in_at),
+            0.98,
+        )
+
+    return None
+
+
 def _availability_observations(
     config: VoltEZConfig,
     run_id: str,
@@ -1151,12 +1200,13 @@ def _availability_observations(
             )
             for booking in bookings_by_port[port_id]
         )
-        latent_available = bool(
+        latent_available_at_target = bool(
             open_at_target
             and not outage_at_target
             and not conflicting_session
             and not conflicting_booking
         )
+        latent_available_within_tolerance = latent_available_at_target
         label = "unknown"
         label_source: str | None = None
         label_observed_at: pd.Timestamp | None = None
@@ -1165,26 +1215,18 @@ def _availability_observations(
         if own_booking_id:
             own_booking = booking_lookup[str(own_booking_id)]
             selected_session = sessions_by_booking.get(str(own_booking_id))
-            if (
-                selected_session
-                and not pd.isna(selected_session["start_at"])
-                and latent_available
-            ):
-                label = "available"
-                label_source = "charging_session_start"
-                label_observed_at = selected_session["start_at"]
-                label_confidence = 0.99
-                censoring_reason = None
-            elif (
-                selected_session and selected_session["status"] == "failed" and not latent_available
-            ):
-                label = "unavailable"
-                label_source = "verified_check_in_failure"
-                label_observed_at = selected_session["check_in_at"]
-                label_confidence = 0.98
-                censoring_reason = None
-            elif selected_session:
-                censoring_reason = "outcome_not_aligned_to_target_time"
+            if selected_session:
+                verified_outcome = _verified_session_availability(
+                    target,
+                    selected_session,
+                    config.synthetic.availability.availability_tolerance_minutes,
+                )
+                if verified_outcome is not None:
+                    label, label_source, label_observed_at, label_confidence = verified_outcome
+                    latent_available_within_tolerance = label == "available"
+                    censoring_reason = None
+                else:
+                    censoring_reason = "outcome_not_aligned_to_target_time"
             elif own_booking["status"] == "no_show":
                 censoring_reason = "driver_no_show"
             elif own_booking["status"] == "cancelled":
@@ -1201,7 +1243,7 @@ def _availability_observations(
                     strong_reports,
                     key=lambda report: abs((report["observed_at"] - target).total_seconds()),
                 )
-                label = "available" if latent_available else "unavailable"
+                label = "available" if latent_available_at_target else "unavailable"
                 label_source = "independent_status_evidence"
                 label_observed_at = strongest["ingested_at"]
                 label_confidence = float(strongest["confidence"])
@@ -1249,7 +1291,11 @@ def _availability_observations(
         latent_rows.append(
             {
                 "observation_id": observation_id,
-                "latent_available": latent_available,
+                "latent_available": latent_available_within_tolerance,
+                "latent_available_at_target": latent_available_at_target,
+                "availability_tolerance_minutes": (
+                    config.synthetic.availability.availability_tolerance_minutes
+                ),
                 "open_at_target": open_at_target,
                 "outage_at_target": outage_at_target,
                 "conflicting_session": conflicting_session,

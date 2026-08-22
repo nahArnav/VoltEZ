@@ -2,7 +2,8 @@
 
 Status: approved design input, implementation contract for the ML branch
 Source: `VoltEZ_Database_Schema_v1_1.png`
-Applies from: synthetic generator v1.1, label definition v1.2, and feature view v2
+Applies from: schema-compatible synthetic generators v1.1–v1.3, label definition v1.3, and
+feature view v3
 
 ## Why this reconciliation exists
 

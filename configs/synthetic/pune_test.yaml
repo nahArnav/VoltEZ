@@ -1,6 +1,6 @@
 synthetic:
   profile_name: pune_test
-  generator_version: v1.2
+  generator_version: v1.3
   start_date: 2026-01-01
   days: 2
   zone_count: 4
@@ -26,6 +26,7 @@ synthetic:
     owner_report_error_probability: 0.08
     user_report_error_probability: 0.04
     median_status_ttl_minutes: 30
+    availability_tolerance_minutes: 10
 
   supply:
     minimum_ports_per_charger: 1

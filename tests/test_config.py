@@ -16,6 +16,8 @@ def test_development_config_loads_expected_project_defaults() -> None:
     assert config.project.timezone == "Asia/Kolkata"
     assert config.time.bucket_minutes == 15
     assert config.time.demand_horizons_minutes == [15, 30, 60, 120, 360]
+    assert config.synthetic.availability.availability_tolerance_minutes == 10
+    assert config.data.label_definition_version == "v1.3"
     assert config.execution.device == "cpu"
 
 

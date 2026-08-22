@@ -234,18 +234,28 @@ This distinction lets Model 2 learn how report source and freshness affect confi
 
 ## 8. Availability label logic
 
-The simulator calculates hidden QA truth for every shown candidate:
+The simulator calculates exact hidden QA truth for every shown candidate:
 
 `available = open AND no outage AND no conflicting session AND no blocking booking`
 
-That hidden truth goes only to `qa_latent_availability`.
+That exact-time truth goes only to `qa_latent_availability`. For a selected driver with verified
+session evidence, v1.3 additionally applies the product tolerance:
+
+`available = service_ready_at <= target_arrival_at + availability_tolerance_minutes`
+
+The default is 10 minutes and equality is included. A port ready at exactly `ETA + 10 minutes` is
+available; one ready even a second later is unavailable. The model never receives
+`service_ready_at` as an input because it is future label evidence.
+
+A driver arriving after the tolerance cannot establish the port's state near the promised ETA, so
+that outcome remains `unknown` instead of blaming the port for driver lateness.
 
 The public training label follows evidence:
 
-- `available`: the selected driver successfully began charging at a target-consistent time, or
-  strong independent evidence supports
-  availability;
-- `unavailable`: a verified check-in failure shows the charger could not be used;
+- `available`: verified evidence shows the selected driver's port became service-ready inside the
+  tolerance, or strong independent evidence supports availability;
+- `unavailable`: verified evidence shows service readiness occurred after the tolerance, or a
+  trustworthy pre-service failure shows the charger could not be used;
 - `unknown`: the driver cancelled, did not arrive, arrived after the target state changed, or the
   unselected candidate lacks strong
   evidence.
@@ -332,6 +342,7 @@ Files prefixed `qa_latent_` are simulator testing truth. Training code must reje
 | `base_operational_probability` | Reduces outage frequency | Too high produces too few false labels |
 | owner/user report error | Adds incorrect reports | Too high makes reports unrealistic |
 | `median_status_ttl_minutes` | Keeps reports usable longer | Stale evidence may appear current |
+| `availability_tolerance_minutes` | Treats more short delays as available | Too high hides a poor arrival experience |
 | min/max ports per charger | Adds capacity per charger | Larger availability-window tables |
 | `recommendations_per_request` | Records more alternatives | Larger impression/observation tables |
 | `selection_probability` | Converts more searches into bookings | Can hide abandonment behavior |

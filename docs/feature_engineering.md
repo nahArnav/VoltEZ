@@ -1,6 +1,6 @@
 # VoltEZ Step 6 — Point-in-time feature engineering
 
-Status: v3 implemented locally; Step 10C source awaits approval to commit
+Status: v3 implemented and committed
 Models: Demand Forecasting and Charger Availability Prediction
 Schema input: v1.1
 
@@ -31,6 +31,10 @@ Each feature snapshot contains:
 
 Unknown availability rows remain available for coverage and censoring analysis. They are not
 silently changed to unavailable and are not copied into the supervised table.
+
+Availability label v1.3 treats a selected port as usable when verified service readiness occurs
+inside the configured 10-minute arrival tolerance. The future `service_ready_at` timestamp is
+label evidence only and never enters the feature columns.
 
 ## 3. Demand model row
 

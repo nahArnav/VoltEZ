@@ -148,7 +148,7 @@ def test_demand_buckets_reconcile_without_double_counting_searches(
     assert bool(demand["occupancy_rate"].between(0, 1).all())
 
 
-def test_known_availability_labels_match_exact_target_truth(
+def test_known_availability_labels_match_tolerance_aware_truth(
     generated_pair: tuple[GeneratedDataset, GeneratedDataset],
 ) -> None:
     result, _ = generated_pair
