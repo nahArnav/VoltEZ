@@ -12,6 +12,7 @@ class BookingStatus(str, enum.Enum):
     CONFIRMED = "CONFIRMED"
     CANCELLED = "CANCELLED"
     EXPIRED = "EXPIRED"
+    FAILED = "FAILED"
     NO_SHOW = "NO_SHOW"
     CHECKED_IN = "CHECKED_IN"
     CHARGING = "CHARGING"

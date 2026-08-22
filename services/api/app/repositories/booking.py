@@ -4,7 +4,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.base import BaseRepository
-from app.models.booking import Booking
+from app.models.booking import Booking, BookingStatus
 from app.models.availability_window import AvailabilityWindow
 from app.schemas.booking import BookingCreate, BookingStatusUpdate
 from app.schemas.availability_window import AvailabilityWindowCreate, AvailabilityWindowUpdate
@@ -21,7 +21,14 @@ class RepositoryBooking(BaseRepository[Booking, BookingCreate, BookingStatusUpda
                 and_(
                     Booking.port_id == port_id,
                     Booking.end_at > current_time,
-                    Booking.status.in_(["pending", "confirmed", "active"])
+                    Booking.status.in_([
+                        BookingStatus.PENDING,
+                        BookingStatus.HELD,
+                        BookingStatus.PAYMENT_PENDING,
+                        BookingStatus.CONFIRMED,
+                        BookingStatus.CHECKED_IN,
+                        BookingStatus.CHARGING,
+                    ])
                 )
             )
         )
