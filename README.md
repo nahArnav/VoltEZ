@@ -87,6 +87,40 @@ The bundle contains the clean model, hash-verified manifest, evaluation report, 
 contract, and deployment metadata. Missing status, unseen categories, major distribution shift, or
 mid-band probability produces `unknown` rather than an unsafe guess.
 
+### Model 2 logic and verification
+
+Model 2 treats `unavailable` as the positive class. Its most influential signals are the latest
+port status, driver ETA, status age, active-session duration, connector type, reliability history,
+nearby bookings, time of day, and time remaining before the host closes. It does not use entity IDs,
+future session outcomes, final booking state, label metadata, or locked-test information.
+
+The backend remains authoritative for hard facts. It first rejects incompatible connectors, closed
+or unverified hosts, missing availability windows, known faults, and overlapping bookings. Only an
+eligible candidate reaches the classifier. Histogram gradient boosting learns nonlinear
+interactions between the 35 point-in-time features; Platt calibration then converts its raw score
+into an estimated probability of unavailability.
+
+Two thresholds turn that probability into a safe application decision:
+
+| Probability of unavailability | API decision | Meaning |
+|---|---|---|
+| `<= 0.1674` | `available` | Validation risk of being wrong is at most the selected 5% target |
+| `0.1674 - 0.4385` | `unknown` | Evidence is not strong enough for either binary claim |
+| `>= 0.4385` | `unavailable` | Selected validation precision is at least the 60% target |
+
+Verification used 35,276 rows from an independent validation world and 37,452 rows from a separate
+stress world. Model 2 beat the always-available, prevalence, fresh-status, and logistic-regression
+baselines; achieved ROC-AUC `0.803/0.809` and PR-AUC `0.327/0.335`; kept calibration error below
+`0.007`; and passed all seven frozen development gates. The published artifact records clean commit
+`7ad207a`, verifies its SHA-256 before loading, and was exercised through the same Pydantic predictor
+used by FastAPI. The repository currently has 112 passing tests, including schema drift, timestamp
+consistency, batch consistency, unknown status, unseen category, and abstention behavior.
+
+This is development and serving verification, not proof from live traffic. Roughly 31% of
+validation/stress cases become `unknown`, and explicit `unavailable` recall is about 4.2% because
+the current policy favors precision and user safety. The locked test remains unopened, and the
+bundle must run in shadow mode on real VoltEZ events before production promotion.
+
 ## Local environment
 
 The project uses Python 3.12 and `uv` for a reproducible local environment.
@@ -229,3 +263,6 @@ See `docs/model1_model_card.md` for the frozen champion and honest real-world li
 See `docs/model1_fastapi_integration.md` for the backend serving and monitoring contract.
 See `docs/model2_availability_training.md` for Model 2 logic, calibration, metrics, and parameters.
 See `docs/backend_fastapi_handoff.md` for the current Backend-branch FastAPI integration contract.
+See the [Models 1 and 2 logical analysis PDF](output/pdf/VoltEZ_Models_1_and_2_Logical_Analysis.pdf)
+for a visual, builder-friendly explanation of both models, their data, evaluation, integration,
+monitoring, and limitations.

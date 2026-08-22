@@ -21,6 +21,7 @@ not belong in this directory.
 | Model 1 API | `model1_fastapi_integration.md` | Backend loading, request/response, fallback, and monitoring |
 | Model 2 training | `model2_availability_training.md` | Hybrid decision boundary, calibration, metrics, and local command |
 | FastAPI handoff | `backend_fastapi_handoff.md` | Exact Model 1/2 integration contract for the Backend branch |
+| Two-model analysis | `../output/pdf/VoltEZ_Models_1_and_2_Logical_Analysis.pdf` | Visual explanation of Model 1 and Model 2 logic, evidence, and deployment |
 
 The repository root `README.md` remains the short operational entry point. This index keeps the
 detailed engineering narrative discoverable without crowding the root.
