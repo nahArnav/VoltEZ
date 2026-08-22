@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, UUID, func
 from sqlalchemy.orm import Mapped, mapped_column
-from database.base import Base
+from database.base_class import Base
 
 
 class Vehicle(Base):

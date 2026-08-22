@@ -1,8 +1,4 @@
-from sqlalchemy.orm import DeclarativeBase
-
-
-class Base(DeclarativeBase):
-    pass
+from database.base_class import Base
 
 from database.models.user import User  # noqa: E402,F401
 from database.models.connector import ConnectorType  # noqa: E402,F401
@@ -14,3 +10,4 @@ from database.models.business_hours import BusinessHours  # noqa: E402,F401
 from database.models.business_hour_exception import BusinessHourException  # noqa: E402,F401
 from database.models.amenity import Amenity  # noqa: E402,F401
 from database.models.business_amenity import BusinessAmenity  # noqa: E402,F401
+from database.models.charger import Charger  # noqa: E402,F401

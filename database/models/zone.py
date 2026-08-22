@@ -5,7 +5,7 @@ from sqlalchemy import Boolean, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from database.base import Base
+from database.base_class import Base
 
 
 class Zone(Base):

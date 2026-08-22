@@ -8,6 +8,7 @@ from database.models.business_hours import BusinessHours
 from database.models.business_hour_exception import BusinessHourException
 from database.models.amenity import Amenity
 from database.models.business_amenity import BusinessAmenity
+from database.models.charger import Charger
 
 
 __all__ = [
