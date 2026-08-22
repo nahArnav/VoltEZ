@@ -30,6 +30,8 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Model 2 data stage: v1.3 correction and five-world Pune v4 feature suite complete
 - Model 2 training stage: clean calibrated classifier and FastAPI-ready shadow bundle published;
   locked test remains closed
+- Supporting Model 5 design: route-energy physics baseline, reachability policy, data contract,
+  synthetic requirements, and evaluation gates implemented; no training performed
 
 ## Model 1: Demand Forecasting
 
@@ -120,6 +122,30 @@ This is development and serving verification, not proof from live traffic. Rough
 validation/stress cases become `unknown`, and explicit `unavailable` recall is about 4.2% because
 the current policy favors precision and user safety. The locked test remains unopened, and the
 bundle must run in shadow mode on real VoltEZ events before production promotion.
+
+## Supporting Model 5: Route-Energy Prediction
+
+Step 1 is design-only and contains no trained ML artifact. It defines an auditable force/energy
+baseline, conservative reachability decisions, a route-snapshot dataset contract, hidden
+segment-level synthetic truth requirements, leakage rules, and evaluation gates. The planned model
+predicts residual error around physics rather than relearning basic physical laws.
+
+```python
+from voltez_ml.route_energy import (
+    RoutePhysicsInput,
+    VehiclePhysicsInput,
+    assess_reachability,
+    estimate_physics_energy,
+)
+```
+
+The physics fallback accounts for rolling resistance, aerodynamic drag, climbing, stop-start
+losses, auxiliary load, drivetrain efficiency, and bounded downhill regeneration. Reachability uses
+conservative P90 energy and the driver's reserve SOC; expected energy alone is not treated as a
+safety guarantee.
+
+See [the complete Step 1 design](docs/model5_route_energy_design.md) and the machine-readable
+contract at [`configs/model_specs/route_energy_v1.yaml`](configs/model_specs/route_energy_v1.yaml).
 
 ## Local environment
 
