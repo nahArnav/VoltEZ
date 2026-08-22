@@ -254,6 +254,42 @@ def _evaluate_role(
     }
 
 
+def _hurdle_stage_diagnostics(
+    model: Any,
+    matrix: pd.DataFrame,
+    truth: NDArray[np.float64],
+    expected_prediction: NDArray[np.float64],
+) -> dict[str, Any] | None:
+    """Expose both hurdle stages while preserving generic estimator support."""
+
+    if not hasattr(model, "predict_nonzero_probability") or not hasattr(
+        model, "predict_positive_mean"
+    ):
+        return None
+    probability = np.asarray(model.predict_nonzero_probability(matrix), dtype="float64")
+    positive_mean = np.asarray(model.predict_positive_mean(matrix), dtype="float64")
+    if probability.shape != truth.shape or positive_mean.shape != truth.shape:
+        raise ValueError("hurdle stage predictions do not match the evaluation target")
+    positive = truth > 0
+    occurrence = positive.astype("int8")
+    return {
+        "occurrence": {
+            **_nonzero_detection(truth, probability),
+            "probability_mean": float(probability.mean()),
+            "brier_score": float(np.mean((probability - occurrence) ** 2)),
+        },
+        "positive_count": _diagnostic_metrics(truth[positive], positive_mean[positive]),
+        "positive_mean_distribution": {
+            "mean": float(positive_mean.mean()),
+            "min": float(positive_mean.min()),
+            "max": float(positive_mean.max()),
+        },
+        "formula_integrity_max_absolute_error": float(
+            np.max(np.abs(expected_prediction - probability * positive_mean))
+        ),
+    }
+
+
 def evaluate_demand_model(
     artifact_dir: Path,
     suite_manifest_path: Path,
@@ -295,10 +331,18 @@ def evaluate_demand_model(
         missing = set(features) - set(frame.columns)
         if missing:
             raise ValueError(f"{role} is missing model features: {sorted(missing)}")
-        prediction = np.clip(
-            model.predict(frame[features].astype("float32")), 0.0, None
+        matrix = frame[features].astype("float32")
+        prediction = np.clip(model.predict(matrix), 0.0, None)
+        role_report = _evaluate_role(frame, baseline, prediction)
+        hurdle_stages = _hurdle_stage_diagnostics(
+            model,
+            matrix,
+            frame[TARGET].to_numpy(dtype="float64"),
+            prediction,
         )
-        role_reports[role] = _evaluate_role(frame, baseline, prediction)
+        if hurdle_stages is not None:
+            role_report["hurdle_stages"] = hurdle_stages
+        role_reports[role] = role_report
         if role == "validation":
             validation_frame = frame.assign(prediction=prediction)
 

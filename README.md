@@ -22,7 +22,9 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Memory-safe five-world feature-suite builder: implemented
 - Model 1 point-demand baseline: trained, validated, and published with the test still locked
 - Step 10B evaluator and causal 60-minute rolling-demand experiment: published
-- Step 10C structural/world and context-feature correction: implemented locally, verification in progress
+- Step 10C structural/world and context-feature correction: verified and published
+- Step 13B detailed Poisson evaluation: complete; final test world remains locked
+- Step 13C two-stage hurdle candidate: implemented and unit-tested, not trained on final data yet
 
 ## Local environment
 
@@ -96,6 +98,15 @@ uv run voltez-evaluate-demand \
   --include-train
 ```
 
+After explicit training approval, train the directly comparable hurdle candidate:
+
+```bash
+uv run voltez-train-demand-hurdle-window \
+  --feature-suite-manifest data/final/pune_v3/features/feature_suite_manifest.json \
+  --window-minutes 60 \
+  --forecast-lead-minutes 15
+```
+
 ## Project structure
 
 ```text
@@ -118,3 +129,4 @@ sponsor boundaries.
 See `docs/README.md` for the ordered documentation map and `docs/rehearsal_results.md` for Step 8.
 See `docs/model_training_handoff.md` for the final dataset, teammate handoff, and Model 1 commands.
 See `docs/demand_evaluation.md` for Step 10B evaluation logic and the 60-minute experiment.
+See `docs/demand_hurdle.md` for the Step 13C hurdle formula, parameter effects, and safeguards.
