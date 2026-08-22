@@ -27,7 +27,8 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Step 13C two-stage hurdle candidate: trained and evaluated as a challenger
 - Model 1 champion: selected, robustness-audited, locked-test evaluated once, and bundled for APIs
 - Model 1 deployment stage: synthetic-validated; real VoltEZ shadow monitoring is still required
-- Model 2 data stage: 10-minute service-readiness label correction in progress
+- Model 2 data stage: v1.3 correction and five-world Pune v4 feature suite complete
+- Model 2 training stage: calibrated classifier development implemented; locked test remains closed
 
 ## Model 1: Demand Forecasting
 
@@ -132,6 +133,15 @@ uv run voltez-evaluate-demand \
   --include-train
 ```
 
+Train Model 2 with two-world calibration, validation thresholds, and stress evaluation without
+opening the locked test:
+
+```bash
+uv run voltez-train-availability \
+  --feature-suite-manifest data/final/pune_v4/features/feature_suite_manifest.json \
+  --output-root artifacts/availability
+```
+
 After explicit training approval, train the directly comparable hurdle candidate:
 
 ```bash
@@ -182,3 +192,4 @@ See `docs/demand_evaluation.md` for Step 10B evaluation logic and the 60-minute 
 See `docs/demand_hurdle.md` for the Step 13C hurdle formula, parameter effects, and safeguards.
 See `docs/model1_model_card.md` for the frozen champion and honest real-world limitations.
 See `docs/model1_fastapi_integration.md` for the backend serving and monitoring contract.
+See `docs/model2_availability_training.md` for Model 2 logic, calibration, metrics, and parameters.

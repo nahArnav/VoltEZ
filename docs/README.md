@@ -19,6 +19,7 @@ not belong in this directory.
 | Steps 13B–13C | `demand_hurdle.md` | Poisson diagnosis and two-stage hurdle candidate |
 | Model 1 final | `model1_model_card.md` | Frozen champion, final metrics, limitations, and rollout |
 | Model 1 API | `model1_fastapi_integration.md` | Backend loading, request/response, fallback, and monitoring |
+| Model 2 training | `model2_availability_training.md` | Hybrid decision boundary, calibration, metrics, and local command |
 
 The repository root `README.md` remains the short operational entry point. This index keeps the
 detailed engineering narrative discoverable without crowding the root.
