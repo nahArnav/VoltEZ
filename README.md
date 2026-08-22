@@ -28,7 +28,8 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Model 1 champion: selected, robustness-audited, locked-test evaluated once, and bundled for APIs
 - Model 1 deployment stage: synthetic-validated; real VoltEZ shadow monitoring is still required
 - Model 2 data stage: v1.3 correction and five-world Pune v4 feature suite complete
-- Model 2 training stage: calibrated classifier development implemented; locked test remains closed
+- Model 2 training stage: clean calibrated classifier and FastAPI-ready shadow bundle published;
+  locked test remains closed
 
 ## Model 1: Demand Forecasting
 
@@ -60,6 +61,31 @@ uses a seasonal fallback when too many values fall outside training experience.
 
 See the [complete model card](docs/model1_model_card.md) and
 [FastAPI integration handoff](docs/model1_fastapi_integration.md).
+
+## Model 2: Charger Availability Prediction
+
+Model 2 estimates the calibrated probability that a specific charger port will be unavailable at
+the driver's ETA. Deterministic backend eligibility gates run first; the model then returns one of
+`available`, `unknown`, or `unavailable` so uncertain data is never silently treated as available.
+
+| Item | Current value |
+|---|---|
+| Bundle | [`voltez-availability-pune-v1`](models/availability/voltez-availability-pune-v1/) |
+| Model ID | `availability-hgb-calibrated-97315b1cdaf67db4` |
+| Algorithm | Histogram gradient boosting + out-of-world Platt calibration |
+| Model SHA-256 | `3813d8867eb9042c3931e63cae2e882d2b28311797f5e466a6d49b87fea35e82` |
+| Training rows | 70,551 from two independent Pune worlds |
+| Feature count | 35 causal, point-in-time features |
+| Validation ROC-AUC / PR-AUC | **0.803 / 0.327** |
+| Stress ROC-AUC / PR-AUC | **0.809 / 0.335** |
+| Unsafe available rate | **4.95% validation / 4.77% stress** |
+| Accuracy when a binary decision is made | **94.65% validation / 94.67% stress** |
+| Locked test | Closed and never accessed |
+| Deployment stage | `shadow` pending real traffic and final-test approval |
+
+The bundle contains the clean model, hash-verified manifest, evaluation report, strict 35-feature
+contract, and deployment metadata. Missing status, unseen categories, major distribution shift, or
+mid-band probability produces `unknown` rather than an unsafe guess.
 
 ## Local environment
 
@@ -142,6 +168,15 @@ uv run voltez-train-availability \
   --output-root artifacts/availability
 ```
 
+Build Model 2's backend feature contract from training worlds only:
+
+```bash
+uv run voltez-build-availability-contract \
+  --artifact-dir artifacts/availability/<model-id> \
+  --feature-suite-manifest data/final/pune_v4/features/feature_suite_manifest.json \
+  --output artifacts/availability/<model-id>/feature_contract.json
+```
+
 After explicit training approval, train the directly comparable hurdle candidate:
 
 ```bash
@@ -193,3 +228,4 @@ See `docs/demand_hurdle.md` for the Step 13C hurdle formula, parameter effects, 
 See `docs/model1_model_card.md` for the frozen champion and honest real-world limitations.
 See `docs/model1_fastapi_integration.md` for the backend serving and monitoring contract.
 See `docs/model2_availability_training.md` for Model 2 logic, calibration, metrics, and parameters.
+See `docs/backend_fastapi_handoff.md` for the current Backend-branch FastAPI integration contract.

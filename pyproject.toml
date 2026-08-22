@@ -27,6 +27,7 @@ voltez-train-demand-hurdle-window = "voltez_ml.training.demand_hurdle_cli:main"
 voltez-train-availability = "voltez_ml.training.availability_cli:main"
 voltez-evaluate-demand = "voltez_ml.evaluation.demand_cli:main"
 voltez-build-demand-contract = "voltez_ml.serving.demand_contract_cli:main"
+voltez-build-availability-contract = "voltez_ml.serving.availability_contract_cli:main"
 voltez-audit-demand-serving = "voltez_ml.serving.demand_audit_cli:main"
 voltez-promote-demand-model = "voltez_ml.serving.promotion_cli:main"
 
