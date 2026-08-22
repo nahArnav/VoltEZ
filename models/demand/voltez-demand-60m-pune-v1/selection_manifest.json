@@ -1,0 +1,66 @@
+{
+  "selection_status": "frozen_before_locked_test",
+  "selected_at": "2026-08-22T00:00:00+05:30",
+  "model_family": "demand_forecasting_rolling_window",
+  "champion": {
+    "model_id": "demand-window-60m-hgbr-bdb1d74f9ce09d73",
+    "artifact_sha256": "82418d51b203e4a7b8e4e7fe94133700c393ddbd80564e59696855197fba5e29",
+    "algorithm": "HistGradientBoostingRegressor(loss=poisson)",
+    "settings": {
+      "learning_rate": 0.05,
+      "max_iter": 250,
+      "max_leaf_nodes": 31,
+      "l2_regularization": 0.2,
+      "random_seed": 20260821
+    },
+    "target": {
+      "window_minutes": 60,
+      "forecast_lead_minutes": 15,
+      "bucket_minutes": 15
+    },
+    "validation": {
+      "mae": 0.7419696557385349,
+      "rmse": 0.9939090253227315,
+      "wape": 0.8254227974530448,
+      "mean_poisson_deviance": 1.0820726626103432
+    },
+    "stress": {
+      "mae": 0.7561751779239104,
+      "rmse": 1.0100492638934162,
+      "wape": 0.8066575283650871,
+      "mean_poisson_deviance": 1.0869524822954606
+    }
+  },
+  "selection_rule": {
+    "primary_metric": "validation_mae",
+    "minimum_practical_relative_improvement": 0.005,
+    "requirements": [
+      "no material stress regression",
+      "no material peak-band regression",
+      "locked test unavailable during selection",
+      "serving robustness audit must pass"
+    ]
+  },
+  "challengers": {
+    "hurdle_default": {
+      "validation_mae": 0.7415895611244616,
+      "validation_rmse": 0.9943085180926017,
+      "stress_mae": 0.7561610007340117,
+      "stress_rmse": 1.0109936308836858,
+      "decision": "rejected: 0.05% MAE gain is below the 0.5% practical threshold and RMSE/peak behavior worsened"
+    },
+    "poisson_slow_regularized": {
+      "validation_mae": 0.7418647235587736,
+      "validation_rmse": 0.9939417899768241,
+      "stress_mae": 0.7560548977441658,
+      "stress_rmse": 1.0099977175828518,
+      "decision": "rejected: 0.014% MAE gain is below the practical threshold and peak behavior did not improve"
+    },
+    "poisson_larger_tree_candidates": {
+      "decision": "rejected: validation MAE, RMSE, WAPE, and deviance worsened"
+    }
+  },
+  "serving_contract_sha256": "82496465fc11b28f195d3698341889773ee7d58ed4fcdbfed4562e2038f82937",
+  "serving_robustness_audit_passed": true,
+  "locked_test_touched_during_selection": false
+}
