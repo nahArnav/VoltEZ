@@ -28,6 +28,37 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Model 1 champion: selected, robustness-audited, locked-test evaluated once, and bundled for APIs
 - Model 1 deployment stage: synthetic-validated; real VoltEZ shadow monitoring is still required
 
+## Model 1: Demand Forecasting
+
+The frozen champion predicts the expected number of charging requests in a Pune zone over a
+60-minute window beginning 15 minutes after the prediction origin.
+
+| Item | Final value |
+|---|---|
+| Bundle | [`voltez-demand-60m-pune-v1`](models/demand/voltez-demand-60m-pune-v1/) |
+| Model ID | `demand-window-60m-hgbr-bdb1d74f9ce09d73` |
+| Algorithm | Histogram gradient boosting with Poisson loss |
+| Model SHA-256 | `82418d51b203e4a7b8e4e7fe94133700c393ddbd80564e59696855197fba5e29` |
+| Training rows | 413,952 from two independent Pune worlds |
+| Feature count | 52 causal, point-in-time features |
+| Locked-test MAE | **0.739 requests** |
+| Locked-test RMSE | **0.990 requests** |
+| Within one request | **75.89%** |
+| Top-demand non-zero precision | **85.10%** |
+| Mean prediction / truth | **0.8983 / 0.8961** |
+| Seasonal-baseline MAE improvement | **22.44%** |
+| Serving robustness | 10,000 unseen validation/stress rows audited; 0% fallback |
+| Deployment stage | `synthetic_validated` |
+
+The repository stores the deployable model, its 52-feature contract, pre-test selection evidence,
+robustness audit, and one-time locked-test report. Large generated Parquet training tables stay out
+of Git; they are reproducible from the committed generator/configuration and their hashed manifests.
+The serving layer rejects impossible inputs and schema drift, warns on mild distribution shift, and
+uses a seasonal fallback when too many values fall outside training experience.
+
+See the [complete model card](docs/model1_model_card.md) and
+[FastAPI integration handoff](docs/model1_fastapi_integration.md).
+
 ## Local environment
 
 The project uses Python 3.12 and `uv` for a reproducible local environment.
