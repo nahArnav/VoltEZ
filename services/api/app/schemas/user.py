@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Literal, Optional
 from datetime import datetime
 from app.models.user import UserRole
 
@@ -13,9 +13,9 @@ class UserBase(BaseModel):
 # Properties to receive via API on creation
 class UserCreate(UserBase):
     password: str
-    role: UserRole = UserRole.DRIVER
+    # Lock down the role to only these two options. Reject anything else.
+    role: Literal["DRIVER", "OWNER"] = "DRIVER" 
     phone: Optional[str] = None
-
 
 # Properties to receive via API on update (PATCH /users/me)
 class UserUpdate(BaseModel):
