@@ -1,6 +1,27 @@
 version: "3.9"
 
 services:
+  api:
+    build: ../services/api  # <--- Goes up one level, then into services/api
+    container_name: voltez-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../services/api:/app  # <--- Goes up one level, then into services/api
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/voltez
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=your-super-secret-key-change-this
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   postgres:
     image: postgis/postgis:16-3.4
     container_name: voltez-postgres
