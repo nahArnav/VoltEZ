@@ -5,6 +5,7 @@ import '../earnings/earnings_screen.dart';
 import '../chargers/add_edit_chargers_screen.dart';
 import 'analytics_screen.dart';
 import '../bookings/bookings_screen.dart';
+import 'ai_recommendations_screen.dart';
 
 // Shared Voltez AI-mobility command-centre palette.
 const _ivory = Color(0xFF05090E);
@@ -334,8 +335,11 @@ class _DashboardHome extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
       decoration: BoxDecoration(
-        color: _forest,
+        color: _panel,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _rust.withValues(alpha: 0.25),
+        ),
       ),
       child: Column(
         children: [
@@ -345,18 +349,26 @@ class _DashboardHome extends StatelessWidget {
               const Text(
                 '76%',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: _rust,
                   fontSize: 34,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              Text(
-                'LAST 7 DAYS',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _rust.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _rust.withValues(alpha: 0.3)),
+                ),
+                child: const Text(
+                  'LAST 7 DAYS',
+                  style: TextStyle(
+                    color: _rust,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
                 ),
               ),
             ],
@@ -386,68 +398,83 @@ class _DashboardHome extends StatelessWidget {
   }
 
   Widget _buildInsight() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: _forest.withValues(alpha: 0.15),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
+    return Builder(
+      builder: (context) {
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AiRecommendationsScreen(),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: _rust,
-              borderRadius: BorderRadius.circular(12),
+              color: _panel,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: _forest.withValues(alpha: 0.15),
+              ),
             ),
-            child: const Icon(
-              Icons.bolt_rounded,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'VOLTEZ INSIGHT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
                     color: _rust,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.bolt_rounded,
+                    color: Colors.white,
                   ),
                 ),
-                SizedBox(height: 7),
-                Text(
-                  'Charger 03 is underutilized between 11 AM – 3 PM.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                    color: _ink,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'View recommendation →',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: _forest,
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'VOLTEZ INSIGHT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.5,
+                          color: _rust,
+                        ),
+                      ),
+                      SizedBox(height: 7),
+                      Text(
+                        'Charger 03 is underutilized between 11 AM – 3 PM.',
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: _ink,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'View recommendation →',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: _forest,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -733,7 +760,7 @@ class _Bar extends StatelessWidget {
               child: Container(
                 width: 20,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.85),
+                  color: _rust,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(5),
                   ),

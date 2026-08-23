@@ -322,30 +322,7 @@ class _AuthPanelState extends State<_AuthPanel> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 11),
-                      OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.g_mobiledata_rounded),
-                        label: const Text('Continue with Google'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: holoText,
-                          side: BorderSide(
-                            color: holoCyan.withValues(alpha: .4),
-                          ),
-                          minimumSize: const Size.fromHeight(48),
-                        ),
-                      ),
                     ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Center(
-                child: Text(
-                  'Turnstile verification runs securely before continuing.',
-                  style: TextStyle(
-                    color: holoMuted.withValues(alpha: .7),
-                    fontSize: 10,
                   ),
                 ),
               ),
@@ -397,7 +374,22 @@ class _AuthPanelState extends State<_AuthPanel> {
             borderSide: BorderSide(color: holoCyan.withValues(alpha: .25)),
           ),
         ),
-        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+        validator: (v) {
+          if (v == null || v.trim().isEmpty) {
+            return '$text is required';
+          }
+          if (email) {
+            final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+            if (!emailRegex.hasMatch(v.trim())) {
+              return 'Please enter a valid email address';
+            }
+          } else if (secret) {
+            if (v.trim().length < 6) {
+              return 'Password must be at least 6 characters';
+            }
+          }
+          return null;
+        },
       );
 }
 

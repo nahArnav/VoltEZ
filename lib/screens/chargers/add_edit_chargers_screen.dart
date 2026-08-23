@@ -169,7 +169,33 @@ class _AddEditChargerScreenState
                   ),
                 ),
                 onPressed: () {
-                  // TODO: POST /api/v1/chargers
+                  final name = nameController.text.trim();
+                  final address = addressController.text.trim();
+                  final priceText = priceController.text.trim();
+
+                  if (name.isEmpty || priceText.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Please fill station name and price per kWh."),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final double price = double.tryParse(priceText) ?? 18.0;
+                  final int powerKw = int.tryParse(power) ?? 60;
+
+                  final chargerData = {
+                    "name": name,
+                    "power": powerKw,
+                    "price": price,
+                    "status": available ? "active" : "paused",
+                    "reliability": 98,
+                    "parking": address.isEmpty ? "Main Bay" : address,
+                    "amenities": ["WiFi", "Parking", connector],
+                  };
+
+                  Navigator.pop(context, chargerData);
                 },
                 child: const Text(
                   "SAVE CHARGER",

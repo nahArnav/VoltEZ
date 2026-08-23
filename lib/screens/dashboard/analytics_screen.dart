@@ -574,16 +574,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             decoration: BoxDecoration(
                               borderRadius:
                                   const BorderRadius.vertical(
-                                top: Radius.circular(5),
+                                top: Radius.circular(6),
                               ),
                               gradient: LinearGradient(
                                 begin: Alignment.bottomCenter,
                                 end: Alignment.topCenter,
                                 colors: [
-                                  _cyan.withOpacity(.25),
-                                  _cyan.withOpacity(.85),
+                                  _lime.withOpacity(.35),
+                                  _lime,
                                 ],
                               ),
+                              boxShadow: [
+                                if (value == maxValue)
+                                  BoxShadow(
+                                    color: _lime.withOpacity(.6),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 7),

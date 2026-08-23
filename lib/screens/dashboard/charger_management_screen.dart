@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'port_details_screen.dart';
+import '../chargers/add_edit_chargers_screen.dart';
 
 const _bg = Color(0xFF05090E);
 const _panel = Color(0xFF0B141C);
@@ -123,7 +124,29 @@ class _ChargerManagementScreenState
         foregroundColor: Colors.black,
         elevation: 0,
 
-        onPressed: _showAddChargerDialog,
+        onPressed: () async {
+          final result = await Navigator.push<Map<String, dynamic>>(
+            context,
+            MaterialPageRoute(builder: (_) => const AddEditChargerScreen()),
+          );
+          if (result != null) {
+            setState(() {
+              chargers.add(result);
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                backgroundColor: _panel,
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: _lime),
+                    const SizedBox(width: 10),
+                    Text("Charger ${result['name']} saved successfully", style: const TextStyle(color: _text)),
+                  ],
+                ),
+              ),
+            );
+          }
+        },
 
         icon: const Icon(
           Icons.add_rounded,
@@ -479,18 +502,18 @@ class _ChargerManagementScreenState
                   ),
 
                   child: const Text(
-                    "VIEW DETAILS",
+                    "DETAILS",
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight:
                           FontWeight.w900,
-                      letterSpacing: .7,
+                      letterSpacing: .5,
                     ),
                   ),
                 ),
               ),
 
-              const SizedBox(width: 9),
+              const SizedBox(width: 6),
 
               Expanded(
                 child: ElevatedButton(
@@ -535,9 +558,69 @@ class _ChargerManagementScreenState
                         : "RESUME",
 
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight:
                           FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      final copy = Map<String, dynamic>.from(charger);
+                      copy["name"] = "${charger["name"]} (Copy)";
+                      chargers.add(copy);
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: _panel,
+                        content: Row(
+                          children: [
+                            const Icon(Icons.copy_rounded, color: _lime, size: 18),
+                            const SizedBox(width: 8),
+                            Text("Duplicated ${charger['name']}", style: const TextStyle(color: _text)),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+
+                  style:
+                      OutlinedButton.styleFrom(
+                    foregroundColor: _lime,
+
+                    side: BorderSide(
+                      color: _lime.withValues(
+                        alpha: .4,
+                      ),
+                    ),
+
+                    minimumSize:
+                        const Size.fromHeight(
+                      44,
+                    ),
+
+                    shape:
+                        RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(
+                        11,
+                      ),
+                    ),
+                  ),
+
+                  child: const Text(
+                    "DUPLICATE",
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight:
+                          FontWeight.w900,
+                      letterSpacing: .5,
                     ),
                   ),
                 ),
