@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'charger_management_screen.dart';
 import '../profile/profile_screen.dart';
+import '../earnings/earnings_screen.dart';
+import '../chargers/add_edit_chargers_screen.dart';
 
 // Shared Voltez AI-mobility command-centre palette.
 const _ivory = Color(0xFF05090E);
@@ -93,7 +95,7 @@ class _DashboardHome extends StatelessWidget {
                 number: '03',
                 title: "TODAY'S BOOKINGS",
               ),
-
+              
               const SizedBox(height: 16),
 
               _buildBookings(),
@@ -178,50 +180,61 @@ class _DashboardHome extends StatelessWidget {
   }
 
   Widget _buildStats() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _StatBlock(
-                value: '08',
-                label: 'ACTIVE\nCHARGERS',
-                accent: _forest,
-              ),
+  return Column(
+    children: [
+      Row(
+        children: const [
+          Expanded(
+            child: _StatBlock(
+              value: '08',
+              label: 'ACTIVE\nCHARGERS',
+              accent: _forest,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatBlock(
-                value: '24',
-                label: 'BOOKINGS\nTODAY',
-                accent: _rust,
-              ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: _StatBlock(
+              value: '24',
+              label: 'BOOKINGS\nTODAY',
+              accent: _rust,
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _StatBlock(
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const EarningsScreen(),
+                  ),
+                );
+              },
+              child: const _StatBlock(
                 value: '₹18.4K',
                 label: 'REVENUE\nTODAY',
                 accent: _ink,
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatBlock(
-                value: '76%',
-                label: 'NETWORK\nUTILIZATION',
-                accent: _forest,
-              ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: _StatBlock(
+              value: '76%',
+              label: 'NETWORK\nUTILIZATION',
+              accent: _forest,
             ),
-          ],
-        ),
-      ],
-    );
-  }
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
 
   Widget _buildChargers() {
     return Column(
@@ -251,7 +264,14 @@ class _DashboardHome extends StatelessWidget {
           width: double.infinity,
           height: 50,
           child: OutlinedButton.icon(
-            onPressed: () {},
+                        onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AddEditChargerScreen(),
+                ),
+              );
+            },
             icon: const Icon(Icons.add_rounded, size: 19),
             label: const Text('ADD CHARGER'),
             style: OutlinedButton.styleFrom(
@@ -860,11 +880,6 @@ class _ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Profile',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
-      ),
-    );
+    return const ProfileScreen();
   }
 }
