@@ -1,4 +1,4 @@
-"""Model 2 training with independent-world calibration and explicit abstention."""
+"""Model 4 training with independent-world calibration and explicit abstention."""
 
 from __future__ import annotations
 
@@ -42,8 +42,8 @@ from sklearn.preprocessing import (  # type: ignore[import-untyped]
 from voltez_ml.synthetic.io import file_sha256, write_manifest
 
 TARGET = "label"
-POSITIVE_LABEL = "unavailable"
-NEGATIVE_LABEL = "available"
+POSITIVE_LABEL = "unreliable"
+NEGATIVE_LABEL = "reliable"
 
 # This allowlist is deliberately explicit. Entity IDs, target-time evidence, raw timestamps,
 # label metadata, and split metadata cannot enter the estimator by accident.
@@ -88,8 +88,8 @@ CATEGORICAL_FEATURE_CANDIDATES = (
     "access_type",
 )
 
-FORBIDDEN_MODEL_COLUMNS = {
-    "observation_id",
+NON_FEATURE_COLUMNS = {
+    "reliability_observation_id",
     "request_id",
     "port_id",
     "charger_id",
@@ -107,11 +107,11 @@ FORBIDDEN_MODEL_COLUMNS = {
     "label",
     "label_known",
     "label_source",
-    "label_confidence",
-    "booking_state",
-    "port_status",
-    "arrived_at",
-    "service_ready_at",
+    "availability_observation_id",
+    "label_failure_reason",
+    "booking_id",
+    "session_id",
+    "target_arrival_at",
     "label_observed_at",
     "split",
     "run_holdout_split",
@@ -122,7 +122,7 @@ IntArray = NDArray[np.int64]
 
 
 @dataclass(frozen=True)
-class AvailabilityFeatureSpec:
+class ReliabilityFeatureSpec:
     numeric: tuple[str, ...]
     categorical: tuple[str, ...]
 
@@ -132,14 +132,14 @@ class AvailabilityFeatureSpec:
 
 
 @dataclass(frozen=True)
-class AvailabilityTrainingSettings:
+class ReliabilityTrainingSettings:
     max_iter: int = 250
     learning_rate: float = 0.05
     max_leaf_nodes: int = 31
     min_samples_leaf: int = 30
     l2_regularization: float = 0.5
-    target_available_risk: float = 0.05
-    target_unavailable_precision: float = 0.60
+    target_reliable_risk: float = 0.05
+    target_unreliable_precision: float = 0.60
     minimum_threshold_rows: int = 100
     permutation_sample_rows: int = 10_000
     permutation_repeats: int = 3
@@ -156,10 +156,10 @@ class AvailabilityTrainingSettings:
             raise ValueError("min_samples_leaf must be at least 2")
         if self.l2_regularization < 0:
             raise ValueError("l2_regularization cannot be negative")
-        if not 0 < self.target_available_risk < 0.5:
-            raise ValueError("target_available_risk must be between zero and 0.5")
-        if not 0.5 <= self.target_unavailable_precision <= 1:
-            raise ValueError("target_unavailable_precision must be between 0.5 and 1")
+        if not 0 < self.target_reliable_risk < 0.5:
+            raise ValueError("target_reliable_risk must be between zero and 0.5")
+        if not 0.5 <= self.target_unreliable_precision <= 1:
+            raise ValueError("target_unreliable_precision must be between 0.5 and 1")
         if self.minimum_threshold_rows <= 0:
             raise ValueError("minimum_threshold_rows must be positive")
         if self.permutation_sample_rows < 0:
@@ -177,10 +177,10 @@ def _load_suite(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     if file_sha256(readiness_path) != suite["training_readiness"]["sha256"]:
         raise ValueError("training-readiness hash does not match the suite manifest")
     readiness = json.loads(readiness_path.read_text("utf-8"))
-    status = readiness.get("models", {}).get("availability", {})
+    status = readiness.get("models", {}).get("reliability", {})
     if status.get("status") != "ready":
         raise ValueError(
-            "Model 2 data readiness failed: "
+            "Model 4 data readiness failed: "
             + "; ".join(str(value) for value in status.get("failures", []))
         )
     return suite, readiness
@@ -188,24 +188,24 @@ def _load_suite(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 
 def _load_role(suite: dict[str, Any], role: str, unlock_test: bool = False) -> pd.DataFrame:
     if role == "test" and not unlock_test:
-        raise ValueError("locked test access is forbidden during Model 2 development")
+        raise ValueError("locked test access is forbidden during Model 4 development")
     root = Path(suite["_manifest_root"])
     entries = [entry for entry in suite["datasets"] if entry["evaluation_role"] == role]
     if not entries:
-        raise ValueError(f"feature suite has no {role} availability partition")
+        raise ValueError(f"feature suite has no {role} reliability partition")
     frames: list[pd.DataFrame] = []
     for entry in entries:
-        path = Path(entry["tables"]["availability_features_labeled"])
+        path = Path(entry["tables"]["reliability_features_labeled"])
         frames.append(pd.read_parquet(path if path.is_absolute() else root / path))
     frame = pd.concat(frames, ignore_index=True)
     if set(frame["run_holdout_split"].astype(str)) != {role}:
-        raise ValueError(f"{role} availability rows contain a mismatched holdout role")
+        raise ValueError(f"{role} reliability rows contain a mismatched holdout role")
     if set(frame[TARGET].astype(str)) != {NEGATIVE_LABEL, POSITIVE_LABEL}:
-        raise ValueError(f"{role} availability partition must contain both known labels")
+        raise ValueError(f"{role} reliability partition must contain both known labels")
     return frame
 
 
-def _feature_spec(train: pd.DataFrame) -> AvailabilityFeatureSpec:
+def _feature_spec(train: pd.DataFrame) -> ReliabilityFeatureSpec:
     numeric = tuple(
         column
         for column in NUMERIC_FEATURE_CANDIDATES
@@ -217,18 +217,18 @@ def _feature_spec(train: pd.DataFrame) -> AvailabilityFeatureSpec:
         if column in train and train[column].nunique(dropna=True) > 1
     )
     if not numeric or not categorical:
-        raise ValueError("availability feature contract requires numeric and categorical inputs")
+        raise ValueError("reliability feature contract requires numeric and categorical inputs")
     selected = set((*numeric, *categorical))
-    forbidden = selected & FORBIDDEN_MODEL_COLUMNS
+    forbidden = selected & NON_FEATURE_COLUMNS
     if forbidden:
-        raise ValueError(f"forbidden availability features selected: {sorted(forbidden)}")
-    return AvailabilityFeatureSpec(numeric=numeric, categorical=categorical)
+        raise ValueError(f"forbidden reliability features selected: {sorted(forbidden)}")
+    return ReliabilityFeatureSpec(numeric=numeric, categorical=categorical)
 
 
-def _model_frame(frame: pd.DataFrame, spec: AvailabilityFeatureSpec) -> pd.DataFrame:
+def _model_frame(frame: pd.DataFrame, spec: ReliabilityFeatureSpec) -> pd.DataFrame:
     missing = set(spec.all) - set(frame.columns)
     if missing:
-        raise ValueError(f"availability frame is missing features: {sorted(missing)}")
+        raise ValueError(f"reliability frame is missing features: {sorted(missing)}")
     result = frame[list(spec.all)].copy()
     for column in spec.numeric:
         result[column] = pd.to_numeric(result[column], errors="coerce").astype("float64")
@@ -242,11 +242,11 @@ def _target(frame: pd.DataFrame) -> IntArray:
 
 
 def _confidence_weight(frame: pd.DataFrame) -> FloatArray:
-    if "label_confidence" not in frame:
+    if "availability_observation_id" not in frame:
         return np.ones(len(frame), dtype="float64")
     return cast(
         FloatArray,
-        pd.to_numeric(frame["label_confidence"], errors="coerce")
+        pd.to_numeric(frame["availability_observation_id"], errors="coerce")
         .fillna(1.0)
         .clip(lower=0.01, upper=1.0)
         .to_numpy(dtype="float64"),
@@ -254,8 +254,8 @@ def _confidence_weight(frame: pd.DataFrame) -> FloatArray:
 
 
 def _candidate_pipeline(
-    spec: AvailabilityFeatureSpec,
-    settings: AvailabilityTrainingSettings,
+    spec: ReliabilityFeatureSpec,
+    settings: ReliabilityTrainingSettings,
 ) -> Pipeline:
     categorical = Pipeline(
         [
@@ -297,8 +297,8 @@ def _candidate_pipeline(
 
 
 def _logistic_pipeline(
-    spec: AvailabilityFeatureSpec,
-    settings: AvailabilityTrainingSettings,
+    spec: ReliabilityFeatureSpec,
+    settings: ReliabilityTrainingSettings,
 ) -> Pipeline:
     numeric = Pipeline(
         [
@@ -330,7 +330,7 @@ def _logistic_pipeline(
 def _fit_pipeline(
     model: Pipeline,
     frame: pd.DataFrame,
-    spec: AvailabilityFeatureSpec,
+    spec: ReliabilityFeatureSpec,
     weight: FloatArray,
 ) -> Pipeline:
     model.fit(_model_frame(frame, spec), _target(frame), model__sample_weight=weight)
@@ -340,7 +340,7 @@ def _fit_pipeline(
 def _positive_probability(
     model: Pipeline,
     frame: pd.DataFrame,
-    spec: AvailabilityFeatureSpec,
+    spec: ReliabilityFeatureSpec,
 ) -> FloatArray:
     probability = model.predict_proba(_model_frame(frame, spec))[:, 1]
     return cast(FloatArray, np.clip(probability.astype("float64"), 1e-6, 1 - 1e-6))
@@ -353,8 +353,8 @@ def _logit(probability: FloatArray) -> NDArray[np.float64]:
 
 def _out_of_world_probability(
     train: pd.DataFrame,
-    spec: AvailabilityFeatureSpec,
-    settings: AvailabilityTrainingSettings,
+    spec: ReliabilityFeatureSpec,
+    settings: ReliabilityTrainingSettings,
 ) -> FloatArray:
     worlds = sorted(train["simulation_run_id"].astype(str).unique())
     if len(worlds) < 2:
@@ -432,8 +432,8 @@ def _probability_metrics(
     tn, fp, fn, tp = confusion_matrix(truth, prediction, labels=[0, 1]).ravel()
     return {
         "rows": len(truth),
-        "unavailable_prevalence": float(truth.mean()),
-        "predicted_unavailable_rate": float(prediction.mean()),
+        "unreliable_prevalence": float(truth.mean()),
+        "predicted_unreliable_rate": float(prediction.mean()),
         "probability_mean": float(probability.mean()),
         "roc_auc": float(roc_auc_score(truth, probability)),
         "average_precision": float(average_precision_score(truth, probability)),
@@ -442,16 +442,16 @@ def _probability_metrics(
         "expected_calibration_error_10_bins": _expected_calibration_error(truth, probability),
         "accuracy_at_0_5": float(accuracy_score(truth, prediction)),
         "balanced_accuracy_at_0_5": float(balanced_accuracy_score(truth, prediction)),
-        "unavailable_precision_at_0_5": float(
+        "unreliable_precision_at_0_5": float(
             precision_score(truth, prediction, zero_division=0)
         ),
-        "unavailable_recall_at_0_5": float(recall_score(truth, prediction, zero_division=0)),
-        "unavailable_f1_at_0_5": float(f1_score(truth, prediction, zero_division=0)),
+        "unreliable_recall_at_0_5": float(recall_score(truth, prediction, zero_division=0)),
+        "unreliable_f1_at_0_5": float(f1_score(truth, prediction, zero_division=0)),
         "confusion_at_0_5": {
-            "true_available_predicted_available": int(tn),
-            "true_available_predicted_unavailable": int(fp),
-            "true_unavailable_predicted_available": int(fn),
-            "true_unavailable_predicted_unavailable": int(tp),
+            "true_reliable_predicted_reliable": int(tn),
+            "true_reliable_predicted_unreliable": int(fp),
+            "true_unreliable_predicted_reliable": int(fn),
+            "true_unreliable_predicted_unreliable": int(tp),
         },
     }
 
@@ -460,7 +460,7 @@ def _status_heuristic(frame: pd.DataFrame, prior: float) -> FloatArray:
     status = frame["latest_status"].astype(str)
     probability = np.full(len(frame), prior, dtype="float64")
     fresh = frame["status_expired"].to_numpy(dtype="int64") == 0
-    probability[fresh & status.eq("available").to_numpy()] = 0.03
+    probability[fresh & status.eq("reliable").to_numpy()] = 0.03
     probability[fresh & status.eq("occupied").to_numpy()] = 0.65
     probability[fresh & status.eq("faulted").to_numpy()] = 0.95
     return cast(FloatArray, np.clip(probability, 1e-6, 1 - 1e-6))
@@ -469,22 +469,22 @@ def _status_heuristic(frame: pd.DataFrame, prior: float) -> FloatArray:
 def _select_thresholds(
     truth: IntArray,
     probability: FloatArray,
-    settings: AvailabilityTrainingSettings,
+    settings: ReliabilityTrainingSettings,
 ) -> dict[str, Any]:
-    available_candidates: list[tuple[float, float, int]] = []
+    reliable_candidates: list[tuple[float, float, int]] = []
     for threshold in np.linspace(0.001, 0.40, 200):
         selected = probability <= threshold
         rows = int(selected.sum())
         if rows < settings.minimum_threshold_rows:
             continue
         risk = float(truth[selected].mean())
-        if risk <= settings.target_available_risk:
-            available_candidates.append((float(threshold), risk, rows))
-    if available_candidates:
-        available_threshold, available_risk, available_rows = max(
-            available_candidates, key=lambda value: value[2]
+        if risk <= settings.target_reliable_risk:
+            reliable_candidates.append((float(threshold), risk, rows))
+    if reliable_candidates:
+        reliable_threshold, reliable_risk, reliable_rows = max(
+            reliable_candidates, key=lambda value: value[2]
         )
-        available_rule = "maximum coverage satisfying available-risk target"
+        reliable_rule = "maximum coverage satisfying reliable-risk target"
     else:
         fallbacks: list[tuple[float, float, int]] = []
         for threshold in np.linspace(0.001, 0.40, 200):
@@ -493,14 +493,14 @@ def _select_thresholds(
             if rows >= settings.minimum_threshold_rows:
                 fallbacks.append((float(threshold), float(truth[selected].mean()), rows))
         if not fallbacks:
-            raise ValueError("validation data cannot support an available threshold")
-        available_threshold, available_risk, available_rows = min(
+            raise ValueError("validation data cannot support an reliable threshold")
+        reliable_threshold, reliable_risk, reliable_rows = min(
             fallbacks, key=lambda value: (value[1], -value[2])
         )
-        available_rule = "lowest observed risk because target was unattainable"
+        reliable_rule = "lowest observed risk because target was unattainable"
 
-    unavailable_candidates: list[tuple[float, float, float, int]] = []
-    lower = max(available_threshold + 0.01, 0.02)
+    unreliable_candidates: list[tuple[float, float, float, int]] = []
+    lower = max(reliable_threshold + 0.01, 0.02)
     positive_rows = max(1, int(truth.sum()))
     for threshold in np.linspace(lower, 0.99, 250):
         selected = probability >= threshold
@@ -509,13 +509,13 @@ def _select_thresholds(
             continue
         precision = float(truth[selected].mean())
         recall = float(int(truth[selected].sum()) / positive_rows)
-        if precision >= settings.target_unavailable_precision:
-            unavailable_candidates.append((float(threshold), precision, recall, rows))
-    if unavailable_candidates:
-        unavailable_threshold, unavailable_precision, unavailable_recall, unavailable_rows = max(
-            unavailable_candidates, key=lambda value: (value[2], value[3])
+        if precision >= settings.target_unreliable_precision:
+            unreliable_candidates.append((float(threshold), precision, recall, rows))
+    if unreliable_candidates:
+        unreliable_threshold, unreliable_precision, unreliable_recall, unreliable_rows = max(
+            unreliable_candidates, key=lambda value: (value[2], value[3])
         )
-        unavailable_rule = "maximum recall satisfying unavailable-precision target"
+        unreliable_rule = "maximum recall satisfying unreliable-precision target"
     else:
         fallbacks_2: list[tuple[float, float, float, int, float]] = []
         for threshold in np.linspace(lower, 0.99, 250):
@@ -528,31 +528,31 @@ def _select_thresholds(
             f1 = float(2 * precision * recall / max(1e-12, precision + recall))
             fallbacks_2.append((float(threshold), precision, recall, rows, f1))
         if not fallbacks_2:
-            raise ValueError("validation data cannot support an unavailable threshold")
+            raise ValueError("validation data cannot support an unreliable threshold")
         fallback_threshold, fallback_precision, fallback_recall, fallback_rows, _ = max(
             fallbacks_2, key=lambda value: value[4]
         )
-        unavailable_threshold = fallback_threshold
-        unavailable_precision = fallback_precision
-        unavailable_recall = fallback_recall
-        unavailable_rows = fallback_rows
-        unavailable_rule = "best F1 because precision target was unattainable"
+        unreliable_threshold = fallback_threshold
+        unreliable_precision = fallback_precision
+        unreliable_recall = fallback_recall
+        unreliable_rows = fallback_rows
+        unreliable_rule = "best F1 because precision target was unattainable"
 
     return {
-        "available_max_probability_unavailable": available_threshold,
-        "unavailable_min_probability_unavailable": unavailable_threshold,
-        "available_selection": {
-            "rule": available_rule,
-            "validation_rows": available_rows,
-            "observed_unavailable_risk": available_risk,
-            "target_maximum_risk": settings.target_available_risk,
+        "reliable_max_probability_unreliable": reliable_threshold,
+        "unreliable_min_probability_unreliable": unreliable_threshold,
+        "reliable_selection": {
+            "rule": reliable_rule,
+            "validation_rows": reliable_rows,
+            "observed_unreliable_risk": reliable_risk,
+            "target_maximum_risk": settings.target_reliable_risk,
         },
-        "unavailable_selection": {
-            "rule": unavailable_rule,
-            "validation_rows": unavailable_rows,
-            "observed_precision": unavailable_precision,
-            "observed_recall": unavailable_recall,
-            "target_minimum_precision": settings.target_unavailable_precision,
+        "unreliable_selection": {
+            "rule": unreliable_rule,
+            "validation_rows": unreliable_rows,
+            "observed_precision": unreliable_precision,
+            "observed_recall": unreliable_recall,
+            "target_minimum_precision": settings.target_unreliable_precision,
         },
     }
 
@@ -562,39 +562,39 @@ def _decision_metrics(
     probability: FloatArray,
     thresholds: dict[str, Any],
 ) -> dict[str, Any]:
-    low = float(thresholds["available_max_probability_unavailable"])
-    high = float(thresholds["unavailable_min_probability_unavailable"])
+    low = float(thresholds["reliable_max_probability_unreliable"])
+    high = float(thresholds["unreliable_min_probability_unreliable"])
     state = np.full(len(truth), "unknown", dtype=object)
     state[probability <= low] = NEGATIVE_LABEL
     state[probability >= high] = POSITIVE_LABEL
     decided = state != "unknown"
-    available = state == NEGATIVE_LABEL
-    unavailable = state == POSITIVE_LABEL
-    predicted_binary = unavailable.astype("int64")
+    reliable = state == NEGATIVE_LABEL
+    unreliable = state == POSITIVE_LABEL
+    predicted_binary = unreliable.astype("int64")
     return {
         "coverage": float(decided.mean()),
         "abstention_rate": float((~decided).mean()),
-        "available_rate": float(available.mean()),
-        "unavailable_rate": float(unavailable.mean()),
+        "reliable_rate": float(reliable.mean()),
+        "unreliable_rate": float(unreliable.mean()),
         "decided_accuracy": float(
             (predicted_binary[decided] == truth[decided]).mean()
         )
         if bool(decided.any())
         else None,
-        "available_precision": float((truth[available] == 0).mean())
-        if bool(available.any())
+        "reliable_precision": float((truth[reliable] == 0).mean())
+        if bool(reliable.any())
         else None,
-        "unsafe_available_rate": float(truth[available].mean())
-        if bool(available.any())
+        "unsafe_reliable_rate": float(truth[reliable].mean())
+        if bool(reliable.any())
         else None,
-        "unavailable_precision": float(truth[unavailable].mean())
-        if bool(unavailable.any())
+        "unreliable_precision": float(truth[unreliable].mean())
+        if bool(unreliable.any())
         else None,
-        "unavailable_recall": float(truth[unavailable].sum() / max(1, truth.sum())),
+        "unreliable_recall": float(truth[unreliable].sum() / max(1, truth.sum())),
         "counts": {
-            NEGATIVE_LABEL: int(available.sum()),
+            NEGATIVE_LABEL: int(reliable.sum()),
             "unknown": int((~decided).sum()),
-            POSITIVE_LABEL: int(unavailable.sum()),
+            POSITIVE_LABEL: int(unreliable.sum()),
         },
     }
 
@@ -619,7 +619,7 @@ def _segment_metrics(
             {
                 "segment": str(segment),
                 "rows": len(part),
-                "unavailable_rate": float(truth.mean()),
+                "unreliable_rate": float(truth.mean()),
                 "probability_mean": float(score.mean()),
                 "brier_score": float(brier_score_loss(truth, score)),
                 "average_precision": float(average_precision_score(truth, score))
@@ -633,8 +633,8 @@ def _segment_metrics(
 def _permutation_importance_report(
     model: Pipeline,
     validation: pd.DataFrame,
-    spec: AvailabilityFeatureSpec,
-    settings: AvailabilityTrainingSettings,
+    spec: ReliabilityFeatureSpec,
+    settings: ReliabilityTrainingSettings,
 ) -> list[dict[str, float | str]]:
     if settings.permutation_sample_rows == 0:
         return []
@@ -676,7 +676,7 @@ def _role_report(
     thresholds: dict[str, Any],
 ) -> dict[str, Any]:
     truth = _target(frame)
-    always_available = np.full(len(frame), 1e-6, dtype="float64")
+    always_reliable = np.full(len(frame), 1e-6, dtype="float64")
     prevalence_constant = np.full(len(frame), train_prevalence, dtype="float64")
     status_probability = _status_heuristic(frame, train_prevalence)
     return {
@@ -686,7 +686,7 @@ def _role_report(
             POSITIVE_LABEL: int((truth == 1).sum()),
         },
         "baselines": {
-            "always_available": _probability_metrics(truth, always_available),
+            "always_reliable": _probability_metrics(truth, always_reliable),
             "training_prevalence_constant": _probability_metrics(
                 truth, prevalence_constant
             ),
@@ -716,7 +716,7 @@ def _role_report(
 def _development_gates(
     validation: dict[str, Any],
     stress: dict[str, Any],
-    settings: AvailabilityTrainingSettings,
+    settings: ReliabilityTrainingSettings,
 ) -> dict[str, Any]:
     validation_model = validation["hist_gradient_boosting_calibrated"]
     validation_prior = validation["baselines"]["training_prevalence_constant"]
@@ -726,7 +726,7 @@ def _development_gates(
         "validation_roc_auc_at_least_0_75": validation_model["roc_auc"] >= 0.75,
         "validation_pr_auc_at_least_twice_prevalence": (
             validation_model["average_precision"]
-            >= 2 * validation_model["unavailable_prevalence"]
+            >= 2 * validation_model["unreliable_prevalence"]
         ),
         "validation_brier_better_than_prevalence_baseline": (
             validation_model["brier_score"] < validation_prior["brier_score"]
@@ -734,17 +734,17 @@ def _development_gates(
         "validation_calibration_error_at_most_0_03": (
             validation_model["expected_calibration_error_10_bins"] <= 0.03
         ),
-        "validation_available_risk_meets_target": (
-            validation_decision["unsafe_available_rate"]
-            <= settings.target_available_risk + 1e-12
+        "validation_reliable_risk_meets_target": (
+            validation_decision["unsafe_reliable_rate"]
+            <= settings.target_reliable_risk + 1e-12
         ),
-        "stress_available_risk_at_most_target_plus_0_02": (
-            stress_decision["unsafe_available_rate"]
-            <= settings.target_available_risk + 0.02
+        "stress_reliable_risk_at_most_target_plus_0_02": (
+            stress_decision["unsafe_reliable_rate"]
+            <= settings.target_reliable_risk + 0.02
         ),
-        "stress_unavailable_precision_at_least_0_50": (
-            stress_decision["unavailable_precision"] is not None
-            and stress_decision["unavailable_precision"] >= 0.50
+        "stress_unreliable_precision_at_least_0_50": (
+            stress_decision["unreliable_precision"] is not None
+            and stress_decision["unreliable_precision"] >= 0.50
         ),
     }
     failures = [name for name, passed in checks.items() if not passed]
@@ -786,13 +786,13 @@ def _portable_reference(target: Path, artifact_dir: Path) -> str:
         return target.name
 
 
-def train_availability_model(
+def train_reliability_model(
     suite_manifest_path: Path,
     output_root: Path,
-    settings: AvailabilityTrainingSettings,
+    settings: ReliabilityTrainingSettings,
     unlock_test: bool = False,
 ) -> Path:
-    """Train and evaluate Model 2 without opening the locked test partition."""
+    """Train and evaluate Model 4 without opening the locked test partition."""
 
     suite, readiness = _load_suite(suite_manifest_path)
     train = _load_role(suite, "train")
@@ -860,7 +860,7 @@ def train_availability_model(
             sort_keys=True,
         ).encode("utf-8")
     )
-    model_id = f"availability-hgb-calibrated-{identity.hexdigest()[:16]}"
+    model_id = f"reliability-hgb-calibrated-{identity.hexdigest()[:16]}"
     output_root.mkdir(parents=True, exist_ok=True)
     output_dir = output_root / model_id
     incomplete = output_root / f".{model_id}.incomplete"
@@ -869,7 +869,7 @@ def train_availability_model(
     incomplete.mkdir()
 
     report: dict[str, Any] = {
-        "model": "charger_availability_prediction",
+        "model": "charger_reliability_prediction",
         "model_id": model_id,
         "positive_class": POSITIVE_LABEL,
         "negative_class": NEGATIVE_LABEL,
@@ -879,15 +879,15 @@ def train_availability_model(
         "locked_test_unlocked": unlock_test,
         "training_rows": len(train),
         "training_worlds": int(train["simulation_run_id"].nunique()),
-        "training_unavailable_prevalence": train_prevalence,
+        "training_unreliable_prevalence": train_prevalence,
         "feature_count": len(spec.all),
         "feature_spec": asdict(spec),
-        "forbidden_feature_columns": sorted(FORBIDDEN_MODEL_COLUMNS),
+        "forbidden_feature_columns": sorted(NON_FEATURE_COLUMNS),
         "settings": asdict(settings),
         "hard_gate_policy": [
             "connector compatibility",
             "business and host access",
-            "approved availability window",
+            "approved reliability window",
             "known active fault or maintenance",
             "confirmed overlapping booking",
             "verification and suspension policy",
@@ -910,7 +910,7 @@ def train_availability_model(
         "development_gates": _development_gates(
             validation_report, stress_report, settings
         ),
-        "data_readiness": readiness["models"]["availability"],
+        "data_readiness": readiness["models"]["reliability"],
         "code_state": code_state,
     }
     
@@ -945,7 +945,7 @@ def train_availability_model(
     write_manifest(report, report_path)
     manifest = {
         "model_id": model_id,
-        "model_name": "charger_availability_prediction",
+        "model_name": "charger_reliability_prediction",
         "model_version": "v1",
         "created_at": datetime.now(UTC).isoformat(),
         "feature_suite_manifest": _portable_reference(

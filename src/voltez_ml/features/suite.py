@@ -228,10 +228,10 @@ def build_feature_suite(
     portable_entries = [
         {
             **entry,
-            "source_manifest": os.path.relpath(entry["source_manifest"], output_root),
-            "feature_manifest": os.path.relpath(entry["feature_manifest"], output_root),
+            "source_manifest": os.path.relpath(entry["source_manifest"], output_root).replace("\\", "/"),
+            "feature_manifest": os.path.relpath(entry["feature_manifest"], output_root).replace("\\", "/"),
             "tables": {
-                name: os.path.relpath(path, output_root)
+                name: os.path.relpath(path, output_root).replace("\\", "/")
                 for name, path in entry["tables"].items()
             },
         }
@@ -239,7 +239,7 @@ def build_feature_suite(
     ]
     suite_manifest = {
         "created_at": datetime.now(UTC).isoformat(),
-        "source_root": os.path.relpath(source_root, output_root),
+        "source_root": os.path.relpath(source_root, output_root).replace("\\", "/"),
         "code_commit": expected_commit,
         "feature_view_version": config.data.feature_view_version,
         "label_definition_version": config.data.label_definition_version,
