@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,7 +10,13 @@ from database.base_class import Base
 
 class BusinessAmenity(Base):
     __tablename__ = "business_amenities"
-    __table_args__ = {"schema": "app"}
+    __table_args__ = (
+    CheckConstraint(
+        "length(trim(source)) > 0",
+        name="ck_business_amenity_source_not_blank",
+    ),
+    {"schema": "app"},
+)
 
     business_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

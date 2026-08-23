@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,7 +10,21 @@ from database.base_class import Base
 
 class ChargingSession(Base):
     __tablename__ = "charging_sessions"
-    __table_args__ = {"schema": "app"}
+    __table_args__ = (
+    CheckConstraint(
+        "ended_at IS NULL OR started_at IS NULL OR ended_at >= started_at",
+        name="ck_charging_sessions_end_after_start",
+    ),
+    CheckConstraint(
+        "energy_kwh IS NULL OR energy_kwh >= 0",
+        name="ck_charging_sessions_energy_nonnegative",
+    ),
+    CheckConstraint(
+        "amount IS NULL OR amount >= 0",
+        name="ck_charging_sessions_amount_nonnegative",
+    ),
+    {"schema": "app"},
+)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

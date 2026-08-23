@@ -29,6 +29,10 @@ class Vehicle(Base):
             "efficiency_wh_per_km IS NULL OR efficiency_wh_per_km > 0",
             name="ck_vehicles_efficiency_positive",
         ),
+        CheckConstraint(
+        "model_year IS NULL OR model_year BETWEEN 1886 AND 2100",
+        name="ck_vehicles_model_year",
+        ),
         {"schema": "app"},
     )
 

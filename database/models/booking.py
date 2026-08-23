@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.dialects.postgresql import ExcludeConstraint, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import expression
@@ -22,6 +22,10 @@ class Booking(Base):
         ),
         name="excl_bookings_port_time",
         using="gist",
+    ),
+    CheckConstraint(
+    "end_at > start_at",
+    name="ck_bookings_end_after_start",
     ),
     {"schema": "app"},
 )
@@ -74,4 +78,10 @@ class Booking(Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+    search_result_id: Mapped[uuid.UUID | None] = mapped_column(
+    UUID(as_uuid=True),
+    ForeignKey("app.charger_search_results.id"),
+    nullable=True,
     )

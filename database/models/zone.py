@@ -1,7 +1,7 @@
 import uuid
 
 from geoalchemy2 import Geometry
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, CheckConstraint, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,7 +10,21 @@ from database.base_class import Base
 
 class Zone(Base):
     __tablename__ = "zones"
-    __table_args__ = {"schema": "app"}
+    __table_args__ = (
+    CheckConstraint(
+        "btrim(city) <> ''",
+        name="ck_zone_city_not_blank",
+    ),
+    CheckConstraint(
+        "btrim(name) <> ''",
+        name="ck_zone_name_not_blank",
+    ),
+    CheckConstraint(
+        "h3_index IS NULL OR btrim(h3_index) <> ''",
+        name="ck_zone_h3_index_not_blank",
+    ),
+    {"schema": "app"},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

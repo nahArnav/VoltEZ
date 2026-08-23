@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,7 +11,17 @@ from database.base_class import Base
 
 class Business(Base):
     __tablename__ = "businesses"
-    __table_args__ = {"schema": "app"}
+    __table_args__ = (
+    CheckConstraint(
+        "verification_status IN ('unverified', 'pending', 'verified', 'rejected')",
+        name="ck_business_verification_status",
+    ),
+    CheckConstraint(
+        "deleted_at IS NULL OR deleted_at >= created_at",
+        name="ck_business_deleted_at_after_created_at",
+    ),
+    {"schema": "app"},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

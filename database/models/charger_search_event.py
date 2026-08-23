@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,7 +11,21 @@ from database.base_class import Base
 
 class ChargerSearchEvent(Base):
     __tablename__ = "charger_search_events"
-    __table_args__ = {"schema": "app"}
+    __table_args__ = (
+    CheckConstraint(
+        "requested_power_kw IS NULL OR requested_power_kw >= 0",
+        name="ck_charger_search_event_power_nonnegative",
+    ),
+    CheckConstraint(
+        "search_radius_km IS NULL OR search_radius_km >= 0",
+        name="ck_charger_search_event_radius_nonnegative",
+    ),
+    CheckConstraint(
+        "chargers_found >= 0",
+        name="ck_charger_search_event_chargers_found_nonnegative",
+    ),
+    {"schema": "app"},
+)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

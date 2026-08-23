@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, CheckConstraint, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database.base_class import Base
@@ -6,7 +6,17 @@ from database.base_class import Base
 
 class ConnectorType(Base):
     __tablename__ = "connector_types"
-    __table_args__ = {"schema": "app"}
+    __table_args__ = (
+    CheckConstraint(
+        "btrim(code) <> ''",
+        name="ck_connector_type_code_not_blank",
+    ),
+    CheckConstraint(
+        "btrim(display_name) <> ''",
+        name="ck_connector_type_display_name_not_blank",
+    ),
+    {"schema": "app"},
+    )
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
