@@ -30,3 +30,4 @@ __all__ = [
     "ChargingSession",
 ]
 from database.models.charging_session import ChargingSession
+from database.models.booking import Booking
