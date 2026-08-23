@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/ai_copilot_drawer.dart';
 
 class AiRecommendationsScreen extends StatefulWidget {
   const AiRecommendationsScreen({super.key});
@@ -75,6 +76,16 @@ class _AiRecommendationsScreenState
               ),
             ),
           ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: cyan,
+        foregroundColor: Colors.black,
+        onPressed: () => AiCopilotSheet.show(context),
+        icon: const Icon(Icons.auto_awesome),
+        label: const Text(
+          "ASK AI COPILOT",
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
         ),
       ),
       body: SingleChildScrollView(

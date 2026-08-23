@@ -256,11 +256,24 @@ class _AvailabilitySchedulerScreenState
                         ),
                       ),
                       onPressed: () {
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(
-                          const SnackBar(
-                            content:
-                                Text("Availability Saved"),
+                        setState(() {
+                          slots.add({
+                            "start": "17:00",
+                            "end": "20:00",
+                            "status": "active",
+                            "price": price.toInt(),
+                          });
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: panel,
+                            content: Row(
+                              children: [
+                                Icon(Icons.check_circle_rounded, color: green),
+                                const SizedBox(width: 8),
+                                Text("Availability slot 17:00 - 20:00 saved @ ₹${price.toInt()}/kWh"),
+                              ],
+                            ),
                           ),
                         );
                       },
