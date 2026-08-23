@@ -122,10 +122,6 @@ Widget build(BuildContext context) {
 }
 } // closes _SplashScreenState
 
-abstract final class _Colors {
-  static const background = Color(0xFF050A12);
-  ...
-}
           
 abstract final class _Colors {
   static const background = Color(0xFF050A12);

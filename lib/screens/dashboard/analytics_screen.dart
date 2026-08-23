@@ -766,7 +766,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       ),
                     ),
                     Text(
-                      GOAL',
+                      'GOAL',
                       style: TextStyle(
                         color: _muted,
                         fontSize: 7,

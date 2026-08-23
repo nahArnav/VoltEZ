@@ -3,6 +3,8 @@ import 'charger_management_screen.dart';
 import '../profile/profile_screen.dart';
 import '../earnings/earnings_screen.dart';
 import '../chargers/add_edit_chargers_screen.dart';
+import 'analytics_screen.dart';
+import '../bookings/bookings_screen.dart';
 
 // Shared Voltez AI-mobility command-centre palette.
 const _ivory = Color(0xFF05090E);
@@ -76,7 +78,7 @@ class _DashboardHome extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              _buildStats(),
+              _buildStats(context),
 
               const SizedBox(height: 34),
 
@@ -87,7 +89,7 @@ class _DashboardHome extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              _buildChargers(),
+              _buildChargers(context),
 
               const SizedBox(height: 34),
 
@@ -179,7 +181,7 @@ class _DashboardHome extends StatelessWidget {
     );
   }
 
-  Widget _buildStats() {
+  Widget _buildStats(BuildContext context) {
   return Column(
     children: [
       Row(
@@ -236,7 +238,7 @@ class _DashboardHome extends StatelessWidget {
 }
 
 
-  Widget _buildChargers() {
+  Widget _buildChargers(BuildContext context) {
     return Column(
       children: [
         const _ChargerRow(
@@ -852,12 +854,7 @@ class _BookingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Bookings',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
-      ),
-    );
+    return const BookingsScreen();
   }
 }
 
@@ -866,12 +863,7 @@ class _AnalyticsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Analytics',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
-      ),
-    );
+    return const AnalyticsScreen();
   }
 }
 
