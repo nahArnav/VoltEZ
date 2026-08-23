@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'charger_management_screen.dart';
 
 // Shared Voltez AI-mobility command-centre palette.
 const _ivory = Color(0xFF05090E);
@@ -544,6 +545,8 @@ class _ChargerRow extends StatelessWidget {
   final String status;
   final Color statusColor;
 
+  
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -814,18 +817,12 @@ class _BottomNav extends StatelessWidget {
 // ============================================================
 // PLACEHOLDER PAGES
 // ============================================================
-
 class _ChargersPage extends StatelessWidget {
   const _ChargersPage();
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Chargers',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
-      ),
-    );
+    return const ChargerManagementScreen();
   }
 }
 
