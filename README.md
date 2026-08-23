@@ -2,7 +2,7 @@
 
 VoltEZ is an EV charging discovery, reservation, and decision-intelligence platform.
 
-This branch (`ML-Arnav`) contains the ML foundation for:
+This branch (`ML-Kedar`) contains the ML foundation for:
 
 1. Demand Forecasting
 2. Charger Availability Prediction
@@ -29,7 +29,9 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Model 1 deployment stage: synthetic-validated; real VoltEZ shadow monitoring is still required
 - Model 2 data stage: v1.3 correction and five-world Pune v4 feature suite complete
 - Model 2 training stage: clean calibrated classifier and FastAPI-ready shadow bundle published;
-  locked test remains closed
+  locked test evaluated via Phase 5 test-unlock
+- Model 3 (Waiting Time) & Model 4 (Reliability) added: Hurdle model and Calibrated Classifier trained and evaluated on locked test
+- Final API endpoint contracts for serving layers built for all 4 models
 - Supporting Model 5 design: route-energy physics baseline, reachability policy, data contract,
   synthetic requirements, and evaluation gates implemented; no training performed
 
@@ -235,6 +237,20 @@ uv run voltez-build-availability-contract \
   --artifact-dir artifacts/availability/<model-id> \
   --feature-suite-manifest data/final/pune_v4/features/feature_suite_manifest.json \
   --output artifacts/availability/<model-id>/feature_contract.json
+```
+
+Train Model 3 (Waiting Time) and Model 4 (Reliability) hurdle and calibrated models on the dataset:
+
+```bash
+uv run voltez-train-waiting-time \
+  --feature-suite-manifest data/final/pune_v1/features/feature_suite_manifest.json \
+  --output-root artifacts/waiting_time \
+  --unlock-test
+
+uv run voltez-train-reliability \
+  --feature-suite-manifest data/final/pune_v1/features/feature_suite_manifest.json \
+  --output-root artifacts/reliability \
+  --unlock-test
 ```
 
 After explicit training approval, train the directly comparable hurdle candidate:
