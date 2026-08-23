@@ -177,7 +177,14 @@ class _PortDetailsScreenState extends State<PortDetailsScreen> {
                           children: [
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () {},
+                                onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AvailabilitySchedulerScreen(),
+                                  ),
+                                );
+                              },
                                 style: OutlinedButton.styleFrom(
                                   side: const BorderSide(color: cyan),
                                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'charger_management_screen.dart';
+import '../profile/profile_screen.dart';
 
 // Shared Voltez AI-mobility command-centre palette.
 const _ivory = Color(0xFF05090E);

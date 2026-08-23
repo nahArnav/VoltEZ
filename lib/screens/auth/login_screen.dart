@@ -184,11 +184,23 @@ class _AuthPanelState extends State<_AuthPanel> {
   }
 
   void _submit() {
-    if (!(_form.currentState?.validate() ?? false)) return;
+  if (!(_form.currentState?.validate() ?? false)) return;
+
+  if (widget.role == AccountRole.business) {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const DashboardScreen()),
+      MaterialPageRoute(
+        builder: (_) => const DashboardScreen(),
+      ),
+    );
+  } else {
+    // TODO: Navigate to driver dashboard
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Driver dashboard coming soon'),
+      ),
     );
   }
+}
 
   @override
   Widget build(BuildContext context) {
