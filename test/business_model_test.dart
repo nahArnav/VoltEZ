@@ -3,7 +3,10 @@ import 'package:voltez_frontend/services/business_api.dart';
 
 void main() {
   group('Business Owner Models & API Unit Tests', () {
-    final api = BusinessApi();
+    final api = BusinessApi(
+      baseUrl: 'https://api.example.com',
+      getAuthToken: () => 'fake_test_token',
+    );
 
     test('loadDashboard returns valid business snapshot', () async {
       final snapshot = await api.loadDashboard();

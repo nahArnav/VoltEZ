@@ -9,15 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  http: ^1.2.0
 
   # Core UI & Icons
   cupertino_icons: ^1.0.6
 
   # Networking & HTTP
-  dio: ^5.4.3+1
+  dio: ^5.9.0
 
   # Secure Storage & State Management
-  flutter_secure_storage: ^9.0.0
+  flutter_secure_storage: ^9.2.4
   flutter_riverpod: ^2.6.1
 
 dev_dependencies:
