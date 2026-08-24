@@ -8,9 +8,8 @@ class BookingEventBase(BaseModel):
     old_status: Optional[str] = Field(default=None, description="Previous status; None for creation event")
     new_status: str = Field(..., description="Target status transitioned into")
     actor: str = Field(..., description="Entity triggering transition: 'system', 'user:<id>', 'admin:<id>'")
-    metadata: Optional[Dict[str, Any]] = Field(
+    metadata_: Optional[Dict[str, Any]] = Field(
         default=None, 
-        alias="metadata_", 
         description="Arbitrary transition context, reasons, or payload diffs"
     )
 
