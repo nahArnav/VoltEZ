@@ -10,7 +10,7 @@ services:
     volumes:
       - ../services/api:/app  # <--- Goes up one level, then into services/api
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/voltez
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/voltez
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=your-super-secret-key-change-this
       - ALGORITHM=HS256
