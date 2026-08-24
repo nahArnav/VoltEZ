@@ -21,9 +21,9 @@ async def test_booking_concurrency_redis_lock(client: AsyncClient, db_session):
     # 1. Seed Data
     user = User(
         email="test_concur@voltez.demo", 
-        hashed_password=hash_password("password123"),
-        full_name="Test Concur",
-        role=UserRole.DRIVER.value
+        password_hash=hash_password("password123"),
+        name="Test Concur",
+        role=UserRole.DRIVER
     )
     db_session.add(user)
     await db_session.flush()
@@ -41,8 +41,7 @@ async def test_booking_concurrency_redis_lock(client: AsyncClient, db_session):
     business = Business(
         owner_id=user.id,
         name="Test Business",
-        gst_number="123",
-        status="verified"
+        verification_status="verified"
     )
     db_session.add(business)
     await db_session.flush()

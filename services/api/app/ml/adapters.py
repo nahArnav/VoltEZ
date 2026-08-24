@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.ml_prediction import MLPrediction
-from app.models.booking import Booking
+from app.models.booking import Booking, BookingStatus
 from app.models.charging_session import ChargingSession
 from app.repositories.operations import ml_prediction_repo
 from app.schemas.ml_prediction import MLPredictionCreate
@@ -91,10 +91,9 @@ class MLAdapter:
         # 1. Count active sessions for this port
         # In a real app we would join Booking with ChargingSession correctly.
         # For prototype, if there's a live charging session, assume 30 mins remaining.
-        # If there are pending bookings, add 45 mins per booking.
-        
+        # Heuristic 2: Count currently active or checked-in bookings for this port
         result = await db.execute(
-            select(Booking).where(Booking.port_id == port_id, Booking.status.in_(["checked_in", "charging"]))
+            select(Booking).where(Booking.port_id == port_id, Booking.status.in_([BookingStatus.CHECKED_IN.value, BookingStatus.CHARGING.value]))
         )
         active_bookings = result.scalars().all()
         

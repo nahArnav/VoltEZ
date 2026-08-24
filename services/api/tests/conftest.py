@@ -42,8 +42,11 @@ async def client(db_session):
         
     app.dependency_overrides[get_db] = override_get_db
     
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as test_client:
-        yield test_client
+    from asgi_lifespan import LifespanManager
+    
+    async with LifespanManager(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as test_client:
+            yield test_client
         
     app.dependency_overrides.clear()
 

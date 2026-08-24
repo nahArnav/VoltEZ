@@ -16,7 +16,8 @@ async def list_businesses(
     db: AsyncSession = Depends(get_db)
 ):
     """List all businesses for the current owner."""
-    businesses = await business_repo.get_by_owner_id(db, owner_id=current_user.id)
+    # type ignore for Pylance Column[int] false positive
+    businesses = await business_repo.get_by_owner_id(db, owner_id=current_user.id)  # type: ignore
     return businesses
 
 @router.post("/", response_model=BusinessResponse, status_code=status.HTTP_201_CREATED)
@@ -27,9 +28,22 @@ async def create_business(
 ):
     """Register a new business."""
     business_data = business_in.model_dump()
+    
+    # Extract lat/lng to convert to PostGIS geometry
+    lat = business_data.pop("latitude", None)
+    lon = business_data.pop("longitude", None)
+    if lat is not None and lon is not None:
+        business_data["location"] = f"SRID=4326;POINT({lon} {lat})"
+        
     business_data["owner_id"] = current_user.id
     business_data["verification_status"] = "PENDING"
+    
     business = await business_repo.create(db, obj_in=business_data)
+    
+    # Attach lat/lng for Pydantic serialization
+    setattr(business, "latitude", lat)
+    setattr(business, "longitude", lon)
+    
     return business
 
 @router.get("/{business_id}", response_model=BusinessResponse)
@@ -52,7 +66,7 @@ async def update_business(
     db: AsyncSession = Depends(get_db)
 ):
     business = await business_repo.get(db, id=business_id)
-    if not business or business.owner_id != current_user.id:
+    if not business or business.owner_id != current_user.id:  # type: ignore
         raise HTTPException(status_code=404, detail="Business not found or unauthorized")
     
     business = await business_repo.update(db, db_obj=business, obj_in=business_in)
@@ -65,7 +79,7 @@ async def delete_business(
     db: AsyncSession = Depends(get_db)
 ):
     business = await business_repo.get(db, id=business_id)
-    if not business or business.owner_id != current_user.id:
+    if not business or business.owner_id != current_user.id:  # type: ignore
         raise HTTPException(status_code=404, detail="Business not found or unauthorized")
     
     await business_repo.remove(db, id=business_id)

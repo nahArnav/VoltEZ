@@ -29,10 +29,13 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         result = await db.execute(select(self.model).offset(skip).limit(limit))
         return list(result.scalars().all())
 
-    async def create(self, db: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
-        """Create a new record in the database using a Pydantic schema."""
+    async def create(self, db: AsyncSession, *, obj_in: Union[CreateSchemaType, Dict[str, Any]]) -> ModelType:
+        """Create a new record in the database using a Pydantic schema or dict."""
         # Convert Pydantic v2 model to a dictionary
-        obj_in_data = obj_in.model_dump()
+        if isinstance(obj_in, dict):
+            obj_in_data = obj_in
+        else:
+            obj_in_data = obj_in.model_dump()
         db_obj = self.model(**obj_in_data)  # type: ignore
         db.add(db_obj)
         await db.flush()

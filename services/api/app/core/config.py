@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     DATABASE_URL: str
 
+    # ML Integrations
+    ML_MODEL_API_URL: str = "http://localhost:8001"
+
+    # Razorpay Integration
+    RAZORPAY_KEY_ID: str = "rzp_test_placeholder"
+    RAZORPAY_KEY_SECRET: str = "rzp_secret_placeholder"
+    RAZORPAY_WEBHOOK_SECRET: str = "rzp_webhook_secret"
+
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
@@ -34,4 +42,4 @@ class Settings(BaseSettings):
 
 
 # Create a global instance of the settings to use throughout the app
-settings = Settings()
+settings = Settings()  # type: ignore
