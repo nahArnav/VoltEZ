@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError
+from fastapi.security import OAuth2PasswordRequestForm
 
 # Adjust the path to your get_db function if it's located elsewhere (e.g., app.core.database)
 from app.db.session import get_db 
@@ -23,10 +24,15 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), # <-- 🆕 Accept OAuth2 Form Data
+    db: AsyncSession = Depends(get_db)
+):
     """Authenticate a user and return JWT access and refresh tokens."""
+    
+    # 🆕 Use form_data.username (Swagger puts the email in the username field)
     user = await auth_service.authenticate_user(
-        db, email=login_data.email, password=login_data.password
+        db, email=form_data.username, password=form_data.password
     )
     
     if not user:
@@ -48,7 +54,6 @@ async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
         refresh_token=refresh_token,
         token_type="bearer"
     )
-
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(token_in: TokenRefresh, db: AsyncSession = Depends(get_db)):

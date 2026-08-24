@@ -42,3 +42,33 @@ async def get_nearby_chargers(
         db=db, latitude=latitude, longitude=longitude, radius_meters=radius_meters
     )
     return chargers
+
+
+@router.post("/{charger_id}/report-issue", status_code=status.HTTP_204_NO_CONTENT)
+async def report_charger_issue(
+    charger_id: int,
+    current_user: User = Depends(require_role(UserRole.DRIVER, UserRole.ADMIN, UserRole.OWNER)),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Allow drivers to report a broken charger. This leverages the No-IoT trust system
+    to heavily penalize the charger's reliability score.
+    """
+    from app.services.trust import trust_service
+    from app.repositories.charger import charger_repo
+    
+    charger = await charger_repo.get(db, id=charger_id)
+    if not charger:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Charger not found")
+        
+    await trust_service.record_event(
+        db=db,
+        charger_id=charger_id,
+        status="offline",
+        source="DRIVER_REPORT",
+        confidence=0.9
+    )
+    
+    await db.commit()
+    return None

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
+from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -11,6 +12,7 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
 @router.post("/", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
 async def create_booking(
+    request: Request,
     booking_in: BookingCreate,
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
@@ -19,8 +21,38 @@ async def create_booking(
     Reserve a charger port.
     Requires a valid JWT access token.
     """
-    booking = await booking_service.create_booking(db=db, user_id=user_id, booking_in=booking_in)
-    return booking
+    redis = request.app.state.redis
+    
+    # Step 2.2: Implement atomic Redis hold locking with a 10-minute TTL
+    # The lock key is scoped to the exact port and time slot to prevent UI double-booking
+    lock_key = f"hold:port:{booking_in.port_id}:{int(booking_in.start_at.timestamp())}:{int(booking_in.end_at.timestamp())}"
+    
+    # SET NX with 10 minutes (600 seconds) TTL
+    acquired = await redis.set(lock_key, str(user_id), nx=True, ex=600)
+    
+    if not acquired:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="SLOT_UNAVAILABLE"
+        )
+        
+    try:
+        # 1. Create the booking in the database
+        booking = await booking_service.create_booking(db=db, user_id=user_id, booking_in=booking_in)
+        
+        # 2. Tell Redis to wake up in 10 minutes (600s) and check this booking.
+        await redis.enqueue_job(
+            "expire_unpaid_booking", 
+            str(booking.id), 
+            _defer_by=timedelta(minutes=10)
+        )
+        
+        return booking
+    except Exception as e:
+        # If DB creation fails (e.g. overlap check fails), release the lock
+        await redis.delete(lock_key)
+        raise e
 
 
 @router.post("/{booking_id}/cancel", response_model=BookingResponse)
