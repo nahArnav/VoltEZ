@@ -6,6 +6,7 @@ import '../chargers/add_edit_chargers_screen.dart';
 import 'analytics_screen.dart';
 import '../bookings/bookings_screen.dart';
 import 'ai_recommendations_screen.dart';
+import 'business_api.dart'; // Ensure business_api is imported
 
 // Shared Voltez AI-mobility command-centre palette.
 const _ivory = Color(0xFF05090E);
@@ -16,7 +17,9 @@ const _fadeInk = Color(0xFF7990A1);
 const _panel = Color(0xFF0D1821);
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final BusinessApi api;
+
+  const DashboardScreen({super.key, required this.api});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -32,12 +35,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
-          children: const [
-            _DashboardHome(),
-            _ChargersPage(),
-            _BookingsPage(),
-            _AnalyticsPage(),
-            _ProfilePage(),
+          children: [
+            const _DashboardHome(),
+            _ChargersPage(api: widget.api), // Passed from widget.api
+            const _BookingsPage(),
+            const _AnalyticsPage(),
+            const _ProfilePage(),
           ],
         ),
       ),
@@ -183,61 +186,60 @@ class _DashboardHome extends StatelessWidget {
   }
 
   Widget _buildStats(BuildContext context) {
-  return Column(
-    children: [
-      Row(
-        children: const [
-          Expanded(
-            child: _StatBlock(
-              value: '08',
-              label: 'ACTIVE\nCHARGERS',
-              accent: _forest,
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: _StatBlock(
-              value: '24',
-              label: 'BOOKINGS\nTODAY',
-              accent: _rust,
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const EarningsScreen(),
-                  ),
-                );
-              },
-              child: const _StatBlock(
-                value: '₹18.4K',
-                label: 'REVENUE\nTODAY',
-                accent: _ink,
+    return Column(
+      children: [
+        Row(
+          children: const [
+            Expanded(
+              child: _StatBlock(
+                value: '08',
+                label: 'ACTIVE\nCHARGERS',
+                accent: _forest,
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: _StatBlock(
-              value: '76%',
-              label: 'NETWORK\nUTILIZATION',
-              accent: _forest,
+            SizedBox(width: 12),
+            Expanded(
+              child: _StatBlock(
+                value: '24',
+                label: 'BOOKINGS\nTODAY',
+                accent: _rust,
+              ),
             ),
-          ),
-        ],
-      ),
-    ],
-  );
-}
-
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const EarningsScreen(),
+                    ),
+                  );
+                },
+                child: const _StatBlock(
+                  value: '₹18.4K',
+                  label: 'REVENUE\nTODAY',
+                  accent: _ink,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: _StatBlock(
+                value: '76%',
+                label: 'NETWORK\nUTILIZATION',
+                accent: _forest,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   Widget _buildChargers(BuildContext context) {
     return Column(
@@ -267,7 +269,7 @@ class _DashboardHome extends StatelessWidget {
           width: double.infinity,
           height: 50,
           child: OutlinedButton.icon(
-                        onPressed: () {
+            onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -595,8 +597,6 @@ class _ChargerRow extends StatelessWidget {
   final String status;
   final Color statusColor;
 
-  
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -867,12 +867,15 @@ class _BottomNav extends StatelessWidget {
 // ============================================================
 // PLACEHOLDER PAGES
 // ============================================================
+
 class _ChargersPage extends StatelessWidget {
-  const _ChargersPage();
+  final BusinessApi api;
+
+  const _ChargersPage({required this.api});
 
   @override
   Widget build(BuildContext context) {
-    return const ChargerManagementScreen();
+    return ChargerManagementScreen(api: api);
   }
 }
 
