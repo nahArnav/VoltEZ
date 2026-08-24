@@ -7,6 +7,7 @@ import 'analytics_screen.dart';
 import '../bookings/bookings_screen.dart';
 import 'ai_recommendations_screen.dart';
 import '../../services/business_api.dart'; // Ensure business_api is imported
+import 'availability_scheduler_screen.dart';
 
 // Shared Voltez AI-mobility command-centre palette.
 const _ivory = Color(0xFF05090E);
@@ -411,6 +412,18 @@ class _DashboardHome extends StatelessWidget {
       builder: (context) {
         return InkWell(
           onTap: () {
+            Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => AvailabilitySchedulerScreen(
+      api: BusinessApi(
+        baseUrl: 'https://api.yourdomain.com', // Your server URL
+        getAuthToken: () => 'YOUR_USER_TOKEN',
+      ),
+      initialChargerId: 'c1', // Optional: ID of charger to open directly
+    ),
+  ),
+);
             Navigator.push(
               context,
               MaterialPageRoute(

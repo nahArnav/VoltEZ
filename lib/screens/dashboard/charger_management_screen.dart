@@ -741,7 +741,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
       ),
     );
   }
-
+  
   Widget _buildEmptyState() {
     return const Center(
       child: Column(

@@ -22,7 +22,7 @@ class BusinessApi {
       };
 
   // ---------------------------------------------------------------------------
-  // API Methods
+  // Dashboard & Profile
   // ---------------------------------------------------------------------------
 
   // GET /businesses/me
@@ -78,6 +78,62 @@ class BusinessApi {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Availability & Scheduling
+  // ---------------------------------------------------------------------------
+
+  // GET /businesses/me/chargers/{chargerId}/availability?date=YYYY-MM-DD
+  Future<List<AvailabilitySlot>> getAvailabilitySlots({
+    required String chargerId,
+    required String date,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/businesses/me/chargers/$chargerId/availability',
+    ).replace(queryParameters: {'date': date});
+
+    final response = await _client.get(uri, headers: _headers);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data
+          .map((e) => AvailabilitySlot.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } else {
+      throw Exception(
+        'Failed to load slots [${response.statusCode}]: ${response.body}',
+      );
+    }
+  }
+
+  // PUT /businesses/me/chargers/{chargerId}/availability
+  Future<void> updateAvailabilitySlots({
+    required String chargerId,
+    required String date,
+    required List<AvailabilitySlot> slots,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/businesses/me/chargers/$chargerId/availability',
+    );
+    final response = await _client.put(
+      uri,
+      headers: _headers,
+      body: jsonEncode({
+        'date': date,
+        'slots': slots.map((s) => s.toJson()).toList(),
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+        'Failed to update slots [${response.statusCode}]: ${response.body}',
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Charger Actions
+  // ---------------------------------------------------------------------------
+
   // POST /businesses/me/chargers/{id}/status
   Future<void> updateChargerStatus(String chargerId, String newStatus) async {
     final uri = Uri.parse('$baseUrl/businesses/me/chargers/$chargerId/status');
@@ -88,9 +144,15 @@ class BusinessApi {
     );
 
     if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception('Failed to update charger status: ${response.statusCode}');
+      throw Exception(
+        'Failed to update charger status: ${response.statusCode}',
+      );
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Recommendations & Bookings
+  // ---------------------------------------------------------------------------
 
   // POST /businesses/me/recommendations/{id}/action
   Future<void> recommendationAction(String id, String action) async {
@@ -102,7 +164,9 @@ class BusinessApi {
     );
 
     if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception('Failed to perform recommendation action: ${response.statusCode}');
+      throw Exception(
+        'Failed to perform recommendation action: ${response.statusCode}',
+      );
     }
   }
 
@@ -112,14 +176,73 @@ class BusinessApi {
     final response = await _client.post(uri, headers: _headers);
 
     if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception('Failed to cancel booking: ${response.statusCode}');
+      throw Exception(
+        'Failed to cancel booking: ${response.statusCode}',
+      );
     }
   }
-} // 👈 Note: All methods end before this closing brace
+}
 
 // ===========================================================================
 // Models & Request DTOs
 // ===========================================================================
+
+class AvailabilitySlot {
+  final String id;
+  final String startTime;
+  final String endTime;
+  final double pricePerKwh;
+  final bool isAvailable;
+  final bool isPeak;
+
+  AvailabilitySlot({
+    required this.id,
+    required this.startTime,
+    required this.endTime,
+    required this.pricePerKwh,
+    required this.isAvailable,
+    this.isPeak = false,
+  });
+
+  factory AvailabilitySlot.fromJson(Map<String, dynamic> json) {
+    return AvailabilitySlot(
+      id: json['id'] ?? '',
+      startTime: json['start_time'] ?? json['startTime'] ?? '',
+      endTime: json['end_time'] ?? json['endTime'] ?? '',
+      pricePerKwh:
+          (json['price_per_kwh'] ?? json['price'] as num?)?.toDouble() ?? 0.0,
+      isAvailable: json['is_available'] ?? json['available'] ?? true,
+      isPeak: json['is_peak'] ?? json['isPeak'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'start_time': startTime,
+        'end_time': endTime,
+        'price_per_kwh': pricePerKwh,
+        'is_available': isAvailable,
+        'is_peak': isPeak,
+      };
+
+  AvailabilitySlot copyWith({
+    String? id,
+    String? startTime,
+    String? endTime,
+    double? pricePerKwh,
+    bool? isAvailable,
+    bool? isPeak,
+  }) {
+    return AvailabilitySlot(
+      id: id ?? this.id,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      pricePerKwh: pricePerKwh ?? this.pricePerKwh,
+      isAvailable: isAvailable ?? this.isAvailable,
+      isPeak: isPeak ?? this.isPeak,
+    );
+  }
+}
 
 class BusinessOnboardingRequest {
   final String businessName;
