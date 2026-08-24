@@ -5,6 +5,7 @@ from app.schemas.recommendation import RecommendationRequest, RecommendationResu
 from app.services.charger import charger_service
 from app.repositories.vehicle import vehicle_repo
 from fastapi import HTTPException
+from app.ml.adapters import ml_adapter
 
 
 def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -76,14 +77,18 @@ class RecommendationService:
             
             # Find best port power
             best_port_kw = 0.0
+            best_port_id = None
             for port in charger.ports:
                 if str(port.status) != "available":
                     continue
                 # Assuming vehicle.connector_types is a list of strings
                 if str(port.connector_type) in (vehicle.connector_types or []):
-                    best_port_kw = max(best_port_kw, get_float(port, "max_power_kw"))
+                    kw = get_float(port, "max_power_kw")
+                    if kw > best_port_kw:
+                        best_port_kw = kw
+                        best_port_id = port.id
             
-            if best_port_kw == 0.0:
+            if best_port_kw == 0.0 or not best_port_id:
                 continue  # No compatible/available ports
             
             is_dc = best_port_kw > 22.0
@@ -100,9 +105,14 @@ class RecommendationService:
             charger_base_price = get_float(charger, "base_price")
             estimated_cost = required_energy_kwh * charger_base_price
             
-            # Wait time (Placeholder)
+            # Wait time (ML Model B)
             rel_score = get_float(charger, "reliability_score", 0.5)
-            predicted_wait_min = 10.0 * (1.0 - rel_score)
+            wait_prediction = await ml_adapter.predict_wait_time(
+                db, 
+                charger_id=int(charger.id), # type: ignore
+                port_id=int(best_port_id)
+            )
+            predicted_wait_min = wait_prediction["wait_minutes"]
 
             # Ranking Formula
             score = 1000.0 - (
