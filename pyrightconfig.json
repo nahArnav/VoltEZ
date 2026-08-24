@@ -1,0 +1,16 @@
+{
+    "executionEnvironments": [
+        {
+            "root": "scripts",
+            "extraPaths": [
+                "services/api"
+            ]
+        },
+        {
+            "root": "services/api",
+            "extraPaths": [
+                "services/api"
+            ]
+        }
+    ]
+}

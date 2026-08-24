@@ -37,6 +37,23 @@ PUNE_LOCATIONS = {
     "phoenix_mall": {"lat": 18.5623, "lng": 73.9166, "name": "Phoenix Marketcity", "category": "mall"},
     "eon_it_park": {"lat": 18.5535, "lng": 73.9435, "name": "EON IT Park", "category": "office"},
     "blue_ridge": {"lat": 18.5880, "lng": 73.9286, "name": "Blue Ridge Society", "category": "apartment"},
+    "kalyani_nagar": {"lat": 18.5471, "lng": 73.9026, "name": "Kalyani Nagar Plaza", "category": "mall"},
+    "magarpatta_city": {"lat": 18.5159, "lng": 73.9272, "name": "Magarpatta Cybercity", "category": "office"},
+    "viman_nagar": {"lat": 18.5679, "lng": 73.9143, "name": "Viman Nagar Hub", "category": "office"},
+    "koregaon_park": {"lat": 18.5362, "lng": 73.8939, "name": "Koregaon Park Arcade", "category": "mall"},
+    "fc_road": {"lat": 18.5183, "lng": 73.8441, "name": "FC Road Hub", "category": "retail"},
+    "baner_balewadi": {"lat": 18.5590, "lng": 73.7868, "name": "Baner Highstreet", "category": "retail"},
+    "hinjewadi_ph1": {"lat": 18.5913, "lng": 73.7389, "name": "Hinjewadi Phase 1", "category": "office"},
+    "hinjewadi_ph2": {"lat": 18.5955, "lng": 73.7196, "name": "Hinjewadi Phase 2", "category": "office"},
+    "hinjewadi_ph3": {"lat": 18.5828, "lng": 73.7029, "name": "Hinjewadi Phase 3", "category": "office"},
+    "wakad": {"lat": 18.5987, "lng": 73.7688, "name": "Wakad Junction", "category": "apartment"},
+    "pimple_saudagar": {"lat": 18.5932, "lng": 73.7937, "name": "Pimple Saudagar Square", "category": "retail"},
+    "aundh": {"lat": 18.5577, "lng": 73.8078, "name": "Aundh IT Park", "category": "office"},
+    "shivaji_nagar": {"lat": 18.5314, "lng": 73.8446, "name": "Shivaji Nagar Metro", "category": "transit"},
+    "swargate": {"lat": 18.5018, "lng": 73.8586, "name": "Swargate Bus Stand", "category": "transit"},
+    "camp": {"lat": 18.5135, "lng": 73.8767, "name": "Camp Cantonment", "category": "retail"},
+    "hadapsar": {"lat": 18.5089, "lng": 73.9259, "name": "Hadapsar Industrial Area", "category": "office"},
+    "kharadi": {"lat": 18.5515, "lng": 73.9348, "name": "Kharadi Bypass", "category": "retail"},
 }
 
 # Charger configurations matching real Indian EV ecosystem
@@ -72,6 +89,26 @@ CHARGER_CONFIGS = [
      "ports": [("CHAdeMO", 50.0)], "reliability": 0.80},
 ]
 
+# Auto-generate basic chargers for the remaining 17 hubs
+for loc_key in list(PUNE_LOCATIONS.keys())[3:]:
+    # Each new hub gets a Fast DC charger and an AC charger
+    CHARGER_CONFIGS.append({
+        "business": loc_key,
+        "name": f"{PUNE_LOCATIONS[loc_key]['name']} DC Fast",
+        "power_kw": 50.0,
+        "base_price": random.choice([15.0, 16.0, 18.0, 20.0]),
+        "ports": [("CCS2", 50.0), ("Type2", 22.0)],
+        "reliability": random.uniform(0.80, 0.99)
+    })
+    CHARGER_CONFIGS.append({
+        "business": loc_key,
+        "name": f"{PUNE_LOCATIONS[loc_key]['name']} AC Slow",
+        "power_kw": 7.4,
+        "base_price": random.choice([8.0, 10.0, 12.0]),
+        "ports": [("Type2", 7.4), ("Type2", 7.4)],
+        "reliability": random.uniform(0.85, 0.99)
+    })
+
 # Demo vehicles matching Indian EV market
 VEHICLES = [
     {"make": "Tata", "model": "Nexon EV Max", "battery_kwh": 40.5, "connectors": ["CCS2", "Type2"],
@@ -89,7 +126,7 @@ async def seed():
         async with session.begin():
             # Check if data already exists
             result = await session.execute(text("SELECT COUNT(*) FROM users"))
-            count = result.scalar()
+            count = result.scalar() or 0
             if count > 0:
                 print("⚠️  Database already has data. Skipping seed.")
                 print("   To re-seed, drop and recreate the database, then run migrations.")
@@ -278,6 +315,47 @@ async def seed():
 
             await session.flush()
             print(f"    ✓ Created {status_count} status events")
+
+            # --- 6.5 Create Synthetic Historical Bookings ---
+            print("  → Creating historical bookings and sessions...")
+            historical_booking_count = 0
+            for i in range(50):
+                # Random time in the last 30 days
+                days_ago = random.randint(1, 30)
+                book_time = now - timedelta(days=days_ago, hours=random.randint(0, 23))
+                start_time = book_time + timedelta(minutes=random.randint(5, 60))
+                end_time = start_time + timedelta(minutes=random.randint(20, 120))
+                
+                # Pick a random driver and port
+                driver = random.choice(drivers)
+                port = random.choice(all_ports)
+                
+                b = Booking(
+                    user_id=driver.id,
+                    port_id=port.id,
+                    start_at=start_time,
+                    end_at=end_time,
+                    status=BookingStatus.COMPLETED,
+                    created_at=book_time,
+                )
+                session.add(b)
+                await session.flush()
+                
+                # Associated charging session
+                cs = ChargingSession(
+                    booking_id=b.id,
+                    check_in_at=start_time - timedelta(minutes=2),
+                    start_at=start_time,
+                    end_at=end_time,
+                    energy_kwh=round(random.uniform(10.0, 45.0), 2),
+                    final_amount=round(random.uniform(150.0, 700.0), 2),
+                    status="completed"
+                )
+                session.add(cs)
+                historical_booking_count += 1
+            
+            await session.flush()
+            print(f"    ✓ Created {historical_booking_count} historical bookings")
 
             # --- 7. Create 30 Days of Synthetic Demand History ---
             print("  → Creating 30 days of demand history...")

@@ -6,18 +6,28 @@ from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
 from app.core.errors import register_exception_handlers
 from app.api.v1.router import api_router
+from arq import create_pool
+from arq.connections import RedisSettings
+from contextlib import asynccontextmanager
 
 # Initialize structured logging
 setup_logging()
 logger = get_logger("main")
-
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Connecting to Redis for background tasks...")
+    app.state.redis = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
+    yield
+    logger.info("Disconnecting from Redis...")
+    await app.state.redis.close()
 
 def create_app() -> FastAPI:
     # 1. Application Factory setup
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
-        openapi_url=f"{settings.API_V1_STR}/openapi.json"
+        openapi_url=f"{settings.API_V1_STR}/openapi.json",
+        lifespan=lifespan  # <-- 🆕 ADD THIS LINE
     )
 
     # 2. CORS Middleware (Allows your frontend teammate to make requests without getting blocked)

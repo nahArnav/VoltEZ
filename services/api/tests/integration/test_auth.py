@@ -43,13 +43,11 @@ async def test_login_user(client):
     await client.post("/api/v1/auth/register", json=register_payload)
 
     # 2. ACT: Attempt to log in with those exact credentials
-    # Note: If your login endpoint uses FastAPI's built-in OAuth2 form data instead of JSON,
-    # you might need to change this to data={"username": "logintester@voltez.com", "password": password}
-    login_payload = {
-        "email": "logintester@voltez.com",
-        "password": password
-    }
-    response = await client.post("/api/v1/auth/login", json=login_payload)
+    # Login endpoint uses OAuth2PasswordRequestForm, which expects form data with "username" field
+    response = await client.post(
+        "/api/v1/auth/login",
+        data={"username": "logintester@voltez.com", "password": password}
+    )
 
     # 3. ASSERT: We expect a 200 OK and a JWT token in the response
     assert response.status_code == 200, response.text
