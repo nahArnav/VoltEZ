@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import List
+from datetime import datetime, timezone, timedelta
+from typing import cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking, BookingStatus
@@ -30,22 +30,25 @@ class BookingService:
             raise NotFoundError(resource="ChargerPort")
 
         # 2. Check if the port is currently operational
-        if port.status != "available":
+        port_status = cast(str, port.status)
+        if port_status != "available":
             raise BadRequestError(
-                message=f"This port is currently {port.status} and cannot be booked.",
+                message=f"This port is currently {port_status} and cannot be booked.",
                 code="PORT_NOT_AVAILABLE",
             )
 
         # 3. Prevent Double-Bookings (Time Conflict Check)
         current_time = datetime.now(timezone.utc)
         active_bookings = await booking_repo.get_active_by_port(
-            db, port_id=port.id, current_time=current_time
+            db, port_id=cast(int, port.id), current_time=current_time
         )
 
         for existing_booking in active_bookings:
+            existing_start_at = cast(datetime, existing_booking.start_at)
+            existing_end_at = cast(datetime, existing_booking.end_at)
             # Overlap logic: A starts before B ends AND A ends after B starts
-            if (booking_in.start_at < existing_booking.end_at) and (
-                booking_in.end_at > existing_booking.start_at
+            if (booking_in.start_at < existing_end_at) and (
+                booking_in.end_at > existing_start_at
             ):
                 raise ConflictError(
                     code="SLOT_UNAVAILABLE",
@@ -55,7 +58,10 @@ class BookingService:
         # 4. Create the booking record
         booking_data = booking_in.model_dump()
         booking_data["user_id"] = user_id
-        booking_data["status"] = BookingStatus.PENDING
+        booking_data["status"] = BookingStatus.HELD
+        
+        # Set the 10-minute hold expiry
+        booking_data["hold_expires_at"] = current_time + timedelta(minutes=10)
 
         db_booking = Booking(**booking_data)
         db.add(db_booking)
@@ -66,7 +72,7 @@ class BookingService:
         event = BookingEvent(
             booking_id=db_booking.id,
             old_status=None,
-            new_status=BookingStatus.PENDING.value,
+            new_status=BookingStatus.HELD.value,
             actor=f"user:{user_id}",
         )
         db.add(event)
@@ -83,17 +89,19 @@ class BookingService:
             raise NotFoundError(resource="Booking")
 
         # Ensure a user is only canceling THEIR OWN booking
-        if booking.user_id != user_id:
+        booking_user_id = cast(int, booking.user_id)
+        if booking_user_id != user_id:
             raise ForbiddenError(message="Not authorized to cancel this booking.")
 
-        if booking.status not in BookingService.CANCELLABLE_STATUSES:
+        booking_status = cast(BookingStatus, booking.status)
+        if booking_status not in BookingService.CANCELLABLE_STATUSES:
             raise BadRequestError(
-                message=f"Cannot cancel a booking that is {booking.status.value}.",
+                message=f"Cannot cancel a booking that is {booking_status.value}.",
                 code="INVALID_STATE_TRANSITION",
             )
 
-        old_status = booking.status.value
-        booking.status = BookingStatus.CANCELLED
+        old_status = booking_status.value
+        setattr(booking, "status", BookingStatus.CANCELLED)
         db.add(booking)
 
         # Write audit event (BR-009)

@@ -25,7 +25,7 @@ async def expire_unpaid_booking(ctx, booking_id: str):
         if booking.status in (BookingStatus.PENDING, BookingStatus.HELD):
             print(f"⚠️ [Worker] Booking {booking_id} is still {booking.status}. Expiring now!")
             
-            booking.status = BookingStatus.EXPIRED
+            setattr(booking, "status", BookingStatus.EXPIRED)
             await db.commit()
             
             print(f"✅ [Worker] Booking {booking_id} successfully expired. Charger is free.")
@@ -43,8 +43,10 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
     
     # Optional startup/shutdown hooks
+    @staticmethod
     async def on_startup(ctx):
         print("🤖 Busboy Worker is starting up and listening for jobs...")
 
+    @staticmethod
     async def on_shutdown(ctx):
         print("🛑 Busboy Worker is shutting down...")

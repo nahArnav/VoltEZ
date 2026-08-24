@@ -37,8 +37,8 @@ class ChargerService:
         await db.refresh(db_charger)
 
         # 5. Attach lat/lng for Pydantic serialization (ChargerResponse expects these fields)
-        db_charger.latitude = lat
-        db_charger.longitude = lon
+        setattr(db_charger, "latitude", lat)
+        setattr(db_charger, "longitude", lon)
 
         return db_charger
 
@@ -73,8 +73,8 @@ class ChargerService:
         # Attach lat/lng onto each ORM object so Pydantic's from_attributes picks them up
         chargers = []
         for charger, lat, lng in rows:
-            charger.latitude = lat
-            charger.longitude = lng
+            setattr(charger, "latitude", lat)
+            setattr(charger, "longitude", lng)
             chargers.append(charger)
 
         return chargers

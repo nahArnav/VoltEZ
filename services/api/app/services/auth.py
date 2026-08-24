@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
@@ -46,7 +46,8 @@ class AuthService:
             return None
             
         # 2. Verify the password matches the stored Argon2 hash
-        if not verify_password(password, user.password_hash):
+        password_hash = cast(str, user.password_hash)
+        if not verify_password(password, password_hash):
             return None
             
         return user
