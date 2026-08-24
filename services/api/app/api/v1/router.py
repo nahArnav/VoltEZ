@@ -9,6 +9,7 @@ from .businesses import router as businesses_router
 from .recommendations import router as recommendations_router
 from .availability import router as availability_router
 from .payments import router as payments_router
+from .ws import router as ws_router
 
 # This is the master router for version 1 of your API
 api_router = APIRouter()
@@ -24,3 +25,4 @@ api_router.include_router(businesses_router)
 api_router.include_router(recommendations_router)
 api_router.include_router(availability_router)
 api_router.include_router(payments_router)
+api_router.include_router(ws_router)

@@ -10,7 +10,8 @@ from app.repositories.booking import booking_repo
 from app.repositories.charger import charger_port_repo
 from app.core.errors import NotFoundError, BadRequestError, ForbiddenError
 from app.services.trust import trust_service
-
+from app.services.fcm import fcm_service
+from app.websockets.manager import manager
 
 class SessionService:
 
@@ -73,6 +74,22 @@ class SessionService:
 
         await db.commit()
         await db.refresh(new_session)
+
+        # 6. Broadcast Real-time Updates (WebSockets & FCM)
+        payload = {
+            "event": "session_checked_in",
+            "session_id": new_session.id,
+            "booking_id": booking.id
+        }
+        await manager.send_personal_message(payload, user_id)
+        await fcm_service.send_push_notification(
+            db=db,
+            user_id=user_id,
+            title="Checked In!",
+            body="You have successfully checked in at the charger.",
+            payload=payload
+        )
+
         return new_session
 
     @staticmethod
@@ -127,6 +144,22 @@ class SessionService:
 
         await db.commit()
         await db.refresh(session)
+
+        # 5. Broadcast Real-time Updates
+        payload = {
+            "event": "charging_started",
+            "session_id": session.id,
+            "port_id": booking.port_id
+        }
+        await manager.send_personal_message(payload, user_id)
+        await fcm_service.send_push_notification(
+            db=db,
+            user_id=user_id,
+            title="Charging Started \u26a1",
+            body="Your vehicle is now charging.",
+            payload=payload
+        )
+
         return session
 
     @staticmethod
@@ -207,6 +240,23 @@ class SessionService:
 
         await db.commit()
         await db.refresh(session)
+
+        # 7. Broadcast Real-time Updates
+        payload = {
+            "event": "charging_completed",
+            "session_id": session.id,
+            "energy_kwh": energy_kwh,
+            "final_amount": total_cost
+        }
+        await manager.send_personal_message(payload, user_id)
+        await fcm_service.send_push_notification(
+            db=db,
+            user_id=user_id,
+            title="Charging Completed \u2705",
+            body=f"Session ended. Total cost: ₹{total_cost}",
+            payload=payload
+        )
+
         return session
 
 
