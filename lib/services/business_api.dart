@@ -8,15 +8,22 @@ class BusinessApi {
   final http.Client _client;
 
   BusinessApi({
-    required this.baseUrl,
+    required String baseUrl,
     required this.getAuthToken,
     http.Client? client,
-  }) : _client = client ?? http.Client();
+  })  : baseUrl = baseUrl.endsWith('/')
+            ? baseUrl.substring(0, baseUrl.length - 1)
+            : baseUrl,
+        _client = client ?? http.Client();
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${getAuthToken()}',
       };
+
+  // ---------------------------------------------------------------------------
+  // API Methods
+  // ---------------------------------------------------------------------------
 
   // GET /businesses/me
   Future<BusinessSnapshot> loadDashboard() async {
@@ -28,7 +35,7 @@ class BusinessApi {
       return BusinessSnapshot.fromJson(data);
     } else {
       throw Exception(
-        'Failed to load dashboard data [${response.statusCode}]: ${response.body}',
+        'Failed to load dashboard [${response.statusCode}]: ${response.body}',
       );
     }
   }
@@ -51,6 +58,40 @@ class BusinessApi {
     }
   }
 
+  // POST /businesses/onboard
+  Future<BusinessSnapshot> createBusinessProfile(
+      BusinessOnboardingRequest request) async {
+    final uri = Uri.parse('$baseUrl/businesses/onboard');
+    final response = await _client.post(
+      uri,
+      headers: _headers,
+      body: jsonEncode(request.toJson()),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final Map<String, dynamic> data = jsonDecode(response.body);
+      return BusinessSnapshot.fromJson(data);
+    } else {
+      throw Exception(
+        'Failed to onboard business [${response.statusCode}]: ${response.body}',
+      );
+    }
+  }
+
+  // POST /businesses/me/chargers/{id}/status
+  Future<void> updateChargerStatus(String chargerId, String newStatus) async {
+    final uri = Uri.parse('$baseUrl/businesses/me/chargers/$chargerId/status');
+    final response = await _client.post(
+      uri,
+      headers: _headers,
+      body: jsonEncode({'status': newStatus}),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Failed to update charger status: ${response.statusCode}');
+    }
+  }
+
   // POST /businesses/me/recommendations/{id}/action
   Future<void> recommendationAction(String id, String action) async {
     final uri = Uri.parse('$baseUrl/businesses/me/recommendations/$id/action');
@@ -61,9 +102,7 @@ class BusinessApi {
     );
 
     if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception(
-        'Failed to perform recommendation action: ${response.statusCode}',
-      );
+      throw Exception('Failed to perform recommendation action: ${response.statusCode}');
     }
   }
 
@@ -76,13 +115,54 @@ class BusinessApi {
       throw Exception('Failed to cancel booking: ${response.statusCode}');
     }
   }
+} // 👈 Note: All methods end before this closing brace
+
+// ===========================================================================
+// Models & Request DTOs
+// ===========================================================================
+
+class BusinessOnboardingRequest {
+  final String businessName;
+  final String legalEntityName;
+  final String contactEmail;
+  final String phone;
+  final String address;
+  final String gstOrTaxId;
+  final String businessType;
+  final int totalChargersPlanned;
+
+  BusinessOnboardingRequest({
+    required this.businessName,
+    required this.legalEntityName,
+    required this.contactEmail,
+    required this.phone,
+    required this.address,
+    required this.gstOrTaxId,
+    required this.businessType,
+    required this.totalChargersPlanned,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'business_name': businessName,
+        'legal_entity_name': legalEntityName,
+        'contact_email': contactEmail,
+        'phone': phone,
+        'address': address,
+        'tax_id': gstOrTaxId,
+        'business_type': businessType,
+        'total_chargers_planned': totalChargersPlanned,
+      };
 }
 
-// ---------------------------------------------------------------------------
-// Models
-// ---------------------------------------------------------------------------
-
 class BusinessSnapshot {
+  final String businessName;
+  final String verification;
+  final double revenue;
+  final double utilization;
+  final List<Charger> chargers;
+  final List<Booking> bookings;
+  final List<Recommendation> recommendations;
+
   const BusinessSnapshot({
     required this.businessName,
     required this.verification,
@@ -92,14 +172,6 @@ class BusinessSnapshot {
     required this.bookings,
     required this.recommendations,
   });
-
-  final String businessName;
-  final String verification;
-  final double revenue;
-  final double utilization;
-  final List<Charger> chargers;
-  final List<Booking> bookings;
-  final List<Recommendation> recommendations;
 
   factory BusinessSnapshot.fromJson(Map<String, dynamic> json) {
     return BusinessSnapshot(
@@ -138,7 +210,9 @@ class RevenueAnalytics {
   factory RevenueAnalytics.fromJson(Map<String, dynamic> json) {
     return RevenueAnalytics(
       period: json['period'] ?? '7d',
-      totalRevenue: (json['total_revenue'] ?? json['totalRevenue'] as num?)?.toDouble() ?? 0.0,
+      totalRevenue:
+          (json['total_revenue'] ?? json['totalRevenue'] as num?)?.toDouble() ??
+              0.0,
       points: (json['points'] ?? json['data_points'] as List<dynamic>?)
               ?.map((e) => RevenuePoint.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -158,13 +232,22 @@ class RevenuePoint {
 
   factory RevenuePoint.fromJson(Map<String, dynamic> json) {
     return RevenuePoint(
-      timestamp: DateTime.tryParse(json['timestamp'] ?? json['date'] ?? '') ?? DateTime.now(),
+      timestamp:
+          DateTime.tryParse(json['timestamp'] ?? json['date'] ?? '') ??
+              DateTime.now(),
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
 
 class Charger {
+  final String id;
+  final String name;
+  final int power;
+  final String status;
+  final double reliability;
+  final List<Port> ports;
+
   const Charger({
     required this.id,
     required this.name,
@@ -173,13 +256,6 @@ class Charger {
     required this.reliability,
     required this.ports,
   });
-
-  final String id;
-  final String name;
-  final int power;
-  final String status;
-  final double reliability;
-  final List<Port> ports;
 
   factory Charger.fromJson(Map<String, dynamic> json) {
     return Charger(
@@ -197,13 +273,13 @@ class Charger {
 }
 
 class Port {
+  final String name;
+  final String status;
+
   const Port({
     required this.name,
     required this.status,
   });
-
-  final String name;
-  final String status;
 
   factory Port.fromJson(Map<String, dynamic> json) {
     return Port(
@@ -214,6 +290,12 @@ class Port {
 }
 
 class Booking {
+  final String id;
+  final String vehicle;
+  final String slot;
+  final String status;
+  final double amount;
+
   const Booking({
     required this.id,
     required this.vehicle,
@@ -221,12 +303,6 @@ class Booking {
     required this.status,
     required this.amount,
   });
-
-  final String id;
-  final String vehicle;
-  final String slot;
-  final String status;
-  final double amount;
 
   factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(
@@ -240,6 +316,19 @@ class Booking {
 }
 
 class Recommendation {
+  final String id;
+  final String type;
+  final String title;
+  final String recommendedStartAt;
+  final String recommendedEndAt;
+  final double suggestedPrice;
+  final int forecastDemand;
+  final int nearbySupply;
+  final double predictedUtilization;
+  final double confidence;
+  final String reason;
+  final String status;
+
   const Recommendation({
     required this.id,
     required this.type,
@@ -255,30 +344,29 @@ class Recommendation {
     required this.status,
   });
 
-  final String id;
-  final String type;
-  final String title;
-  final String recommendedStartAt;
-  final String recommendedEndAt;
-  final double suggestedPrice;
-  final int forecastDemand;
-  final int nearbySupply;
-  final double predictedUtilization;
-  final double confidence;
-  final String reason;
-  final String status;
-
   factory Recommendation.fromJson(Map<String, dynamic> json) {
     return Recommendation(
       id: json['id'] ?? '',
       type: json['type'] ?? '',
       title: json['title'] ?? '',
-      recommendedStartAt: json['recommendedStartAt'] ?? json['recommended_start_at'] ?? '',
-      recommendedEndAt: json['recommendedEndAt'] ?? json['recommended_end_at'] ?? '',
-      suggestedPrice: (json['suggestedPrice'] ?? json['suggested_price'] as num?)?.toDouble() ?? 0.0,
-      forecastDemand: (json['forecastDemand'] ?? json['forecast_demand'] as num?)?.toInt() ?? 0,
-      nearbySupply: (json['nearbySupply'] ?? json['nearby_supply'] as num?)?.toInt() ?? 0,
-      predictedUtilization: (json['predictedUtilization'] ?? json['predicted_utilization'] as num?)?.toDouble() ?? 0.0,
+      recommendedStartAt: json['recommendedStartAt'] ??
+          json['recommended_start_at'] ??
+          '',
+      recommendedEndAt:
+          json['recommendedEndAt'] ?? json['recommended_end_at'] ?? '',
+      suggestedPrice: (json['suggestedPrice'] ?? json['suggested_price'] as num?)
+              ?.toDouble() ??
+          0.0,
+      forecastDemand:
+          (json['forecastDemand'] ?? json['forecast_demand'] as num?)
+                  ?.toInt() ??
+              0,
+      nearbySupply:
+          (json['nearbySupply'] ?? json['nearby_supply'] as num?)?.toInt() ?? 0,
+      predictedUtilization: (json['predictedUtilization'] ??
+                  json['predicted_utilization'] as num?)
+              ?.toDouble() ??
+          0.0,
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
       reason: json['reason'] ?? '',
       status: json['status'] ?? 'pending',
