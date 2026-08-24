@@ -31,6 +31,31 @@ dependencies:
   flutter:
     sdk: flutter
 
+  name: voltez_app
+description: "VoltEZ EV Charging Network Mobile Client"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Networking & Storage dependencies
+  dio: ^5.4.3+1
+  flutter_secure_storage: ^9.0.0
+  flutter_riverpod: ^2.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
