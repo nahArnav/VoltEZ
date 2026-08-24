@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'port_details_screen.dart';
+import 'availability_scheduler_screen.dart';
 import '../chargers/add_edit_chargers_screen.dart';
 import '../../services/business_api.dart';
 
@@ -61,10 +62,10 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     setState(() => _updatingIds.add(charger.id));
 
     try {
-      // If your API supports updating charger status:
-      // await widget.api.updateChargerStatus(charger.id, newStatus);
+      // Call the live API
+      await widget.api.updateChargerStatus(charger.id, newStatus);
 
-      // Optimistic local state update & refresh
+      // Optimistic local state update
       final index = _allChargers.indexWhere((c) => c.id == charger.id);
       if (index != -1) {
         setState(() {
@@ -437,7 +438,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
 
           const SizedBox(height: 18),
 
-          // ACTION BUTTONS
+          // ACTION BUTTONS (Row 1: DETAILS & SCHEDULE)
           Row(
             children: [
               // DETAILS
@@ -449,6 +450,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                       MaterialPageRoute(
                         builder: (_) => PortDetailsScreen(
                           chargerName: charger.name,
+                          api: widget.api,
                         ),
                       ),
                     );
@@ -458,7 +460,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                     side: BorderSide(
                       color: _cyan.withValues(alpha: .4),
                     ),
-                    minimumSize: const Size.fromHeight(44),
+                    minimumSize: const Size.fromHeight(40),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(11),
                     ),
@@ -475,6 +477,48 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
               ),
               const SizedBox(width: 6),
 
+              // SCHEDULE & RATES
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AvailabilitySchedulerScreen(
+                          api: widget.api,
+                          initialChargerId: charger.id,
+                        ),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _lime,
+                    side: BorderSide(
+                      color: _lime.withValues(alpha: .4),
+                    ),
+                    minimumSize: const Size.fromHeight(40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                  ),
+                  child: const Text(
+                    "RATES & SLOTS",
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          // ACTION BUTTONS (Row 2: PAUSE/RESUME & DUPLICATE)
+          Row(
+            children: [
               // PAUSE / RESUME (WITH LOADING SPINNER)
               Expanded(
                 child: ElevatedButton(
@@ -487,7 +531,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                         : _lime,
                     foregroundColor: Colors.black,
                     elevation: 0,
-                    minimumSize: const Size.fromHeight(44),
+                    minimumSize: const Size.fromHeight(40),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(11),
                     ),
@@ -545,11 +589,11 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: _lime,
+                    foregroundColor: _muted,
                     side: BorderSide(
-                      color: _lime.withValues(alpha: .4),
+                      color: _muted.withValues(alpha: .4),
                     ),
-                    minimumSize: const Size.fromHeight(44),
+                    minimumSize: const Size.fromHeight(40),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(11),
                     ),
@@ -741,7 +785,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
       ),
     );
   }
-  
+
   Widget _buildEmptyState() {
     return const Center(
       child: Column(
