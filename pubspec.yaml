@@ -1,4 +1,4 @@
-name: voltez_app
+name: voltez_frontend
 description: "VoltEZ EV Charging Network Mobile Client"
 publish_to: 'none'
 version: 1.0.0+1

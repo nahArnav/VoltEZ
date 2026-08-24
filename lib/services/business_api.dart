@@ -9,7 +9,7 @@ class BusinessApi {
     return const BusinessSnapshot(
       businessName: 'ABC Motors',
       verification: 'verified',
-      revenue: 18420,
+      revenue: 18420.0,
       utilization: 0.76,
       chargers: [
         Charger(
@@ -49,14 +49,14 @@ class BusinessApi {
           vehicle: 'Tata Nexon EV',
           slot: '10:00 – 11:00',
           status: 'CONFIRMED',
-          amount: 420,
+          amount: 420.0,
         ),
         Booking(
           id: 'BK-1285',
           vehicle: 'MG ZS EV',
           slot: '12:30 – 13:30',
           status: 'HELD',
-          amount: 510,
+          amount: 510.0,
         ),
       ],
       recommendations: [
@@ -66,7 +66,7 @@ class BusinessApi {
           title: 'Open availability',
           recommendedStartAt: '14:00',
           recommendedEndAt: '17:00',
-          suggestedPrice: 20,
+          suggestedPrice: 20.0,
           forecastDemand: 18,
           nearbySupply: 5,
           predictedUtilization: 0.82,
