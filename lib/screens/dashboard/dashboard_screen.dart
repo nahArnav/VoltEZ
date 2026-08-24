@@ -6,7 +6,7 @@ import '../chargers/add_edit_chargers_screen.dart';
 import 'analytics_screen.dart';
 import '../bookings/bookings_screen.dart';
 import 'ai_recommendations_screen.dart';
-import 'business_api.dart'; // Ensure business_api is imported
+import '../../services/business_api.dart'; // Ensure business_api is imported
 
 // Shared Voltez AI-mobility command-centre palette.
 const _ivory = Color(0xFF05090E);
@@ -19,7 +19,14 @@ const _panel = Color(0xFF0D1821);
 class DashboardScreen extends StatefulWidget {
   final BusinessApi api;
 
-  const DashboardScreen({super.key, required this.api});
+  DashboardScreen({
+    super.key,
+    BusinessApi? api,
+  }) : api = api ??
+            BusinessApi(
+              baseUrl: 'https://api.yourdomain.com', // Your default URL
+              getAuthToken: () => '',
+            );
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
