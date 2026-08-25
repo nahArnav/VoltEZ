@@ -22,6 +22,25 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Generated data and# Widget Preview related
+.widget_preview/
+
+# Python and Backend
+venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+htmlcov/
+dist/
+build/
+*.egg-info/data/interim/
+data/processed/
+data/synthetic/
+data/rehearsals/
+data/final/
+artifacts/
+
 # Generated data and model artifacts
 data/raw/
 data/interim/
