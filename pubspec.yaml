@@ -1,0 +1,34 @@
+name: voltez_frontend
+description: "VoltEZ EV Charging Network Mobile Client"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+
+  go_router: ^14.8.0
+  fl_chart: ^0.69.0
+  # Core UI & Icons
+  cupertino_icons: ^1.0.6
+
+  # Networking & HTTP
+  dio: ^5.9.0
+
+  # Secure Storage & State Management
+  flutter_secure_storage: ^9.2.4
+  flutter_riverpod: ^2.6.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  mocktail: ^1.0.4 # or mockito
+  dio: ^5.7.0
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
