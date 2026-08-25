@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, cast
 
 from app.db.session import get_db
 from app.models.user import User, UserRole
@@ -16,7 +16,8 @@ async def list_vehicles(
     db: AsyncSession = Depends(get_db)
 ):
     """List all vehicles for the current user."""
-    vehicles = await vehicle_repo.get_by_owner(db, user_id=current_user.id)
+    uid = cast(int, current_user.id)
+    vehicles = await vehicle_repo.get_by_owner(db, user_id=uid)
     return vehicles
 
 @router.post("/", response_model=VehicleResponse, status_code=status.HTTP_201_CREATED)
@@ -27,7 +28,8 @@ async def create_vehicle(
 ):
     """Register a new vehicle."""
     vehicle_data = vehicle_in.model_dump()
-    vehicle_data["user_id"] = current_user.id
+    uid = cast(int, current_user.id)
+    vehicle_data["user_id"] = uid
     vehicle = await vehicle_repo.create(db, obj_in=vehicle_data)
     return vehicle
 
@@ -38,7 +40,8 @@ async def get_vehicle(
     db: AsyncSession = Depends(get_db)
 ):
     vehicle = await vehicle_repo.get(db, id=vehicle_id)
-    if not vehicle or vehicle.user_id != current_user.id:
+    uid = cast(int, current_user.id)
+    if not vehicle or cast(int, vehicle.user_id) != uid:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return vehicle
 
@@ -50,7 +53,8 @@ async def update_vehicle(
     db: AsyncSession = Depends(get_db)
 ):
     vehicle = await vehicle_repo.get(db, id=vehicle_id)
-    if not vehicle or vehicle.user_id != current_user.id:
+    uid = cast(int, current_user.id)
+    if not vehicle or cast(int, vehicle.user_id) != uid:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     
     vehicle = await vehicle_repo.update(db, db_obj=vehicle, obj_in=vehicle_in)
@@ -63,7 +67,8 @@ async def delete_vehicle(
     db: AsyncSession = Depends(get_db)
 ):
     vehicle = await vehicle_repo.get(db, id=vehicle_id)
-    if not vehicle or vehicle.user_id != current_user.id:
+    uid = cast(int, current_user.id)
+    if not vehicle or cast(int, vehicle.user_id) != uid:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     
     await vehicle_repo.remove(db, id=vehicle_id)

@@ -45,7 +45,7 @@ async def login(
     # Generate tokens
     access_token = create_access_token(
         subject=str(user.id), 
-        role=user.role.value if hasattr(user.role, 'value') else user.role
+        role=str(user.role.value if hasattr(user.role, 'value') else user.role)
     )
     refresh_token = create_refresh_token(subject=str(user.id))
 
@@ -60,7 +60,10 @@ async def refresh_token(token_in: TokenRefresh, db: AsyncSession = Depends(get_d
     """Use a valid refresh token to get a new access token."""
     try:
         payload = decode_refresh_token(token_in.refresh_token)
-        user_id = int(payload.get("sub"))
+        sub = payload.get("sub")
+        if not sub:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        user_id = int(sub)
         
         user = await user_repo.get(db, id=user_id)
         if not user:
@@ -68,7 +71,7 @@ async def refresh_token(token_in: TokenRefresh, db: AsyncSession = Depends(get_d
             
         new_access = create_access_token(
             subject=str(user.id), 
-            role=user.role.value if hasattr(user.role, 'value') else user.role
+            role=str(user.role.value if hasattr(user.role, 'value') else user.role)
         )
         new_refresh = create_refresh_token(subject=str(user.id))
         

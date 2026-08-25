@@ -8,7 +8,7 @@ import logging
 import json
 import sys
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Any
 
 
 class JSONFormatter(logging.Formatter):
@@ -18,7 +18,7 @@ class JSONFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        log_entry = {
+        log_entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
