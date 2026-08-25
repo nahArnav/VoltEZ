@@ -30,8 +30,9 @@ This branch (`ML-Arnav`) contains the ML foundation for:
 - Model 2 data stage: v1.3 correction and five-world Pune v4 feature suite complete
 - Model 2 training stage: clean calibrated classifier and FastAPI-ready shadow bundle published;
   locked test remains closed
-- Supporting Model 5 design: route-energy physics baseline, reachability policy, data contract,
-  synthetic requirements, and evaluation gates implemented; no training performed
+- Supporting Model 5 Step 2: physics baseline plus schema-compatible vehicle energy profiles,
+  immutable direct/candidate route snapshots, and long-route coverage implemented; no labels or
+  training performed
 
 ## Model 1: Demand Forecasting
 
@@ -115,8 +116,8 @@ stress world. Model 2 beat the always-available, prevalence, fresh-status, and l
 baselines; achieved ROC-AUC `0.803/0.809` and PR-AUC `0.327/0.335`; kept calibration error below
 `0.007`; and passed all seven frozen development gates. The published artifact records clean commit
 `7ad207a`, verifies its SHA-256 before loading, and was exercised through the same Pydantic predictor
-used by FastAPI. The repository currently has 112 passing tests, including schema drift, timestamp
-consistency, batch consistency, unknown status, unseen category, and abstention behavior.
+used by FastAPI. The test suite covers schema drift, timestamp consistency, batch consistency,
+unknown status, unseen category, and abstention behavior.
 
 This is development and serving verification, not proof from live traffic. Roughly 31% of
 validation/stress cases become `unknown`, and explicit `unavailable` recall is about 4.2% because
@@ -125,10 +126,11 @@ bundle must run in shadow mode on real VoltEZ events before production promotion
 
 ## Supporting Model 5: Route-Energy Prediction
 
-Step 1 is design-only and contains no trained ML artifact. It defines an auditable force/energy
-baseline, conservative reachability decisions, a route-snapshot dataset contract, hidden
-segment-level synthetic truth requirements, leakage rules, and evaluation gates. The planned model
-predicts residual error around physics rather than relearning basic physical laws.
+Steps 1 and 2 contain no trained ML artifact. Step 1 defines an auditable force/energy baseline,
+conservative reachability policy, leakage rules, and evaluation gates. Step 2 adds one versioned
+public energy profile per vehicle, immutable destination and candidate-charger route snapshots, and
+geographically consistent urban/highway/intercity coverage trips. The planned model predicts
+residual error around physics rather than relearning basic physical laws.
 
 ```python
 from voltez_ml.route_energy import (
@@ -146,6 +148,8 @@ safety guarantee.
 
 See [the complete Step 1 design](docs/model5_route_energy_design.md) and the machine-readable
 contract at [`configs/model_specs/route_energy_v1.yaml`](configs/model_specs/route_energy_v1.yaml).
+See the [Step 2 implementation guide](docs/model5_route_energy_step2.md) for table relationships,
+parameter logic, synthetic coverage, commands, and the explicit boundary before hidden truth.
 
 ## Local environment
 

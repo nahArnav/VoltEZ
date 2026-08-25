@@ -1,6 +1,6 @@
 # Model 5 route-energy prediction - Step 1 design
 
-Status: **problem, physics baseline, data contract, synthetic requirements, and evaluation plan**
+Status: **Step 1 frozen; Step 2 public planning inputs implemented**
 
 Training status: **not started**
 
@@ -9,6 +9,8 @@ Locked-test status: **not accessed**
 Machine-readable design: `configs/model_specs/route_energy_v1.yaml`
 
 Executable baseline: `src/voltez_ml/route_energy/physics.py`
+
+Step 2 implementation guide: `docs/model5_route_energy_step2.md`
 
 ## 1. What Model 5 answers
 
@@ -395,8 +397,9 @@ sponsor outage does not make route planning impossible.
 
 ## 15. Step sequence from here
 
-1. Step 1A - review and freeze this physics/data/evaluation design.
-2. Step 2 - extend schema-compatible synthetic route and vehicle profiles.
+1. Step 1A - review and freeze this physics/data/evaluation design. **Complete.**
+2. Step 2 - extend schema-compatible synthetic route and vehicle profiles. **Implemented locally;
+   pending review/commit.**
 3. Step 3 - implement hidden segment-level energy truth and validation invariants.
 4. Step 4 - build leakage-safe route-energy feature views for all worlds.
 5. Step 5 - audit readiness and baselines without opening test.

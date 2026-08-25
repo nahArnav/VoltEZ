@@ -111,6 +111,24 @@ Purpose: compatibility, charging-time estimation, and route intelligence.
 
 Connector compatibility is many-to-many and should not be stored as an unvalidated string array.
 
+### 4.2.1 `app.vehicle_energy_profiles`
+
+Purpose: version the physical and battery priors used for route-energy estimates without rewriting
+historical decisions when a specification is corrected.
+
+Fields: `id`, `vehicle_id`, `effective_from`, `effective_to`, `source`, `confidence`,
+`curb_mass_kg`, `default_payload_kg`, `drag_area_m2`, `rolling_resistance_coefficient`,
+`drivetrain_efficiency`, `regenerative_braking_efficiency`, `usable_capacity_fraction`,
+`battery_health_fraction`, `created_at`.
+
+Rules:
+
+- validity intervals for one vehicle must not overlap;
+- source and confidence are required because catalogue, owner, and class-default values have
+  different certainty;
+- a profile is a planning-time estimate, not immutable physical truth;
+- prediction records reference the profile version they used.
+
 ### 4.3 `app.connector_types`
 
 Purpose: controlled connector vocabulary.
@@ -295,10 +313,33 @@ Purpose: represent a driver's journey and the charger alternatives considered al
 `started_at`, `ended_at`, `distance_km`, `status`.
 
 `trip_charger_options` fields: `trip_id`, `charger_id`, `rank`, `estimated_detour_km`,
-`estimated_arrival_at`, `estimated_charge_time_min`, `estimated_total_cost`.
+`estimated_arrival_at`, `estimated_charge_time_min`, `estimated_total_cost`, `route_snapshot_id`.
 
 Route-planning requests use the additive `charging_requests.trip_id` foreign key so the trip is
 not matched heuristically by user and timestamp.
+
+Ordinary trips may exist without a charging request. This supports destination reachability and
+energy planning before the driver begins a charger search.
+
+### 4.15.1 `app.route_snapshots`
+
+Purpose: preserve the immutable route/context response used for one destination or candidate-
+charger energy decision.
+
+Fields: `id`, `trip_id`, nullable `request_id`, `vehicle_id`, nullable `candidate_charger_id`,
+`leg_type`, `provider`, `provider_route_id`, `route_hash`, `requested_at`, `generated_at`,
+`expires_at`, restricted origin/destination points, distance, normal/traffic duration, elevation
+and grade summaries, urban/highway fractions, estimated stops, timestamped weather summaries,
+source-quality fields, and `created_at`.
+
+Rules:
+
+- a trip references one direct destination snapshot;
+- every candidate option references its origin-to-charger snapshot;
+- snapshots are immutable; refreshed provider data creates a new row;
+- exact coordinates follow a restricted retention policy and are excluded from training exports;
+- missing elevation or weather remains null with an explicit quality state, never numeric zero;
+- realized energy, post-trip duration, and arrival SOC do not belong in this table.
 
 ### 4.16 `app.recommendation_impressions`
 

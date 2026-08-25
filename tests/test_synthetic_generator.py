@@ -114,13 +114,120 @@ def test_route_requests_are_linked_to_trips_and_options(
     requests = _read(result, "charging_requests")
     trips = _read(result, "trips")
     options = _read(result, "trip_charger_options")
+    vehicles = _read(result, "vehicles")
     route_requests = requests[requests["request_type"] == "route_planning"]
 
     assert not route_requests.empty
-    assert set(route_requests["trip_id"]) == set(trips["trip_id"])
+    request_trip_ids = set(route_requests["trip_id"])
+    all_trip_ids = set(trips["trip_id"])
+    assert request_trip_ids.issubset(all_trip_ids)
+    assert len(all_trip_ids - request_trip_ids) == len(vehicles)
     assert set(options["trip_id"]).issubset(set(trips["trip_id"]))
     assert bool((options["estimated_detour_km"] >= 0).all())
     assert bool((options["estimated_total_cost"] >= 0).all())
+
+
+def test_route_energy_profiles_cover_every_vehicle_with_public_priors(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    vehicles = _read(result, "vehicles")
+    profiles = _read(result, "vehicle_energy_profiles")
+
+    assert len(profiles) == len(vehicles)
+    assert profiles["vehicle_id"].is_unique
+    assert set(profiles["vehicle_id"]) == set(vehicles["vehicle_id"])
+    assert set(profiles["source"]).issubset(
+        {"catalogue", "owner_declared", "class_default"}
+    )
+    assert bool(profiles["confidence"].between(0, 1).all())
+    assert bool(profiles["drivetrain_efficiency"].between(0.5, 1).all())
+    assert bool(profiles["usable_capacity_fraction"].between(0.5, 1).all())
+    assert bool(profiles["battery_health_fraction"].between(0.5, 1).all())
+
+
+def test_route_snapshots_cover_direct_and_candidate_legs_without_broken_links(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    trips = _read(result, "trips")
+    options = _read(result, "trip_charger_options")
+    snapshots = _read(result, "route_snapshots")
+
+    assert len(snapshots) == len(trips) + len(options)
+    assert snapshots["route_snapshot_id"].is_unique
+    direct = trips[["trip_id", "direct_route_snapshot_id"]].merge(
+        snapshots,
+        left_on="direct_route_snapshot_id",
+        right_on="route_snapshot_id",
+        validate="one_to_one",
+    )
+    assert bool((direct["trip_id_x"] == direct["trip_id_y"]).all())
+    assert set(direct["leg_type"]) == {"destination"}
+    assert bool(direct["candidate_charger_id"].isna().all())
+
+    candidates = options[["trip_id", "charger_id", "route_snapshot_id"]].merge(
+        snapshots,
+        on="route_snapshot_id",
+        validate="one_to_one",
+    )
+    assert bool((candidates["trip_id_x"] == candidates["trip_id_y"]).all())
+    assert bool((candidates["charger_id"] == candidates["candidate_charger_id"]).all())
+    assert set(candidates["leg_type"]) == {"candidate_charger"}
+
+
+def test_route_snapshot_context_is_point_in_time_and_explicitly_missing(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    snapshots = _read(result, "route_snapshots")
+
+    assert bool((snapshots["requested_at"] <= snapshots["route_snapshot_at"]).all())
+    assert bool((snapshots["route_snapshot_at"] < snapshots["expires_at"]).all())
+    assert bool(
+        (snapshots["traffic_duration_minutes"] >= snapshots["normal_duration_minutes"]).all()
+    )
+    assert bool(
+        (snapshots["urban_fraction"] + snapshots["highway_fraction"])
+        .sub(1.0)
+        .abs()
+        .le(0.00001)
+        .all()
+    )
+
+    missing_weather = snapshots["weather_source_quality"] == "missing"
+    assert bool(missing_weather.any())
+    assert bool(snapshots.loc[missing_weather, "ambient_temperature_c"].isna().all())
+    known_weather = snapshots.loc[~missing_weather]
+    assert bool((known_weather["weather_ingested_at"] <= known_weather["route_snapshot_at"]).all())
+
+
+def test_route_coverage_includes_highway_and_intercity_lengths(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    snapshots = _read(result, "route_snapshots")
+    ordinary_journeys = snapshots[snapshots["request_id"].isna()]
+
+    assert len(ordinary_journeys) == result.row_counts["vehicles"]
+    assert float(ordinary_journeys["distance_km"].max()) > 100
+    assert float(ordinary_journeys["urban_fraction"].min()) < 0.35
+    assert float(ordinary_journeys["urban_fraction"].max()) > 0.75
+    assert int((ordinary_journeys["distance_km"] >= 30).sum()) >= 20
+
+
+def test_route_energy_step_two_contains_no_realized_energy_or_hidden_truth(
+    generated_pair: tuple[GeneratedDataset, GeneratedDataset],
+) -> None:
+    result, _ = generated_pair
+    manifest = json.loads(result.manifest_path.read_text("utf-8"))
+    table_names = set(manifest["tables"])
+
+    assert "route_energy_observations" not in table_names
+    assert "qa_latent_route_energy" not in table_names
+    for table_name in ("vehicle_energy_profiles", "route_snapshots"):
+        columns = set(manifest["tables"][table_name]["columns"])
+        assert not any(column.startswith(("qa_", "latent_", "actual_")) for column in columns)
 
 
 def test_session_energy_matches_meter_delta(

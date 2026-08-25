@@ -17,11 +17,13 @@ The simulator behaves like a small artificial VoltEZ marketplace:
    faults, and confirmed booking conflicts.
 6. Record trips, trip charger options, and every recommendation impression, not only the
    selected result.
-7. Simulate selection, booking, cancellation, no-show, arrival, failure, and completed charging.
-8. Produce noisy owner/driver reports separately from trustworthy check-in/session evidence.
-9. Aggregate the raw events into complete demand buckets.
-10. Reconstruct availability as available, unavailable, or unknown according to evidence quality.
-11. Validate the result and write versioned Parquet files plus a manifest.
+7. Add versioned vehicle-energy priors and immutable direct/candidate route snapshots, including
+   ordinary long-route coverage trips.
+8. Simulate selection, booking, cancellation, no-show, arrival, failure, and completed charging.
+9. Produce noisy owner/driver reports separately from trustworthy check-in/session evidence.
+10. Aggregate the raw events into complete demand buckets.
+11. Reconstruct availability as available, unavailable, or unknown according to evidence quality.
+12. Validate the result and write versioned Parquet files plus a manifest.
 
 The order is causal. A future session cannot influence a recommendation that happened earlier.
 
@@ -32,6 +34,7 @@ The order is causal. A future session cannot influence a recommendation that hap
 | `config.py` | Typed settings and parameter bounds | Bad settings fail before expensive work begins |
 | `synthetic/randomness.py` | Named random streams, stable IDs, count-distribution math | Reproducibility rules stay independent of business logic |
 | `synthetic/entities.py` | Schema v1.1 identity, geography, hosts, schedules, supply, tariffs, and vehicles | Static application state is created before mutable events |
+| `route_energy/synthetic.py` | Public vehicle energy profiles, route snapshots, context, and length coverage | Model 5 planning inputs stay separate from future hidden truth |
 | `synthetic/events.py` | Demand, requests, recommendations, bookings, sessions, reports, labels | Preserves causal event order in one visible pipeline |
 | `synthetic/validation.py` | Memory preflight and post-generation invariants | A bad dataset is rejected before training can read it |
 | `synthetic/io.py` | Parquet files, schema hashes, content hashes | Storage mechanics cannot silently change model logic |
@@ -127,6 +130,10 @@ Synthetic users and vehicles follow the v1.1 ownership relationship. The simulat
 home zone only in `qa_latent_driver_profiles` to create origins; it is not a public model feature.
 Vehicles store battery, range, efficiency, maximum AC/DC power, class, and normalized connector
 compatibility.
+
+Model 5 additionally stores versioned public physical priors in `vehicle_energy_profiles`. Ordinary
+trip coverage includes urban, highway, and intercity lengths, while every route-planning candidate
+receives an immutable `route_snapshot`. See `model5_route_energy_step2.md` for the full logic.
 
 ## 5. Demand generation logic
 
@@ -280,8 +287,9 @@ lags have not yet been created, preventing accidental leakage at this stage.
 ### Before generation
 
 A conservative row estimate considers time-grid size, maximum ports, availability windows,
-expected request volume with headroom, recommendations, labels, and status events. The full Pune
-profile currently estimates about 2.87 million rows against a 5-million-row ceiling.
+expected request volume with headroom, recommendations, labels, status events, vehicle energy
+profiles, and route snapshots. The full Pune profile currently estimates about 3.47 million rows
+against a 5-million-row ceiling.
 
 ### After generation
 
@@ -295,6 +303,8 @@ Validation checks:
 - session timestamps, energy, and SOC bounds;
 - meter-energy and non-negative price reconciliation;
 - route request/trip linkage and non-negative option estimates;
+- vehicle-energy physical bounds and profile validity;
+- direct/candidate route-snapshot coverage, causal timing, context missingness, and route diversity;
 - user/vehicle ownership and charger/parking alignment;
 - status observation-versus-ingestion timing and confidence bounds;
 - availability cutoff timing;
@@ -320,9 +330,9 @@ Public operational/analytics tables include:
 
 - users, zones, businesses, schedules, amenities, offers, chargers, normalized ports, parking,
   availability windows, and tariffs;
-- vehicles and normalized connector compatibility;
-- requests, trips, trip charger options, impressions, bookings, booking events, sessions, and
-  status events;
+- vehicles, versioned energy profiles, and normalized connector compatibility;
+- requests, trips, route snapshots, trip charger options, impressions, bookings, booking events,
+  sessions, and status events;
 - context events, demand buckets, and availability observations.
 
 Files prefixed `qa_latent_` are simulator testing truth. Training code must reject them as features.
@@ -336,6 +346,7 @@ Files prefixed `qa_latent_` are simulator testing truth. Training code must reje
 | `business_count` | Adds host diversity | More supply entities |
 | `charger_count` | Adds charging supply | Can make `no_candidate` unrealistically rare |
 | `driver_count` | Adds vehicle/driver diversity | Larger static tables |
+| `coverage_trips_per_vehicle` | Adds ordinary urban/highway/intercity route examples | Larger trip and route-snapshot tables |
 | `average_requests_per_zone_per_day` | Raises total demand | More conflicts and event rows |
 | `negative_binomial_dispersion` | Reduces burstiness | Very high values may look too smooth |
 | `spatial_spillover_weight` | Correlates neighboring zones | Too high erases local differences |
@@ -345,6 +356,7 @@ Files prefixed `qa_latent_` are simulator testing truth. Training code must reje
 | `availability_tolerance_minutes` | Treats more short delays as available | Too high hides a poor arrival experience |
 | min/max ports per charger | Adds capacity per charger | Larger availability-window tables |
 | `recommendations_per_request` | Records more alternatives | Larger impression/observation tables |
+| route-energy missingness probabilities | Exercises elevation/weather fallback behavior | Too high weakens physics inputs |
 | `selection_probability` | Converts more searches into bookings | Can hide abandonment behavior |
 | cancellation/no-show probability | Reduces successful attendance | Fewer trustworthy availability labels |
 | `maximum_generated_rows` | Allows larger simulations | Setting above safe RAM defeats protection |
