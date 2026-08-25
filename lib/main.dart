@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
-import 'routes/app_router.dart';
+import 'package:provider/provider.dart';
+import 'app.dart';
+import 'core/auth/auth_provider.dart';
+import 'core/providers/charger_discovery_provider.dart';
+import 'core/providers/route_planner_provider.dart';
+import 'core/providers/booking_provider.dart';
+import 'core/providers/session_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const VoltezApp());
-}
-
-class VoltezApp extends StatelessWidget {
-  const VoltezApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Voltez Station Intelligence',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF05090E),
-      ),
-      routerConfig: AppRouter.router,
-    );
-  }
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()..restoreSession()),
+        ChangeNotifierProvider(create: (_) => ChargerDiscoveryProvider()),
+        ChangeNotifierProvider(create: (_) => RoutePlannerProvider()),
+        ChangeNotifierProvider(create: (_) => BookingProvider()),
+        ChangeNotifierProvider(create: (_) => SessionProvider()),
+      ],
+      child: const VoltezApp(),
+    ),
+  );
 }

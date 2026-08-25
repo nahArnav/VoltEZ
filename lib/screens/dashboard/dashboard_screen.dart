@@ -1,13 +1,5 @@
 import 'package:flutter/material.dart';
 import 'charger_management_screen.dart';
-import '../profile/profile_screen.dart';
-import '../earnings/earnings_screen.dart';
-import '../chargers/add_edit_chargers_screen.dart';
-import 'analytics_screen.dart';
-import '../bookings/bookings_screen.dart';
-import 'ai_recommendations_screen.dart';
-import '../../services/business_api.dart'; // Ensure business_api is imported
-import 'availability_scheduler_screen.dart';
 
 // Shared Voltez AI-mobility command-centre palette.
 const _ivory = Color(0xFF05090E);
@@ -18,16 +10,7 @@ const _fadeInk = Color(0xFF7990A1);
 const _panel = Color(0xFF0D1821);
 
 class DashboardScreen extends StatefulWidget {
-  final BusinessApi api;
-
-  DashboardScreen({
-    super.key,
-    BusinessApi? api,
-  }) : api = api ??
-            BusinessApi(
-              baseUrl: 'https://api.yourdomain.com', // Your default URL
-              getAuthToken: () => '',
-            );
+  const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -43,12 +26,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
-          children: [
-            const _DashboardHome(),
-            _ChargersPage(api: widget.api), // Passed from widget.api
-            const _BookingsPage(),
-            const _AnalyticsPage(),
-            const _ProfilePage(),
+          children: const [
+            _DashboardHome(),
+            _ChargersPage(),
+            _BookingsPage(),
+            _AnalyticsPage(),
+            _ProfilePage(),
           ],
         ),
       ),
@@ -90,7 +73,7 @@ class _DashboardHome extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              _buildStats(context),
+              _buildStats(),
 
               const SizedBox(height: 34),
 
@@ -101,7 +84,7 @@ class _DashboardHome extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              _buildChargers(context),
+              _buildChargers(),
 
               const SizedBox(height: 34),
 
@@ -109,7 +92,7 @@ class _DashboardHome extends StatelessWidget {
                 number: '03',
                 title: "TODAY'S BOOKINGS",
               ),
-              
+
               const SizedBox(height: 16),
 
               _buildBookings(),
@@ -193,11 +176,11 @@ class _DashboardHome extends StatelessWidget {
     );
   }
 
-  Widget _buildStats(BuildContext context) {
+  Widget _buildStats() {
     return Column(
       children: [
         Row(
-          children: const [
+          children: [
             Expanded(
               child: _StatBlock(
                 value: '08',
@@ -205,7 +188,7 @@ class _DashboardHome extends StatelessWidget {
                 accent: _forest,
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: _StatBlock(
                 value: '24',
@@ -219,24 +202,14 @@ class _DashboardHome extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const EarningsScreen(),
-                    ),
-                  );
-                },
-                child: const _StatBlock(
-                  value: '₹18.4K',
-                  label: 'REVENUE\nTODAY',
-                  accent: _ink,
-                ),
+              child: _StatBlock(
+                value: '₹18.4K',
+                label: 'REVENUE\nTODAY',
+                accent: _ink,
               ),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: _StatBlock(
                 value: '76%',
                 label: 'NETWORK\nUTILIZATION',
@@ -249,7 +222,7 @@ class _DashboardHome extends StatelessWidget {
     );
   }
 
-  Widget _buildChargers(BuildContext context) {
+  Widget _buildChargers() {
     return Column(
       children: [
         const _ChargerRow(
@@ -277,14 +250,7 @@ class _DashboardHome extends StatelessWidget {
           width: double.infinity,
           height: 50,
           child: OutlinedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AddEditChargerScreen(),
-                ),
-              );
-            },
+            onPressed: () {},
             icon: const Icon(Icons.add_rounded, size: 19),
             label: const Text('ADD CHARGER'),
             style: OutlinedButton.styleFrom(
@@ -345,11 +311,8 @@ class _DashboardHome extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
       decoration: BoxDecoration(
-        color: _panel,
+        color: _forest,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: _rust.withValues(alpha: 0.25),
-        ),
       ),
       child: Column(
         children: [
@@ -359,26 +322,18 @@ class _DashboardHome extends StatelessWidget {
               const Text(
                 '76%',
                 style: TextStyle(
-                  color: _rust,
+                  color: Colors.white,
                   fontSize: 34,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _rust.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _rust.withValues(alpha: 0.3)),
-                ),
-                child: const Text(
-                  'LAST 7 DAYS',
-                  style: TextStyle(
-                    color: _rust,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
+              Text(
+                'LAST 7 DAYS',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.65),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
                 ),
               ),
             ],
@@ -408,95 +363,68 @@ class _DashboardHome extends StatelessWidget {
   }
 
   Widget _buildInsight() {
-    return Builder(
-      builder: (context) {
-        return InkWell(
-          onTap: () {
-            Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (_) => AvailabilitySchedulerScreen(
-      api: BusinessApi(
-        baseUrl: 'https://api.yourdomain.com', // Your server URL
-        getAuthToken: () => 'YOUR_USER_TOKEN',
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: _forest.withValues(alpha: 0.15),
+        ),
       ),
-      initialChargerId: 'c1', // Optional: ID of charger to open directly
-    ),
-  ),
-);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const AiRecommendationsScreen(),
-              ),
-            );
-          },
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            padding: const EdgeInsets.all(20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: _panel,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: _forest.withValues(alpha: 0.15),
-              ),
+              color: _rust,
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
+            child: const Icon(
+              Icons.bolt_rounded,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
+                Text(
+                  'VOLTEZ INSIGHT',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
                     color: _rust,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.bolt_rounded,
-                    color: Colors.white,
                   ),
                 ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'VOLTEZ INSIGHT',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.5,
-                          color: _rust,
-                        ),
-                      ),
-                      SizedBox(height: 7),
-                      Text(
-                        'Charger 03 is underutilized between 11 AM – 3 PM.',
-                        style: TextStyle(
-                          fontSize: 15,
-                          height: 1.35,
-                          fontWeight: FontWeight.w600,
-                          color: _ink,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'View recommendation →',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _forest,
-                        ),
-                      ),
-                    ],
+                SizedBox(height: 7),
+                Text(
+                  'Charger 03 is underutilized between 11 AM – 3 PM.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                    color: _ink,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'View recommendation →',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _forest,
                   ),
                 ),
               ],
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -616,6 +544,8 @@ class _ChargerRow extends StatelessWidget {
   final String type;
   final String status;
   final Color statusColor;
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -780,7 +710,7 @@ class _Bar extends StatelessWidget {
               child: Container(
                 width: 20,
                 decoration: BoxDecoration(
-                  color: _rust,
+                  color: Colors.white.withValues(alpha: 0.85),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(5),
                   ),
@@ -887,15 +817,12 @@ class _BottomNav extends StatelessWidget {
 // ============================================================
 // PLACEHOLDER PAGES
 // ============================================================
-
 class _ChargersPage extends StatelessWidget {
-  final BusinessApi api;
-
-  const _ChargersPage({required this.api});
+  const _ChargersPage();
 
   @override
   Widget build(BuildContext context) {
-    return ChargerManagementScreen(api: api);
+    return const ChargerManagementScreen();
   }
 }
 
@@ -904,7 +831,12 @@ class _BookingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const BookingsScreen();
+    return const Center(
+      child: Text(
+        'Bookings',
+        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+    );
   }
 }
 
@@ -913,7 +845,12 @@ class _AnalyticsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const AnalyticsScreen();
+    return const Center(
+      child: Text(
+        'Analytics',
+        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+    );
   }
 }
 
@@ -922,6 +859,11 @@ class _ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ProfileScreen();
+    return const Center(
+      child: Text(
+        'Profile',
+        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+    );
   }
 }

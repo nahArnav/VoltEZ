@@ -4,22 +4,22 @@ import 'colors.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData darkTheme = ThemeData(
+  static ThemeData dark = ThemeData(
     brightness: Brightness.dark,
     scaffoldBackgroundColor: AppColors.background,
-    primaryColor: AppColors.cyan,
+    primaryColor: AppColors.primary,
 
     colorScheme: const ColorScheme.dark(
-      primary: AppColors.cyan,
-      secondary: AppColors.emerald,
+      primary: AppColors.primary,
+      secondary: AppColors.secondary,
       surface: AppColors.surface,
-      error: AppColors.red,
+      error: AppColors.error,
     ),
 
     appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.background,
       elevation: 0,
-      foregroundColor: AppColors.text,
+      foregroundColor: AppColors.textPrimary,
     ),
 
     cardTheme: CardThemeData(

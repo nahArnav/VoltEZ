@@ -8,7 +8,7 @@
 PRODUCT_NAME = voltez_frontend
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.voltezFrontend
+PRODUCT_BUNDLE_IDENTIFIER = io.voltlez.voltezFrontend
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 io.voltlez. All rights reserved.

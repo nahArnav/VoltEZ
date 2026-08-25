@@ -1,12 +1,26 @@
-# Environments and local secrets
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+.freebuff/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
 .env
 .env.*
 !.env.example
-.venv/
-venv/
-ENV/
-env.bak/
-venv.bak/
 
 # Python caches
 __pycache__/
@@ -22,24 +36,14 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Generated data and# Widget Preview related
-.widget_preview/
-
 # Python and Backend
 venv/
-__pycache__/
-*.pyc
-.env
-.pytest_cache/
-htmlcov/
+.venv/
+ENV/
+env.bak/
+venv.bak/
 dist/
-build/
-*.egg-info/data/interim/
-data/processed/
-data/synthetic/
-data/rehearsals/
-data/final/
-artifacts/
+*.egg-info/
 
 # Generated data and model artifacts
 data/raw/
@@ -60,19 +64,9 @@ reports/demand/
 # Node
 node_modules/
 
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-
-# OS files
-.DS_Store
-Thumbs.db
-
 # Build and distribution
 build/
 dist/
-*.egg-info/
 
 # Local databases and runtime files
 *.db
@@ -81,3 +75,6 @@ dist/
 
 # Logs
 *.log
+
+# Widget Preview
+.widget_preview/

@@ -4,8 +4,6 @@ import '../services/copilot_service.dart';
 const Color _bg = Color(0xFF05090E);
 const Color _panel = Color(0xFF0B141C);
 const Color _cyan = Color(0xFF50F5FF);
-const Color _lime = Color(0xFFC9FF58);
-const Color _violet = Color(0xFF9678FF);
 const Color _text = Color(0xFFF1F7FA);
 const Color _muted = Color(0xFF7D909D);
 

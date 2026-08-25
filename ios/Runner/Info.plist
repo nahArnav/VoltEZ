@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>VoltEZ uses your location to find nearby charging stations.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>VoltEZ uses your location to find nearby charging stations and show your position on the map.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

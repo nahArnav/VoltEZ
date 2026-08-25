@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 const Color _bg = Color(0xFF05090E);
 const Color _panel = Color(0xFF0B141C);
 const Color _cyan = Color(0xFF50F5FF);
-const Color _lime = Color(0xFFC9FF58);
-const Color _violet = Color(0xFF9678FF);
 const Color _amber = Color(0xFFFFC857);
 const Color _danger = Color(0xFFFF5F6D);
 const Color _text = Color(0xFFF1F8FF);
@@ -94,7 +92,6 @@ class _EarningsScreenState extends State<EarningsScreen> {
             Text(
               "FINANCIAL ANALYTICS",
               style: TextStyle(
-                color: _lime,
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2,
@@ -159,10 +156,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _lime.withOpacity(0.18)),
         boxShadow: [
           BoxShadow(
-            color: _lime.withOpacity(0.04),
             blurRadius: 28,
             offset: const Offset(0, 10),
           ),
@@ -176,18 +171,15 @@ class _EarningsScreenState extends State<EarningsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: _lime.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.bolt_rounded, color: _lime, size: 14),
                     SizedBox(width: 4),
                     Text(
                       "AUTO-SETTLE ACTIVE",
                       style: TextStyle(
-                        color: _lime,
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1,
@@ -360,12 +352,10 @@ class _EarningsScreenState extends State<EarningsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _lime.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
                   "+18.4% vs last period",
-                  style: TextStyle(color: _lime, fontSize: 10, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -564,7 +554,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
     switch (item.status) {
       case 'paid':
-        badgeColor = _lime;
+        badgeColor = const Color(0xFF34D399);
         statusIcon = Icons.check_circle_rounded;
         break;
       case 'processing':
@@ -668,7 +658,6 @@ class _EarningsScreenState extends State<EarningsScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.account_balance_rounded, color: _lime, size: 22),
                   const SizedBox(width: 10),
                   const Text(
                     "Settlement Account",
@@ -699,7 +688,6 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 height: 48,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _lime,
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -716,7 +704,6 @@ class _EarningsScreenState extends State<EarningsScreen> {
                         backgroundColor: _bg,
                         content: Text(
                           "Settlement account updated successfully!",
-                          style: TextStyle(color: _lime),
                         ),
                       ),
                     );
