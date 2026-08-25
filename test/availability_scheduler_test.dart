@@ -10,21 +10,21 @@ void main() {
   late MockBusinessApi mockApi;
 
   final sampleChargers = [
-    Charger(
+    const Charger(
       id: 'ch-01',
       name: 'Bay 01 • DC Fast',
       power: 60,
       status: 'active',
       reliability: 0.98,
-      ports: [Port(id: 'p1', name: 'CCS2', status: 'available')],
+      ports: [Port(name: 'CCS2', status: 'available')],
     ),
-    Charger(
+    const Charger(
       id: 'ch-02',
       name: 'Bay 02 • AC',
       power: 22,
       status: 'active',
       reliability: 0.95,
-      ports: [Port(id: 'p2', name: 'Type 2', status: 'available')],
+      ports: [Port(name: 'Type 2', status: 'available')],
     ),
   ];
 
@@ -50,13 +50,16 @@ void main() {
   setUp(() {
     mockApi = MockBusinessApi();
 
+    // Uses the exact BusinessSnapshot class from business_api.dart
     when(() => mockApi.loadDashboard()).thenAnswer(
-      (_) async => DashboardSnapshot(
+      (_) async => BusinessSnapshot(
         businessName: 'VoltHub Prime',
-        totalRevenue: 100000,
-        energyDispensed: 1200,
-        activeChargersCount: 2,
+        verification: 'verified',
+        revenue: 128640.0,
+        utilization: 0.82,
         chargers: sampleChargers,
+        bookings: const [],
+        recommendations: const [],
       ),
     );
 
@@ -69,7 +72,7 @@ void main() {
           chargerId: any(named: 'chargerId'),
           date: any(named: 'date'),
           slots: any(named: 'slots'),
-        )).thenAnswer((_) async => true);
+        )).thenAnswer((_) async => Future.value());
   });
 
   Widget createTestWidget(Widget child) {
@@ -96,7 +99,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap on second day in the horizontal date picker
+      // Tap on a date chip in the horizontal date picker
       final dateItems = find.byType(GestureDetector);
       await tester.tap(dateItems.at(3));
       await tester.pumpAndSettle();
@@ -134,7 +137,6 @@ void main() {
 
       expect(find.text('Edit Slot Rate (06:00 - 07:00)'), findsOneWidget);
 
-      // Enter new price in the dialog
       final dialogInput = find.descendant(
         of: find.byType(AlertDialog),
         matching: find.byType(TextField),
