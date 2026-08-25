@@ -94,7 +94,7 @@ class _ChargingSessionScreenState extends State<ChargingSessionScreen>
                   session.phase != SessionPhase.checkedIn) {
                 return const SizedBox.shrink();
               }
-              return _buildConnectionBadge(session.connectionState);
+              return _buildConnectionBadge(session.connectionStateLabel);
             },
           ),
           const SizedBox(width: 12),
@@ -403,7 +403,7 @@ class _ChargingSessionScreenState extends State<ChargingSessionScreen>
           // Live indicator
           AnimatedBuilder(
             animation: _pulseController,
-            builder: (_, __) {
+            builder: (_, _) {
               return Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

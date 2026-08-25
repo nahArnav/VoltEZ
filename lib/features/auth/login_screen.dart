@@ -86,7 +86,7 @@ class _RoleSelect extends StatelessWidget {
                   title: 'Business owner',
                   detail: 'Manage chargers, fleet and insights.',
                   color: AppColors.success,
-                  onTap: () => onSelect(AccountRole.business),
+                  onTap: () => onSelect(AccountRole.owner),
                 ),
                 const SizedBox(height: 20),
               ],
@@ -183,7 +183,7 @@ class _AuthPanelState extends State<_AuthPanel> {
     // Quick demo login — skip backend for now
     context.read<AuthProvider>().demoLogin(widget.role);
 
-    if (widget.role == AccountRole.business) {
+    if (widget.role == AccountRole.owner) {
       context.go('/business/dashboard');
     } else {
       context.go('/driver/home');
@@ -193,7 +193,7 @@ class _AuthPanelState extends State<_AuthPanel> {
   @override
   Widget build(BuildContext context) {
     final accent =
-        widget.role == AccountRole.business ? AppColors.success : AppColors.primary;
+        widget.role == AccountRole.owner ? AppColors.success : AppColors.primary;
 
     return LayoutBuilder(
       builder: (_, box) => SingleChildScrollView(

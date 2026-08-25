@@ -109,7 +109,7 @@ class BookingProvider extends ChangeNotifier {
 
     try {
       _slots = await _api.getAvailability(
-        _selectedCharger!.id,
+        _selectedCharger!.id.toString(),
         DateTime.now(),
       );
     } catch (e) {
@@ -131,7 +131,7 @@ class BookingProvider extends ChangeNotifier {
 
     try {
       _holdResult = await _api.holdSlot(
-        chargerId: _selectedCharger!.id,
+        chargerId: _selectedCharger!.id.toString(),
         slotId: slot.id,
         connectorType: slot.connectorType,
       );
@@ -175,17 +175,28 @@ class BookingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Process payment — verify with backend.
-  Future<void> processPayment() async {
+  // ─── Razorpay payment details ───
+  String? _razorpayPaymentId;
+  String? get razorpayPaymentId => _razorpayPaymentId;
+
+  /// Process payment after Razorpay checkout succeeds.
+  /// Sends the Razorpay payment_id, order_id, and signature to the
+  /// backend for server-side verification.
+  Future<void> processPayment({
+    String? razorpayPaymentId,
+    String? razorpayOrderId,
+    String? razorpaySignature,
+  }) async {
     if (_paymentOrder == null || _holdResult == null) return;
 
     _phase = BookingPhase.paymentProcessing;
     _errorMessage = null;
+    _razorpayPaymentId = razorpayPaymentId;
     notifyListeners();
 
     try {
       _confirmedBooking = await _api.verifyPayment(
-        orderId: _paymentOrder!.orderId,
+        orderId: razorpayOrderId ?? _paymentOrder!.orderId,
         bookingId: _holdResult!.bookingId,
       );
 
@@ -218,6 +229,13 @@ class BookingProvider extends ChangeNotifier {
     _holdResult = null;
     _selectedSlot = null;
     _phase = BookingPhase.paymentCancelled;
+    notifyListeners();
+  }
+
+  /// Set a payment error from an external source (e.g. Razorpay failure).
+  void setPaymentError(String message) {
+    _errorMessage = message;
+    _phase = BookingPhase.paymentFailed;
     notifyListeners();
   }
 

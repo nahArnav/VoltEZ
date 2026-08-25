@@ -31,21 +31,27 @@ class AuthProvider extends ChangeNotifier {
       final response = await _api.login(email, password);
       final data = response.data as Map<String, dynamic>;
 
-      // Store token
-      final token = data['token'] as String?;
-      if (token != null) {
-        _api.setToken(token);
+      // Backend returns: { access_token, refresh_token, token_type: "bearer" }
+      final accessToken = data['access_token'] as String?;
+      final refreshToken = data['refresh_token'] as String?;
+      if (accessToken != null) {
+        _api.setToken(accessToken);
+        _api.setRefreshToken(refreshToken);
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', token);
+        await prefs.setString('auth_token', accessToken);
+        if (refreshToken != null) {
+          await prefs.setString('refresh_token', refreshToken);
+        }
       }
 
-      // Parse user
-      if (data['user'] != null) {
-        _user = User.fromJson(data['user'] as Map<String, dynamic>);
-      } else {
+      // After login, fetch user profile from /users/me
+      try {
+        final userResponse = await _api.getMe();
+        _user = User.fromJson(userResponse.data as Map<String, dynamic>);
+      } catch (_) {
         // Fallback: create from email
         _user = User(
-          id: 'temp',
+          id: 0,
           name: email.split('@').first,
           email: email,
           role: AccountRole.driver,
@@ -64,27 +70,28 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ─── Signup ───
+  // Backend: POST /auth/register → returns UserResponse
   Future<bool> signup(String name, String email, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _api.signup(name, email, password);
-      final data = response.data as Map<String, dynamic>;
+      final response = await _api.register(name: name, email: email, password: password);
+      final userData = response.data as Map<String, dynamic>;
 
-      final token = data['token'] as String?;
-      if (token != null) {
-        _api.setToken(token);
+      // Backend returns user object, then we need to login separately
+      final loginResponse = await _api.login(email, password);
+      final loginData = loginResponse.data as Map<String, dynamic>;
+
+      final accessToken = loginData['access_token'] as String?;
+      if (accessToken != null) {
+        _api.setToken(accessToken);
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', token);
+        await prefs.setString('auth_token', accessToken);
       }
 
-      if (data['user'] != null) {
-        _user = User.fromJson(data['user'] as Map<String, dynamic>);
-      } else {
-        _user = User(id: 'temp', name: name, email: email, role: AccountRole.driver);
-      }
+      _user = User.fromJson(userData);
 
       _isLoading = false;
       notifyListeners();
@@ -105,7 +112,6 @@ class AuthProvider extends ChangeNotifier {
         name: _user!.name,
         email: _user!.email,
         phone: _user!.phone,
-        avatarUrl: _user!.avatarUrl,
         role: role,
       );
       notifyListeners();
@@ -115,7 +121,7 @@ class AuthProvider extends ChangeNotifier {
   // ─── Quick login (for demo/testing — skips backend) ───
   void demoLogin(AccountRole role) {
     _user = User(
-      id: 'demo-${role.name}',
+      id: 9999,
       name: role == AccountRole.driver ? 'Demo Driver' : 'ABC Motors',
       email: role == AccountRole.driver ? 'driver@voltez.in' : 'business@voltez.in',
       role: role,

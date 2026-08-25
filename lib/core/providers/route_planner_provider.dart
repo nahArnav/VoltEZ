@@ -62,39 +62,23 @@ class RoutePlannerProvider extends ChangeNotifier {
       _destinationName.isNotEmpty &&
       _selectedVehicle != null;
 
-  // ─── Mock Vehicles ───
+  // ─── Mock Vehicles (match backend Vehicle schema) ───
   final List<Vehicle> availableVehicles = const [
     Vehicle(
-      id: 'v1',
-      make: 'Tata',
-      model: 'Nexon EV',
-      year: 2024,
-      batteryCapacityKwh: 40.5,
-      connectorType: ConnectorType.ccs2,
+      id: 1, userId: 1, make: 'Tata', model: 'Nexon EV',
+      batteryKwh: 40.5, connectorTypes: ['CCS2'],
     ),
     Vehicle(
-      id: 'v2',
-      make: 'MG',
-      model: 'ZS EV',
-      year: 2024,
-      batteryCapacityKwh: 50.3,
-      connectorType: ConnectorType.ccs2,
+      id: 2, userId: 1, make: 'MG', model: 'ZS EV',
+      batteryKwh: 50.3, connectorTypes: ['CCS2'],
     ),
     Vehicle(
-      id: 'v3',
-      make: 'Hyundai',
-      model: 'Ioniq 5',
-      year: 2024,
-      batteryCapacityKwh: 58.0,
-      connectorType: ConnectorType.ccs2,
+      id: 3, userId: 1, make: 'Hyundai', model: 'Ioniq 5',
+      batteryKwh: 58.0, connectorTypes: ['CCS2'],
     ),
     Vehicle(
-      id: 'v4',
-      make: 'BYD',
-      model: 'Atto 3',
-      year: 2024,
-      batteryCapacityKwh: 60.5,
-      connectorType: ConnectorType.ccs2,
+      id: 4, userId: 1, make: 'BYD', model: 'Atto 3',
+      batteryKwh: 60.5, connectorTypes: ['CCS2'],
     ),
   ];
 
@@ -192,7 +176,7 @@ class RoutePlannerProvider extends ChangeNotifier {
         vehicleMake: _selectedVehicle!.make,
         vehicleModel: _selectedVehicle!.model,
         batteryCapacityKwh: _selectedVehicle!.batteryCapacityKwh,
-        connectorType: _selectedVehicle!.connectorType.name,
+        connectorType: _selectedVehicle!.primaryConnector,
         currentSOC: _currentSOC,
         reserveSOC: _reserveSOC,
         preference: _preference.name,

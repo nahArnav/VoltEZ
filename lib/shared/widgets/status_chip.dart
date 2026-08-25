@@ -53,12 +53,17 @@ class BookingStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      BookingStatus.pending => ('PENDING', AppColors.warning),
-      BookingStatus.confirmed => ('CONFIRMED', AppColors.success),
-      BookingStatus.held => ('HELD', AppColors.primary),
-      BookingStatus.active => ('ACTIVE', AppColors.primary),
-      BookingStatus.completed => ('COMPLETED', AppColors.success),
-      BookingStatus.cancelled => ('CANCELLED', AppColors.error),
+      BookingStatus.PENDING => ('PENDING', AppColors.warning),
+      BookingStatus.HELD => ('HELD', AppColors.primary),
+      BookingStatus.PAYMENT_PENDING => ('PAYMENT PENDING', AppColors.warning),
+      BookingStatus.CONFIRMED => ('CONFIRMED', AppColors.success),
+      BookingStatus.CANCELLED => ('CANCELLED', AppColors.error),
+      BookingStatus.EXPIRED => ('EXPIRED', AppColors.error),
+      BookingStatus.FAILED => ('FAILED', AppColors.error),
+      BookingStatus.NO_SHOW => ('NO SHOW', AppColors.error),
+      BookingStatus.CHECKED_IN => ('CHECKED IN', AppColors.primary),
+      BookingStatus.CHARGING => ('CHARGING', AppColors.primary),
+      BookingStatus.COMPLETED => ('COMPLETED', AppColors.success),
     };
 
     return Container(

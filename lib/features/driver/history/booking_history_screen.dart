@@ -158,7 +158,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: filters.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final (key, label) = filters[index];
           final selected = _filter == key;

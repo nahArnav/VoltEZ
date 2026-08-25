@@ -1,41 +1,51 @@
+// ignore_for_file: constant_identifier_names
+// UPPER_CASE enum values intentionally match backend JSON strings.
+
 /// VoltEZ Data Models
 ///
 /// Shared between Driver and Business sides.
+/// Backend-aligned models with backward-compatible aliases for existing screens.
 library;
 
 import 'package:flutter/material.dart';
 
 // ─── User / Auth ───
+// Backend: UserRole enum = "DRIVER" | "OWNER" | "ADMIN"
 
-enum AccountRole { driver, business }
+enum AccountRole { driver, owner, admin }
 
 class User {
-  final String id;
+  final int id;
   final String name;
   final String email;
   final String? phone;
-  final String? avatarUrl;
   final AccountRole role;
+  final String verificationStatus;
+  final DateTime? createdAt;
 
   const User({
     required this.id,
     required this.name,
     required this.email,
     this.phone,
-    this.avatarUrl,
     required this.role,
+    this.verificationStatus = 'unverified',
+    this.createdAt,
   });
 
+  // ─── Backward-compat ───
+  String get idString => id.toString();
+
   factory User.fromJson(Map<String, dynamic> json) => User(
-        id: json['id'] as String,
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
         name: json['name'] as String,
         email: json['email'] as String,
         phone: json['phone'] as String?,
-        avatarUrl: json['avatarUrl'] as String?,
-        role: AccountRole.values.firstWhere(
-          (e) => e.name == json['role'],
-          orElse: () => AccountRole.driver,
-        ),
+        role: _parseUserRole(json['role'] as String?),
+        verificationStatus: json['verification_status'] as String? ?? 'unverified',
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'] as String)
+            : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -43,236 +53,640 @@ class User {
         'name': name,
         'email': email,
         'phone': phone,
-        'avatarUrl': avatarUrl,
         'role': role.name,
+        'verification_status': verificationStatus,
+      };
+}
+
+AccountRole _parseUserRole(String? role) {
+  switch (role) {
+    case 'DRIVER':
+    case 'driver':
+      return AccountRole.driver;
+    case 'OWNER':
+    case 'owner':
+      return AccountRole.owner;
+    case 'ADMIN':
+    case 'admin':
+      return AccountRole.admin;
+    default:
+      return AccountRole.driver;
+  }
+}
+
+// ─── Vehicle ───
+// Backend: { id: int, user_id, make, model, battery_kwh, connector_types: List[str], ... }
+
+class Vehicle {
+  final int id;
+  final int userId;
+  final String make;
+  final String model;
+  final double batteryKwh;
+  final List<String> connectorTypes;
+  final double? maxAcKw;
+  final double? maxDcKw;
+  final double? estimatedRangeKm;
+  final DateTime? createdAt;
+
+  const Vehicle({
+    required this.id,
+    required this.userId,
+    required this.make,
+    required this.model,
+    required this.batteryKwh,
+    required this.connectorTypes,
+    this.maxAcKw,
+    this.maxDcKw,
+    this.estimatedRangeKm,
+    this.createdAt,
+  });
+
+  String get displayName => '$make $model';
+  String get primaryConnector => connectorTypes.isNotEmpty ? connectorTypes.first : 'Unknown';
+
+  // ─── Backward-compat for old screens ───
+  double get batteryCapacityKwh => batteryKwh;
+  String get connectorType => primaryConnector;
+  int get year => createdAt?.year ?? 2024;
+
+  factory Vehicle.fromJson(Map<String, dynamic> json) => Vehicle(
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+        userId: json['user_id'] is int ? json['user_id'] as int : 0,
+        make: json['make'] as String,
+        model: json['model'] as String,
+        batteryKwh: (json['battery_kwh'] as num).toDouble(),
+        connectorTypes: (json['connector_types'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ?? [],
+        maxAcKw: (json['max_ac_kw'] as num?)?.toDouble(),
+        maxDcKw: (json['max_dc_kw'] as num?)?.toDouble(),
+        estimatedRangeKm: (json['estimated_range_km'] as num?)?.toDouble(),
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'] as String)
+            : null,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'make': make,
+        'model': model,
+        'battery_kwh': batteryKwh,
+        'connector_types': connectorTypes,
+        if (maxAcKw != null) 'max_ac_kw': maxAcKw,
+        if (maxDcKw != null) 'max_dc_kw': maxDcKw,
+        if (estimatedRangeKm != null) 'estimated_range_km': estimatedRangeKm,
       };
 }
 
 // ─── Charger ───
+// Backend: { id: int, business_id, name, power_kw, access_type, base_price,
+//   status: "active"|"paused"|"inactive", reliability_score, latitude, longitude,
+//   ports: List[ChargerPortResponse], amenities? (comma-separated str) }
 
-enum ChargerStatus { available, busy, offline, maintenance }
+enum ChargerOperationalStatus { active, paused, inactive }
+enum PortStatus { available, occupied, offline, unknown }
 
+/// Backward-compatible connector type enum (legacy screens reference this).
+/// Backend uses plain strings: "CCS2", "Type2", "CHAdeMO", etc.
 enum ConnectorType { ccs2, type2, chademo, gbT, type1 }
 
+/// Backward-compatible charger status enum (legacy screens reference this).
+/// Backend uses: "active"/"paused"/"inactive" for charger status,
+/// and "available"/"occupied"/"offline"/"unknown" for port status.
+enum ChargerStatus { available, busy, offline, maintenance }
+
+String connectorTypeLabel(String type) {
+  switch (type) {
+    case 'CCS2': return 'CCS2';
+    case 'Type2': return 'Type 2';
+    case 'Type 2': return 'Type 2';
+    case 'CHAdeMO': return 'CHAdeMO';
+    case 'GB_T': return 'GB/T';
+    case 'Type1': return 'Type 1';
+    default: return type;
+  }
+}
+
+class ChargerPort {
+  final int id;
+  final int chargerId;
+  final String connectorType;
+  final double maxPowerKw;
+  final String status;
+  final DateTime? createdAt;
+
+  const ChargerPort({
+    required this.id,
+    required this.chargerId,
+    required this.connectorType,
+    required this.maxPowerKw,
+    required this.status,
+    this.createdAt,
+  });
+
+  bool get isAvailable => status == 'available';
+
+  factory ChargerPort.fromJson(Map<String, dynamic> json) => ChargerPort(
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+        chargerId: json['charger_id'] is int ? json['charger_id'] as int : 0,
+        connectorType: json['connector_type'] as String,
+        maxPowerKw: (json['max_power_kw'] as num).toDouble(),
+        status: json['status'] as String? ?? 'available',
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'] as String)
+            : null,
+      );
+}
+
 class Charger {
-  final String id;
+  final int id;
+  final int businessId;
   final String name;
-  final String address;
+  final String? address; // Not in backend — may be computed from lat/lng or omitted
   final double latitude;
   final double longitude;
   final double powerKw;
-  final double pricePerKwh;
-  final ChargerStatus status;
-  final List<ConnectorType> connectors;
-  final List<String> amenities;
-  final double rating;
-  final int totalRatings;
-  final String? imageUrl;
-  final String? businessId;
+  final String accessType;
+  final double basePrice; // INR per kWh
+  final String status; // "active", "paused", "inactive"
+  final double reliabilityScore; // 0.0 – 1.0
+  final String? parkingInfo;
+  final String? amenities; // comma-separated string
+  final List<ChargerPort> ports;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  // ─── Backward-compat fields for legacy screens ───
+  final List<ConnectorType> _legacyConnectors;
+  final ChargerStatus _legacyStatus;
 
   const Charger({
     required this.id,
+    this.businessId = 0,
     required this.name,
-    required this.address,
+    this.address,
     required this.latitude,
     required this.longitude,
     required this.powerKw,
-    required this.pricePerKwh,
-    required this.status,
-    required this.connectors,
-    this.amenities = const [],
-    this.rating = 0.0,
-    this.totalRatings = 0,
-    this.imageUrl,
-    this.businessId,
-  });
+    this.accessType = 'public',
+    this.basePrice = 0,
+    this.status = 'active',
+    this.reliabilityScore = 0.5,
+    this.parkingInfo,
+    this.amenities,
+    this.ports = const [],
+    this.createdAt,
+    this.updatedAt,
+    List<ConnectorType> connectors = const [],
+    ChargerStatus chargerStatus = ChargerStatus.available,
+  }) : _legacyConnectors = connectors,
+       _legacyStatus = chargerStatus;
 
-  factory Charger.fromJson(Map<String, dynamic> json) => Charger(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        address: json['address'] as String,
-        latitude: (json['latitude'] as num).toDouble(),
-        longitude: (json['longitude'] as num).toDouble(),
-        powerKw: (json['powerKw'] as num).toDouble(),
-        pricePerKwh: (json['pricePerKwh'] as num).toDouble(),
-        status: ChargerStatus.values.firstWhere(
-          (e) => e.name == json['status'],
-          orElse: () => ChargerStatus.offline,
-        ),
-        connectors: (json['connectors'] as List<dynamic>?)
-                ?.map((e) => ConnectorType.values.firstWhere(
-                      (c) => c.name == e,
-                      orElse: () => ConnectorType.ccs2,
-                    ))
-                .toList() ??
-            [],
-        amenities: (json['amenities'] as List<dynamic>?)
-                ?.map((e) => e as String)
-                .toList() ??
-            [],
-        rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
-        totalRatings: json['totalRatings'] as int? ?? 0,
-        imageUrl: json['imageUrl'] as String?,
-        businessId: json['businessId'] as String?,
-      );
+  /// Backward-compat: display status for UI.
+  String get displayStatus {
+    switch (status) {
+      case 'active': return 'Available';
+      case 'paused': return 'Paused';
+      case 'inactive': return 'Offline';
+      default: return status;
+    }
+  }
+
+  /// Connector types derived from ports.
+  List<String> get connectorTypes =>
+      ports.map((p) => p.connectorType).toSet().toList();
+
+  /// Highest power port.
+  double get maxPortPower =>
+      ports.isEmpty ? powerKw : ports.map((p) => p.maxPowerKw).reduce((a, b) => a > b ? a : b);
+
+  /// Parsed amenities list from comma-separated string.
+  List<String> get amenitiesList =>
+      amenities?.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() ?? [];
+
+  /// Backward-compat: rating (use reliabilityScore * 5 as proxy).
+  double get rating => (reliabilityScore * 5).clamp(0.0, 5.0);
+
+  /// Backward-compat: totalRatings (not in backend — return 0).
+  int get totalRatings => 0;
+
+  /// Backward-compat: pricePerKwh (backend uses basePrice).
+  double get pricePerKwh => basePrice;
+
+  /// Backward-compat: connectors list (derived from ports or legacy).
+  List<ConnectorType> get connectors =>
+      ports.isNotEmpty
+          ? ports.map((p) => _connectorTypeFromString(p.connectorType)).toList()
+          : _legacyConnectors;
+
+  /// Backward-compat: ChargerStatus (derived from backend status string).
+  ChargerStatus get chargerStatus => _legacyStatus;
+
+  ConnectorType _connectorTypeFromString(String s) {
+    switch (s) {
+      case 'CCS2': return ConnectorType.ccs2;
+      case 'Type2': case 'Type 2': return ConnectorType.type2;
+      case 'CHAdeMO': return ConnectorType.chademo;
+      case 'GB_T': return ConnectorType.gbT;
+      case 'Type1': return ConnectorType.type1;
+      default: return ConnectorType.ccs2;
+    }
+  }
+
+  factory Charger.fromJson(Map<String, dynamic> json) {
+    // Handle legacy connectors list (old frontend format)
+    final legacyConnectors = (json['connectors'] as List<dynamic>?)
+            ?.map((e) {
+              final s = e as String;
+              switch (s) {
+                case 'ccs2': return ConnectorType.ccs2;
+                case 'type2': return ConnectorType.type2;
+                case 'chademo': return ConnectorType.chademo;
+                case 'gbT': return ConnectorType.gbT;
+                case 'type1': return ConnectorType.type1;
+                default: return ConnectorType.ccs2;
+              }
+            }).toList() ?? [];
+
+    // Handle legacy status enum (old frontend format)
+    final statusStr = json['status'] as String? ?? 'active';
+    ChargerStatus legacyStatus;
+    switch (statusStr) {
+      case 'available': legacyStatus = ChargerStatus.available; break;
+      case 'busy': legacyStatus = ChargerStatus.busy; break;
+      case 'offline': legacyStatus = ChargerStatus.offline; break;
+      case 'maintenance': legacyStatus = ChargerStatus.maintenance; break;
+      case 'active': legacyStatus = ChargerStatus.available; break;
+      case 'paused': legacyStatus = ChargerStatus.busy; break;
+      case 'inactive': legacyStatus = ChargerStatus.offline; break;
+      default: legacyStatus = ChargerStatus.offline;
+    }
+
+    // Handle amenities as list or string
+    String? amenitiesStr;
+    if (json['amenities'] is String) {
+      amenitiesStr = json['amenities'] as String;
+    } else if (json['amenities'] is List) {
+      amenitiesStr = (json['amenities'] as List).join(', ');
+    }
+
+    return Charger(
+      id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+      businessId: json['business_id'] is int ? json['business_id'] as int : 0,
+      name: json['name'] as String,
+      address: json['address'] as String?,
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
+      powerKw: (json['power_kw'] as num?)?.toDouble() ?? (json['powerKw'] as num?)?.toDouble() ?? 0,
+      accessType: json['access_type'] as String? ?? 'public',
+      basePrice: (json['base_price'] as num?)?.toDouble() ?? (json['pricePerKwh'] as num?)?.toDouble() ?? 0,
+      status: statusStr,
+      reliabilityScore: (json['reliability_score'] as num?)?.toDouble() ?? 0.5,
+      parkingInfo: json['parking_info'] as String?,
+      amenities: amenitiesStr,
+      ports: (json['ports'] as List<dynamic>?)
+              ?.map((e) => ChargerPort.fromJson(e as Map<String, dynamic>))
+              .toList() ?? [],
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'] as String) : null,
+      connectors: legacyConnectors,
+      chargerStatus: legacyStatus,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'business_id': businessId,
         'name': name,
-        'address': address,
         'latitude': latitude,
         'longitude': longitude,
-        'powerKw': powerKw,
-        'pricePerKwh': pricePerKwh,
-        'status': status.name,
-        'connectors': connectors.map((e) => e.name).toList(),
+        'power_kw': powerKw,
+        'access_type': accessType,
+        'base_price': basePrice,
+        'status': status,
+        'reliability_score': reliabilityScore,
         'amenities': amenities,
-        'rating': rating,
-        'totalRatings': totalRatings,
-        'imageUrl': imageUrl,
-        'businessId': businessId,
+        'ports': ports.map((p) => {
+          'id': p.id, 'charger_id': p.chargerId,
+          'connector_type': p.connectorType, 'max_power_kw': p.maxPowerKw, 'status': p.status,
+        }).toList(),
       };
 }
 
 // ─── Booking ───
+// Backend: BookingStatus = PENDING | HELD | PAYMENT_PENDING | CONFIRMED |
+//   CANCELLED | EXPIRED | FAILED | NO_SHOW | CHECKED_IN | CHARGING | COMPLETED
 
-enum BookingStatus { pending, confirmed, held, active, completed, cancelled }
+enum BookingStatus {
+  PENDING, HELD, PAYMENT_PENDING, CONFIRMED, CANCELLED,
+  EXPIRED, FAILED, NO_SHOW, CHECKED_IN, CHARGING, COMPLETED,
+}
+
+BookingStatus parseBookingStatus(String? status) {
+  if (status == null) return BookingStatus.PENDING;
+  return BookingStatus.values.firstWhere(
+    (e) => e.name == status.toUpperCase(),
+    orElse: () => BookingStatus.PENDING,
+  );
+}
 
 class Booking {
-  final String id;
-  final String chargerId;
-  final String chargerName;
-  final String driverId;
-  final DateTime startTime;
-  final DateTime endTime;
+  final int id;
+  final int userId;
+  final int? vehicleId;
+  final int portId;
+  final DateTime startAt;
+  final DateTime endAt;
   final BookingStatus status;
-  final double amount;
-  final String? connectorType;
+  final DateTime? holdExpiresAt;
+  final Map<String, dynamic>? quoteSnapshot;
+  final String? idempotencyKey;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   const Booking({
     required this.id,
-    required this.chargerId,
-    required this.chargerName,
-    required this.driverId,
-    required this.startTime,
-    required this.endTime,
+    required this.userId,
+    this.vehicleId,
+    required this.portId,
+    required this.startAt,
+    required this.endAt,
     required this.status,
-    required this.amount,
-    this.connectorType,
+    this.holdExpiresAt,
+    this.quoteSnapshot,
+    this.idempotencyKey,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
-        id: json['id'] as String,
-        chargerId: json['chargerId'] as String,
-        chargerName: json['chargerName'] as String? ?? '',
-        driverId: json['driverId'] as String? ?? '',
-        startTime: DateTime.parse(json['startTime'] as String),
-        endTime: DateTime.parse(json['endTime'] as String),
-        status: BookingStatus.values.firstWhere(
-          (e) => e.name == json['status'],
-          orElse: () => BookingStatus.pending,
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+        userId: json['user_id'] is int ? json['user_id'] as int : 0,
+        vehicleId: json['vehicle_id'] as int?,
+        portId: json['port_id'] is int ? json['port_id'] as int : 0,
+        startAt: DateTime.parse(json['start_at'] as String),
+        endAt: DateTime.parse(json['end_at'] as String),
+        status: parseBookingStatus(json['status'] as String?),
+        holdExpiresAt: json['hold_expires_at'] != null ? DateTime.tryParse(json['hold_expires_at'] as String) : null,
+        quoteSnapshot: json['quote_snapshot'] as Map<String, dynamic>?,
+        idempotencyKey: json['idempotency_key'] as String?,
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+        updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'] as String) : null,
+      );
+}
+
+// ─── ChargingSession ───
+// Backend: status = "checked_in" | "charging" | "completed" | "failed"
+
+enum SessionStatus { checkedIn, charging, completed, failed }
+
+SessionStatus parseSessionStatus(String? status) {
+  switch (status) {
+    case 'checked_in': return SessionStatus.checkedIn;
+    case 'charging': return SessionStatus.charging;
+    case 'completed': return SessionStatus.completed;
+    case 'failed': return SessionStatus.failed;
+    default: return SessionStatus.checkedIn;
+  }
+}
+
+class ChargingSession {
+  final int id;
+  final int bookingId;
+  final DateTime? checkInAt;
+  final DateTime? startAt;
+  final DateTime? endAt;
+  final double? energyKwh;
+  final double? finalAmount;
+  final SessionStatus status;
+  final DateTime? createdAt;
+
+  const ChargingSession({
+    required this.id,
+    required this.bookingId,
+    this.checkInAt,
+    this.startAt,
+    this.endAt,
+    this.energyKwh,
+    this.finalAmount,
+    required this.status,
+    this.createdAt,
+  });
+
+  int get elapsedSeconds {
+    if (startAt == null) return 0;
+    final end = endAt ?? DateTime.now();
+    return end.difference(startAt!).inSeconds;
+  }
+
+  factory ChargingSession.fromJson(Map<String, dynamic> json) => ChargingSession(
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+        bookingId: json['booking_id'] is int ? json['booking_id'] as int : 0,
+        checkInAt: json['check_in_at'] != null ? DateTime.tryParse(json['check_in_at'] as String) : null,
+        startAt: json['start_at'] != null ? DateTime.tryParse(json['start_at'] as String) : null,
+        endAt: json['end_at'] != null ? DateTime.tryParse(json['end_at'] as String) : null,
+        energyKwh: (json['energy_kwh'] as num?)?.toDouble(),
+        finalAmount: (json['final_amount'] as num?)?.toDouble(),
+        status: parseSessionStatus(json['status'] as String?),
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+      );
+}
+
+// ─── Payment ───
+// Backend: status = "pending" | "completed" | "failed" | "refunded"
+
+enum PaymentStatus { pending, completed, failed, refunded }
+
+class Payment {
+  final int id;
+  final int bookingId;
+  final double amount;
+  final String currency;
+  final PaymentStatus status;
+  final String? providerOrderId;
+  final String? providerPaymentId;
+  final DateTime? verifiedAt;
+  final DateTime? createdAt;
+
+  const Payment({
+    required this.id,
+    required this.bookingId,
+    required this.amount,
+    this.currency = 'INR',
+    required this.status,
+    this.providerOrderId,
+    this.providerPaymentId,
+    this.verifiedAt,
+    this.createdAt,
+  });
+
+  factory Payment.fromJson(Map<String, dynamic> json) => Payment(
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+        bookingId: json['booking_id'] is int ? json['booking_id'] as int : 0,
+        amount: (json['amount'] as num).toDouble(),
+        currency: json['currency'] as String? ?? 'INR',
+        status: PaymentStatus.values.firstWhere(
+          (e) => e.name == json['status'], orElse: () => PaymentStatus.pending,
         ),
-        amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
-        connectorType: json['connectorType'] as String?,
+        providerOrderId: json['provider_order_id'] as String?,
+        providerPaymentId: json['provider_payment_id'] as String?,
+        verifiedAt: json['verified_at'] != null ? DateTime.tryParse(json['verified_at'] as String) : null,
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
       );
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'chargerId': chargerId,
-        'chargerName': chargerName,
-        'driverId': driverId,
-        'startTime': startTime.toIso8601String(),
-        'endTime': endTime.toIso8601String(),
-        'status': status.name,
-        'amount': amount,
-        'connectorType': connectorType,
-      };
 }
 
-// ─── Slot ───
+// ─── AvailabilityWindow ───
+// Backend: { id: int, port_id, start_at, end_at, source?, price_override?, status?, ... }
 
-class Slot {
-  final String id;
-  final String chargerId;
-  final DateTime startTime;
-  final DateTime endTime;
-  final bool isAvailable;
+class AvailabilityWindow {
+  final int id;
+  final int portId;
+  final DateTime startAt;
+  final DateTime endAt;
+  final String? source;
   final double? priceOverride;
+  final String? status;
+  final bool isRecurring;
+  final DateTime? createdAt;
 
-  const Slot({
+  const AvailabilityWindow({
     required this.id,
-    required this.chargerId,
-    required this.startTime,
-    required this.endTime,
-    required this.isAvailable,
+    required this.portId,
+    required this.startAt,
+    required this.endAt,
+    this.source,
     this.priceOverride,
+    this.status,
+    this.isRecurring = false,
+    this.createdAt,
   });
 
-  factory Slot.fromJson(Map<String, dynamic> json) => Slot(
-        id: json['id'] as String,
-        chargerId: json['chargerId'] as String,
-        startTime: DateTime.parse(json['startTime'] as String),
-        endTime: DateTime.parse(json['endTime'] as String),
-        isAvailable: json['isAvailable'] as bool? ?? true,
-        priceOverride: (json['priceOverride'] as num?)?.toDouble(),
+  factory AvailabilityWindow.fromJson(Map<String, dynamic> json) => AvailabilityWindow(
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+        portId: json['port_id'] is int ? json['port_id'] as int : 0,
+        startAt: DateTime.parse(json['start_at'] as String),
+        endAt: DateTime.parse(json['end_at'] as String),
+        source: json['source'] as String?,
+        priceOverride: (json['price_override'] as num?)?.toDouble(),
+        status: json['status'] as String?,
+        isRecurring: json['is_recurring'] as bool? ?? false,
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
       );
 }
 
-// ─── Vehicle (Driver Onboarding) ───
+// ─── Review ───
 
-class Vehicle {
-  final String id;
-  final String make;
-  final String model;
-  final int year;
-  final double batteryCapacityKwh;
-  final ConnectorType connectorType;
+class Review {
+  final int id;
+  final int sessionId;
+  final int userId;
+  final double rating;
+  final String? comment;
+  final List<String>? issueFlags;
+  final DateTime? createdAt;
 
-  const Vehicle({
+  const Review({
     required this.id,
-    required this.make,
-    required this.model,
-    required this.year,
-    required this.batteryCapacityKwh,
-    required this.connectorType,
+    required this.sessionId,
+    required this.userId,
+    required this.rating,
+    this.comment,
+    this.issueFlags,
+    this.createdAt,
   });
 
-  String get displayName => '$year $make $model';
+  factory Review.fromJson(Map<String, dynamic> json) => Review(
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+        sessionId: json['session_id'] is int ? json['session_id'] as int : 0,
+        userId: json['user_id'] is int ? json['user_id'] as int : 0,
+        rating: (json['rating'] as num).toDouble(),
+        comment: json['comment'] as String?,
+        issueFlags: (json['issue_flags'] as List<dynamic>?)?.map((e) => e as String).toList(),
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+      );
 }
 
-// ─── Business (Business Partner) ───
+// ─── Business ───
 
 class Business {
-  final String id;
+  final int id;
   final String name;
   final String email;
   final String? phone;
-  final String? address;
-  final String? gstNumber;
-  final bool isVerified;
-  final double rating;
 
-  const Business({
-    required this.id,
-    required this.name,
-    required this.email,
-    this.phone,
-    this.address,
-    this.gstNumber,
-    this.isVerified = false,
-    this.rating = 0.0,
-  });
+  const Business({required this.id, required this.name, required this.email, this.phone});
 
   factory Business.fromJson(Map<String, dynamic> json) => Business(
-        id: json['id'] as String,
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
         name: json['name'] as String,
         email: json['email'] as String,
         phone: json['phone'] as String?,
-        address: json['address'] as String?,
-        gstNumber: json['gstNumber'] as String?,
-        isVerified: json['isVerified'] as bool? ?? false,
-        rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       );
+}
+
+// ─── Notification ───
+
+class Notification {
+  final int id;
+  final int userId;
+  final String type;
+  final Map<String, dynamic>? payload;
+  final String status;
+  final DateTime? createdAt;
+
+  const Notification({required this.id, required this.userId, required this.type, this.payload, this.status = 'pending', this.createdAt});
+
+  factory Notification.fromJson(Map<String, dynamic> json) => Notification(
+        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+        userId: json['user_id'] is int ? json['user_id'] as int : 0,
+        type: json['type'] as String,
+        payload: json['payload'] as Map<String, dynamic>?,
+        status: json['status'] as String? ?? 'pending',
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+      );
+}
+
+// ─── Recommendation ───
+
+enum RecommendationPreference { fastest, cheapest, balanced, reliable }
+
+class RecommendationReason {
+  const RecommendationReason({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+  });
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+}
+
+class ChargerRecommendation {
+  final Charger charger;
+  final String reason;
+  final double estimatedCost;
+  final int estimatedTimeMinutes;
+  final double confidenceScore;
+  final int detourMinutes;
+  final int predictedWaitMinutes;
+  final double reliabilityScore;
+  final bool connectorCompatible;
+  final List<RecommendationReason> factors;
+
+  const ChargerRecommendation({
+    required this.charger,
+    required this.reason,
+    required this.estimatedCost,
+    required this.estimatedTimeMinutes,
+    required this.confidenceScore,
+    this.detourMinutes = 0,
+    this.predictedWaitMinutes = 0,
+    this.reliabilityScore = 0.0,
+    this.connectorCompatible = true,
+    this.factors = const [],
+  });
 }
 
 // ─── Analytics Summary (Business) ───
@@ -300,53 +714,5 @@ class AnalyticsSummary {
 class HourlyData {
   final int hour;
   final double value;
-
   const HourlyData({required this.hour, required this.value});
-}
-
-// ─── AI Recommendation (Driver) ───
-
-enum RecommendationPreference { fastest, cheapest, balanced, reliable }
-
-/// A single explanation factor shown in the "Why this charger?" section.
-class RecommendationReason {
-  const RecommendationReason({
-    required this.icon,
-    required this.label,
-    required this.description,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final String description;
-  final Color color;
-}
-
-class ChargerRecommendation {
-  final Charger charger;
-  final String reason;
-  final double estimatedCost;
-  final int estimatedTimeMinutes;
-  final double confidenceScore;
-
-  /// Extra fields for the detailed recommendation card.
-  final int detourMinutes;
-  final int predictedWaitMinutes;
-  final double reliabilityScore; // 0.0 – 1.0
-  final bool connectorCompatible;
-  final List<RecommendationReason> factors;
-
-  const ChargerRecommendation({
-    required this.charger,
-    required this.reason,
-    required this.estimatedCost,
-    required this.estimatedTimeMinutes,
-    required this.confidenceScore,
-    this.detourMinutes = 0,
-    this.predictedWaitMinutes = 0,
-    this.reliabilityScore = 0.0,
-    this.connectorCompatible = true,
-    this.factors = const [],
-  });
 }

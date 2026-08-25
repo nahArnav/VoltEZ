@@ -325,7 +325,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: planner.availableVehicles.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final vehicle = planner.availableVehicles[index];
           final selected =
@@ -407,7 +407,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                       const SizedBox(width: 8),
                       _vehicleSpec(
                           Icons.power_rounded,
-                          vehicle.connectorType == ConnectorType.ccs2
+                          vehicle.connectorType == 'CCS2'
                               ? 'CCS2'
                               : 'Type 2',
                           selected),
@@ -775,7 +775,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                     child: Text(
                       'Finding stops compatible with your '
                       '${planner.selectedVehicle!.make} ${planner.selectedVehicle!.model} '
-                      '(${planner.selectedVehicle!.connectorType == ConnectorType.ccs2 ? 'CCS2' : 'Type 2'}, '
+                      '(${planner.selectedVehicle!.connectorType == 'CCS2' ? 'CCS2' : 'Type 2'}, '
                       '${planner.selectedVehicle!.batteryCapacityKwh.round()} kWh). '
                       'Calculating reachable stations based on your SOC.',
                       style: AppTypography.bodySmall.copyWith(
@@ -803,6 +803,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
             onPressed: valid
                 ? () async {
                     await planner.findRecommendations();
+                    if (!mounted) return;
                     if (planner.hasSearched && context.mounted) {
                       context.go('/driver/recommendations');
                     }

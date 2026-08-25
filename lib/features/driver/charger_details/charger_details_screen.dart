@@ -44,7 +44,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
     try {
       final planner = context.read<RoutePlannerProvider>();
       for (final rec in planner.recommendations) {
-        if (rec.charger.id == widget.chargerId) {
+        if (rec.charger.id.toString() == widget.chargerId) {
           setState(() {
             _charger = rec.charger;
             _detourMinutes = rec.detourMinutes;
@@ -60,7 +60,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
     try {
       final discovery = context.read<ChargerDiscoveryProvider>();
       for (final c in discovery.allChargers) {
-        if (c.id == widget.chargerId) {
+        if (c.id.toString() == widget.chargerId) {
           setState(() {
             _charger = c;
             _detourMinutes = 0;
@@ -72,22 +72,20 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       }
     } catch (_) {}
 
-    // Final fallback — use default charger if ID matches c1
+    // Final fallback — use default charger
     setState(() {
       _charger = const Charger(
-        id: 'c1',
+        id: 1, businessId: 1,
         name: 'Phoenix Mall Charger',
         address: 'Phoenix Mall, Lower Parel, Mumbai',
         latitude: 19.0760,
         longitude: 72.8777,
         powerKw: 60,
-        pricePerKwh: 14,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.ccs2],
-        amenities: ['WiFi', 'Food Court', 'Parking', 'Restroom', 'AC Waiting Lounge'],
-        rating: 4.6,
-        totalRatings: 234,
-        businessId: 'b1',
+        accessType: 'public',
+        basePrice: 14,
+        status: 'active',
+        reliabilityScore: 0.92,
+        amenities: 'WiFi,Food Court,Parking,Restroom,AC Waiting Lounge',
       );
       _detourMinutes = 6;
       _reliabilityScore = 0.94;
@@ -372,7 +370,8 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
 
   // ─── Amenities ───
   Widget _buildAmenities(Charger charger) {
-    if (charger.amenities.isEmpty) return const SizedBox.shrink();
+    final amenities = charger.amenitiesList;
+    if (amenities.isEmpty) return const SizedBox.shrink();
 
     final icons = {
       'WiFi': Icons.wifi_rounded,
@@ -391,7 +390,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
         Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: charger.amenities.map((a) {
+          children: amenities.map((a) {
             return Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -517,7 +516,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
 
   // ─── Host Info ───
   Widget _buildHostInfo(Charger charger) {
-    if (charger.businessId == null) return const SizedBox.shrink();
+    if (charger.businessId == 0) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -635,28 +634,29 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
   }
 
   // ─── Helpers ───
-  Color _statusColor(ChargerStatus status) {
+  Color _statusColor(String status) {
     switch (status) {
-      case ChargerStatus.available:
+      case 'active':
         return AppColors.success;
-      case ChargerStatus.busy:
+      case 'paused':
         return AppColors.warning;
-      case ChargerStatus.offline:
-      case ChargerStatus.maintenance:
+      case 'inactive':
         return AppColors.error;
+      default:
+        return AppColors.textMuted;
     }
   }
 
-  String _statusLabel(ChargerStatus status) {
+  String _statusLabel(String status) {
     switch (status) {
-      case ChargerStatus.available:
+      case 'active':
         return 'Available';
-      case ChargerStatus.busy:
-        return 'Busy';
-      case ChargerStatus.offline:
+      case 'paused':
+        return 'Paused';
+      case 'inactive':
         return 'Offline';
-      case ChargerStatus.maintenance:
-        return 'Maintenance';
+      default:
+        return status;
     }
   }
 

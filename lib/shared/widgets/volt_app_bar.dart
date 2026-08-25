@@ -86,7 +86,7 @@ class VoltAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ),
                       ),
               ),
-              if (actions != null) ...actions!,
+              ...?actions,
             ],
           ),
         ),

@@ -454,7 +454,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 childAspectRatio: 2.0,
               ),
               itemCount: 8,
-              itemBuilder: (_, __) => Container(
+              itemBuilder: (_, _) => Container(
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(14),

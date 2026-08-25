@@ -1,10 +1,11 @@
+// ignore_for_file: use_null_aware_elements, unintended_html_in_doc_comment
 import 'package:dio/dio.dart';
 
 /// VoltEZ API Service
 /// Single Dio instance used by both Driver and Business sides.
 ///
-/// Driver endpoints: /auth/*, /users/*, /chargers/*, /routes/*, /slots, /bookings, /payments, /sessions
-/// Business endpoints: /business/*
+/// Backend API prefix: /api/v1
+/// All endpoints match the actual FastAPI backend contracts.
 class ApiService {
   ApiService({String? baseUrl}) {
     _dio = Dio(
@@ -20,15 +21,12 @@ class ApiService {
     );
 
     _dio.interceptors.add(_AuthInterceptor(() => _token));
-    _dio.interceptors.add(LogInterceptor(
-      requestBody: true,
-      responseBody: true,
-      logPrint: (obj) => print('[API] $obj'),
-    ));
+    _dio.interceptors.add(_ErrorInterceptor());
   }
 
-  // ─── Configure this for your backend ───
-  static const String _defaultBaseUrl = 'http://localhost:3000/api';
+  // ─── Backend base URL ───
+  // Backend serves under /api/v1
+  static const String _defaultBaseUrl = 'http://localhost:3000/api/v1';
 
   late final Dio _dio;
 
@@ -37,6 +35,7 @@ class ApiService {
   // ─── Token Management ───
 
   String? _token;
+  String? _refreshToken;
 
   void setToken(String? token) {
     _token = token;
@@ -44,57 +43,116 @@ class ApiService {
 
   String? get token => _token;
 
-  // ─── Driver APIs ───
+  void setRefreshToken(String? refreshToken) {
+    _refreshToken = refreshToken;
+  }
 
-  // Auth
-  Future<Response> login(String email, String password) =>
-      _dio.post('/auth/login', data: {'email': email, 'password': password});
+  String? get refreshToken => _refreshToken;
 
-  Future<Response> signup(String name, String email, String password) =>
-      _dio.post('/auth/signup', data: {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Auth — POST /auth/register, /auth/login, /auth/refresh, /auth/logout
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// POST /auth/register
+  /// Body: { name, email, password, role: "DRIVER"|"OWNER", phone? }
+  Future<Response> register({
+    required String name,
+    required String email,
+    required String password,
+    String role = 'DRIVER',
+    String? phone,
+  }) =>
+      _dio.post('/auth/register', data: {
         'name': name,
+        'email': email,
+        'password': password,
+        'role': role,
+        if (phone != null) 'phone': phone,
+      });
+
+  /// POST /auth/login
+  /// Body: { email, password }
+  /// Returns: { access_token, refresh_token, token_type: "bearer" }
+  Future<Response> login(String email, String password) =>
+      _dio.post('/auth/login', data: {
         'email': email,
         'password': password,
       });
 
-  // User
+  /// POST /auth/refresh
+  /// Body: { refresh_token }
+  /// Returns: { access_token, refresh_token, token_type: "bearer" }
+  Future<Response> refreshTokens(String refreshToken) =>
+      _dio.post('/auth/refresh', data: {
+        'refresh_token': refreshToken,
+      });
+
+  /// POST /auth/logout
+  Future<Response> logout() => _dio.post('/auth/logout');
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Users — GET /users/me, PATCH /users/me
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// GET /users/me
+  /// Returns: { id: int, name, email, phone?, role, verification_status, created_at }
   Future<Response> getMe() => _dio.get('/users/me');
 
-  // Chargers
+  /// PATCH /users/me
+  /// Body: { name?, phone? }
+  Future<Response> updateMe(Map<String, dynamic> data) =>
+      _dio.patch('/users/me', data: data);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Vehicles — CRUD under /vehicles
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// POST /vehicles
+  /// Body: { make, model, battery_kwh, connector_types: ["CCS2"], max_ac_kw?, max_dc_kw?, estimated_range_km? }
+  Future<Response> createVehicle(Map<String, dynamic> data) =>
+      _dio.post('/vehicles', data: data);
+
+  /// GET /vehicles
+  Future<Response> getVehicles() => _dio.get('/vehicles');
+
+  /// GET /vehicles/{id}
+  Future<Response> getVehicle(int id) => _dio.get('/vehicles/$id');
+
+  /// PATCH /vehicles/{id}
+  Future<Response> updateVehicle(int id, Map<String, dynamic> data) =>
+      _dio.patch('/vehicles/$id', data: data);
+
+  /// DELETE /vehicles/{id}
+  Future<Response> deleteVehicle(int id) => _dio.delete('/vehicles/$id');
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Chargers — GET /chargers/nearby, GET /chargers/{id}
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// GET /chargers/nearby?latitude=...&longitude=...&radius_meters=5000
+  /// Returns: List<ChargerResponse> with nested ports
   Future<Response> getNearbyChargers({
-    required double lat,
-    required double lng,
-    double radiusKm = 10,
+    required double latitude,
+    required double longitude,
+    int radiusMeters = 5000,
   }) =>
       _dio.get('/chargers/nearby', queryParameters: {
-        'lat': lat,
-        'lng': lng,
-        'radius': radiusKm,
+        'latitude': latitude,
+        'longitude': longitude,
+        'radius_meters': radiusMeters,
       });
 
-  Future<Response> getChargerById(String id) =>
-      _dio.get('/chargers/$id');
+  /// GET /chargers/{id}
+  /// Returns: ChargerResponse with nested ports
+  Future<Response> getChargerById(int id) => _dio.get('/chargers/$id');
 
-  // Recommendations (legacy — kept for backward compat)
-  Future<Response> getRecommendations({
-    required double lat,
-    required double lng,
-    double batteryPercent = 80,
-    String preference = 'balanced',
-  }) =>
-      _dio.post('/routes/recommend', data: {
-        'lat': lat,
-        'lng': lng,
-        'batteryPercent': batteryPercent,
-        'preference': preference,
-      });
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Routes & Recommendations — POST /routes/recommendations
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Full route-aware recommendation.
-  ///
   /// POST /routes/recommendations
-  /// Sends origin/destination coordinates, vehicle specs, current SOC,
-  /// reserve SOC, and the driver's preference. Returns a list of
-  /// recommended charging stops ranked by the backend AI.
+  /// Full route-aware recommendation request.
+  /// NOTE: Backend endpoint is in the API contract but may not be implemented yet.
   Future<Response> getRouteRecommendations({
     required double originLat,
     required double originLng,
@@ -124,74 +182,113 @@ class ApiService {
         'vehicle': {
           'make': vehicleMake,
           'model': vehicleModel,
-          'batteryCapacityKwh': batteryCapacityKwh,
-          'connectorType': connectorType,
+          'battery_kwh': batteryCapacityKwh,
+          'connector_types': [connectorType],
         },
-        'currentSOC': currentSOC,
-        'reserveSOC': reserveSOC,
+        'current_soc': currentSOC,
+        'reserve_soc': reserveSOC,
         'preference': preference,
       });
 
-  // Slots
-  Future<Response> getSlots(String chargerId, DateTime date) =>
-      _dio.get('/slots', queryParameters: {
-        'chargerId': chargerId,
-        'date': date.toIso8601String(),
-      });
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Bookings — POST /bookings/, POST /bookings/{id}/cancel, GET /bookings
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  // Bookings (Driver)
+  /// POST /bookings/
+  /// Body: { port_id: int, start_at: datetime, end_at: datetime, vehicle_id?: int, idempotency_key?: str }
+  /// Returns: BookingResponse
   Future<Response> createBooking(Map<String, dynamic> data) =>
       _dio.post('/bookings', data: data);
 
+  /// POST /bookings/{id}/confirm
+  /// Confirm a booking after payment verification.
+  Future<Response> confirmBooking(int bookingId) =>
+      _dio.post('/bookings/$bookingId/confirm');
+
+  /// POST /bookings/{id}/cancel
+  /// Returns: BookingResponse
+  Future<Response> cancelBooking(int bookingId) =>
+      _dio.post('/bookings/$bookingId/cancel');
+
+  /// GET /bookings
+  /// Returns: List<BookingResponse>
   Future<Response> getDriverBookings() => _dio.get('/bookings');
 
-  Future<Response> cancelBooking(String id) =>
-      _dio.delete('/bookings/$id');
+  /// GET /bookings/{id}
+  Future<Response> getBooking(int bookingId) => _dio.get('/bookings/$bookingId');
 
-  // Sessions
-  Future<Response> checkIn(String bookingId) =>
-      _dio.post('/sessions/check-in', data: {'bookingId': bookingId});
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Payments — POST /payments/create-order, POST /payments/verify
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  Future<Response> getSessionStatus(String sessionId) =>
-      _dio.get('/sessions/$sessionId');
+  /// POST /payments/create-order
+  Future<Response> createPaymentOrder(Map<String, dynamic> data) =>
+      _dio.post('/payments/create-order', data: data);
 
-  Future<Response> endSession(String sessionId) =>
-      _dio.post('/sessions/$sessionId/end');
+  /// POST /payments/verify
+  Future<Response> verifyPayment(Map<String, dynamic> data) =>
+      _dio.post('/payments/verify', data: data);
 
-  // ─── Business APIs ───
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Sessions — POST /sessions/check-in, POST /sessions/{id}/start,
+  //           POST /sessions/{id}/complete, POST /sessions/{id}/report-issue
+  // ═══════════════════════════════════════════════════════════════════════════
 
-  Future<Response> getBusinessProfile() => _dio.get('/business/profile');
+  /// POST /sessions/check-in
+  /// Body: { booking_id: int }
+  /// Returns: ChargingSessionResponse
+  Future<Response> checkIn(int bookingId) =>
+      _dio.post('/sessions/check-in', data: {'booking_id': bookingId});
 
-  Future<Response> updateBusinessProfile(Map<String, dynamic> data) =>
-      _dio.put('/business/profile', data: data);
+  /// POST /sessions/{id}/start
+  /// Mark charging has begun (plug connected, power flowing).
+  /// Returns: ChargingSessionResponse
+  Future<Response> startCharging(int sessionId) =>
+      _dio.post('/sessions/$sessionId/start');
 
-  Future<Response> getBusinessChargers() => _dio.get('/business/chargers');
+  /// POST /sessions/{id}/complete
+  /// Body: { energy_kwh: float }
+  /// Returns: ChargingSessionResponse
+  Future<Response> completeSession(int sessionId, double energyKwh) =>
+      _dio.post('/sessions/$sessionId/complete', data: {
+        'energy_kwh': energyKwh,
+      });
+
+  /// POST /sessions/{id}/report-issue
+  Future<Response> reportSessionIssue(int sessionId, Map<String, dynamic> data) =>
+      _dio.post('/sessions/$sessionId/report-issue', data: data);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Business APIs
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Future<Response> getBusinessProfile() => _dio.get('/businesses/me');
+
+  Future<Response> updateBusinessProfile(int id, Map<String, dynamic> data) =>
+      _dio.patch('/businesses/$id', data: data);
+
+  Future<Response> getBusinessChargers(int businessId) =>
+      _dio.get('/chargers', queryParameters: {'business_id': businessId});
 
   Future<Response> createCharger(Map<String, dynamic> data) =>
-      _dio.post('/business/chargers', data: data);
+      _dio.post('/chargers', data: data);
 
-  Future<Response> updateCharger(String id, Map<String, dynamic> data) =>
-      _dio.put('/business/chargers/$id', data: data);
+  Future<Response> updateCharger(int id, Map<String, dynamic> data) =>
+      _dio.patch('/chargers/$id', data: data);
 
-  Future<Response> deleteCharger(String id) =>
-      _dio.delete('/business/chargers/$id');
+  Future<Response> deleteCharger(int id) => _dio.delete('/chargers/$id');
 
-  Future<Response> getAvailability(String chargerId) =>
-      _dio.get('/business/availability', queryParameters: {'chargerId': chargerId});
+  /// GET /ports/{id}/availability
+  Future<Response> getPortAvailability(int portId) =>
+      _dio.get('/ports/$portId/availability');
 
-  Future<Response> updateAvailability(String chargerId, List<Map<String, dynamic>> slots) =>
-      _dio.put('/business/availability', data: {
-        'chargerId': chargerId,
-        'slots': slots,
-      });
+  /// POST /ports/{id}/availability
+  Future<Response> createAvailabilityWindow(int portId, Map<String, dynamic> data) =>
+      _dio.post('/ports/$portId/availability', data: data);
 
-  Future<Response> getBusinessBookings({String? status}) =>
-      _dio.get('/business/bookings', queryParameters: {
-        if (status != null) 'status': status,
-      });
-
-  Future<Response> getAnalytics({String period = 'daily'}) =>
-      _dio.get('/business/analytics', queryParameters: {'period': period});
+  /// GET /businesses/{id}/analytics
+  Future<Response> getAnalytics(int businessId) =>
+      _dio.get('/businesses/$businessId/analytics');
 }
 
 /// Adds Bearer token to every request.
@@ -207,4 +304,57 @@ class _AuthInterceptor extends Interceptor {
     }
     handler.next(options);
   }
+}
+
+/// Standardized error handling for backend error responses.
+/// Backend returns: { code, message, request_id, field_errors? }
+class _ErrorInterceptor extends Interceptor {
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final response = err.response;
+    if (response != null && response.data is Map) {
+      final data = response.data as Map<String, dynamic>;
+      final code = data['code'] as String? ?? 'UNKNOWN_ERROR';
+      final message = data['message'] as String? ?? 'An error occurred';
+      final fieldErrors = data['field_errors'] as List?;
+
+      // Attach structured error info for callers to parse
+      err = DioException(
+        requestOptions: err.requestOptions,
+        response: err.response,
+        type: err.type,
+        error: ApiError(
+          code: code,
+          message: message,
+          statusCode: response.statusCode ?? 500,
+          fieldErrors: fieldErrors?.cast<Map<String, dynamic>>(),
+        ),
+      );
+    }
+    handler.next(err);
+  }
+}
+
+/// Parsed backend error structure.
+class ApiError implements Exception {
+  ApiError({
+    required this.code,
+    required this.message,
+    required this.statusCode,
+    this.fieldErrors,
+  });
+
+  final String code;
+  final String message;
+  final int statusCode;
+  final List<Map<String, dynamic>>? fieldErrors;
+
+  bool get isNotFound => statusCode == 404;
+  bool get isUnauthorized => statusCode == 401;
+  bool get isForbidden => statusCode == 403;
+  bool get isConflict => statusCode == 409;
+  bool get isValidationError => statusCode == 422;
+
+  @override
+  String toString() => 'ApiError($code: $message)';
 }

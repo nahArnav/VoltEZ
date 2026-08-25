@@ -242,7 +242,7 @@ class MockBookingApi implements BookingApi {
       }
 
       slots.add(SlotInfo(
-        id: 'slot_${chargerId}_${hour}',
+        id: 'slot_${chargerId}_$hour',
         chargerId: chargerId,
         portName: 'Port ${hour - 5}',
         connectorType: hour % 2 == 0 ? 'ccs2' : 'type2',

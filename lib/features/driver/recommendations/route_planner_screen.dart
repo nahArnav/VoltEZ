@@ -616,7 +616,7 @@ class _RecommendationCardState extends State<_RecommendationCard> {
                     children: [
                       Text(rec.charger.name,
                           style: AppTypography.headlineSmall),
-                      Text(rec.charger.address,
+                      Text(rec.charger.address ?? '',
                           style: AppTypography.bodySmall,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),

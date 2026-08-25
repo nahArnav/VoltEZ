@@ -19,6 +19,7 @@ dependencies:
 
   # Network
   dio: ^5.11.0
+  web_socket_channel: ^3.0.3
 
   # Storage
   shared_preferences: ^2.5.5
@@ -29,6 +30,9 @@ dependencies:
 
   # Maps
   google_maps_flutter: ^2.18.0
+
+  # Payments
+  razorpay_flutter: ^1.4.0
 
   # UI
   flutter_svg: ^2.3.0

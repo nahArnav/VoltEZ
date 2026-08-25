@@ -47,7 +47,7 @@ class AppRouter {
 
       // If logged in and on splash, redirect to appropriate dashboard
       if (isLoggedIn && state.matchedLocation == '/splash') {
-        return _auth.currentRole == AccountRole.business
+        return _auth.currentRole == AccountRole.owner
             ? '/business/dashboard'
             : '/driver/home';
       }

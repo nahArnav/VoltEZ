@@ -52,7 +52,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 subtitle: 'Manage your charging business.',
                 color: AppColors.success,
                 onTap: () {
-                  context.read<AuthProvider>().setRole(AccountRole.business);
+                  context.read<AuthProvider>().setRole(AccountRole.owner);
                   context.go('/business/dashboard');
                 },
               ),

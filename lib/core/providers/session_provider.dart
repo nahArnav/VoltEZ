@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../network/session_api.dart';
+import '../network/session_websocket.dart';
 
 /// Phase of the session flow.
 enum SessionPhase {
@@ -13,7 +14,7 @@ enum SessionPhase {
   /// Checked in but not yet charging.
   checkedIn,
 
-  /// Actively charging — polling for live data.
+  /// Actively charging — receiving live updates.
   charging,
 
   /// Session ending (end request in flight).
@@ -32,13 +33,17 @@ enum SessionPhase {
 /// Manages the full driver session flow:
 /// check-in → live charging → end session → rating → history.
 ///
-/// Inject [MockSessionApi] for dev/testing, swap to [LiveSessionApi]
-/// when the backend is ready.
+/// Uses a [SessionWebSocket] for real-time updates during charging,
+/// falling back to the REST [SessionApi] for check-in, end, rating, and history.
 class SessionProvider extends ChangeNotifier {
-  SessionProvider({SessionApi? sessionApi})
-      : _api = sessionApi ?? MockSessionApi();
+  SessionProvider({
+    SessionApi? sessionApi,
+    SessionWebSocket? webSocket,
+  })  : _api = sessionApi ?? MockSessionApi(),
+        _webSocket = webSocket ?? MockSessionWebSocket();
 
   final SessionApi _api;
+  final SessionWebSocket _webSocket;
 
   // ─── Phase ───
   SessionPhase _phase = SessionPhase.idle;
@@ -53,8 +58,23 @@ class SessionProvider extends ChangeNotifier {
   SessionSummary? get sessionSummary => _sessionSummary;
 
   // ─── Connection State ───
-  String _connectionState = 'Live';
-  String get connectionState => _connectionState;
+  WebSocketConnectionState _wsState = WebSocketConnectionState.disconnected;
+  WebSocketConnectionState get wsState => _wsState;
+
+  /// Human-readable connection label for the UI.
+  String get connectionStateLabel {
+    switch (_wsState) {
+      case WebSocketConnectionState.connected:
+        return 'Live';
+      case WebSocketConnectionState.connecting:
+      case WebSocketConnectionState.reconnecting:
+        return 'Connecting…';
+      case WebSocketConnectionState.disconnected:
+        return 'Disconnected';
+    }
+  }
+
+  bool get isConnected => _wsState == WebSocketConnectionState.connected;
 
   // ─── Error ───
   String? _errorMessage;
@@ -70,9 +90,9 @@ class SessionProvider extends ChangeNotifier {
   bool _ratingSubmitted = false;
   bool get ratingSubmitted => _ratingSubmitted;
 
-  // ─── Polling ───
-  Timer? _pollTimer;
-
+  // ─── WebSocket subscriptions ───
+  StreamSubscription<SessionStreamEvent>? _eventSubscription;
+  StreamSubscription<WebSocketConnectionState>? _wsStateSubscription;
 
   // ─── Active booking context ───
   String? _bookingId;
@@ -88,7 +108,7 @@ class SessionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Check in at the charger.
+  /// Check in at the charger, then connect the WebSocket for live updates.
   Future<void> checkIn() async {
     if (_bookingId == null) return;
 
@@ -99,7 +119,8 @@ class SessionProvider extends ChangeNotifier {
     try {
       _sessionData = await _api.checkIn(_bookingId!);
       _phase = SessionPhase.checkedIn;
-      _startPolling();
+      // Connect WebSocket for live updates
+      await _connectWebSocket(_sessionData!.sessionId);
     } on SessionApiException catch (e) {
       _errorMessage = e.message;
       _phase = SessionPhase.error;
@@ -122,7 +143,7 @@ class SessionProvider extends ChangeNotifier {
   Future<void> endSession() async {
     if (_sessionData == null) return;
 
-    _stopPolling();
+    await _disconnectWebSocket();
     _phase = SessionPhase.ending;
     _errorMessage = null;
     notifyListeners();
@@ -133,11 +154,12 @@ class SessionProvider extends ChangeNotifier {
     } on SessionApiException catch (e) {
       _errorMessage = e.message;
       _phase = SessionPhase.charging;
-      _startPolling(); // Resume polling
+      // Reconnect WebSocket
+      await _connectWebSocket(_sessionData!.sessionId);
     } catch (e) {
       _errorMessage = 'Failed to end session. Please try again.';
       _phase = SessionPhase.charging;
-      _startPolling();
+      await _connectWebSocket(_sessionData!.sessionId);
     }
 
     notifyListeners();
@@ -191,68 +213,85 @@ class SessionProvider extends ChangeNotifier {
 
   /// Reset to idle (e.g., after returning from session).
   void reset() {
-    _stopPolling();
+    _disconnectWebSocket();
     _phase = SessionPhase.idle;
     _sessionData = null;
     _sessionSummary = null;
     _errorMessage = null;
     _bookingId = null;
     _ratingSubmitted = false;
-    _connectionState = 'Live';
+    _wsState = WebSocketConnectionState.disconnected;
     notifyListeners();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Polling
+  // WebSocket
   // ═══════════════════════════════════════════════════════════════════════════
 
-  void _startPolling() {
-    _stopPolling();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      await _pollSessionStatus();
+  Future<void> _connectWebSocket(String sessionId) async {
+    await _disconnectWebSocket();
+
+    // Listen to connection state changes
+    _wsStateSubscription = _webSocket.connectionStateChanges.listen((state) {
+      final changed = _wsState != state;
+      _wsState = state;
+      if (changed) notifyListeners();
     });
+
+    // Listen to session events
+    _eventSubscription = _webSocket.events.listen(
+      _handleWebSocketEvent,
+      onError: (_) {
+        _wsState = WebSocketConnectionState.disconnected;
+        notifyListeners();
+      },
+    );
+
+    // Start the connection
+    await _webSocket.connect(sessionId);
+    _wsState = _webSocket.connectionState;
+    notifyListeners();
   }
 
-  void _stopPolling() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
+  Future<void> _disconnectWebSocket() async {
+    await _eventSubscription?.cancel();
+    await _wsStateSubscription?.cancel();
+    _eventSubscription = null;
+    _wsStateSubscription = null;
+    await _webSocket.disconnect();
+    _wsState = WebSocketConnectionState.disconnected;
   }
 
-  Future<void> _pollSessionStatus() async {
-    if (_sessionData == null) return;
-    if (_phase != SessionPhase.checkedIn && _phase != SessionPhase.charging) {
-      return;
-    }
+  void _handleWebSocketEvent(SessionStreamEvent event) {
+    switch (event.type) {
+      case 'status_update':
+        if (event.sessionData != null) {
+          _sessionData = event.sessionData;
+          _errorMessage = null;
 
-    try {
-      final updated = await _api.getSessionStatus(_sessionData!.sessionId);
-      _sessionData = updated;
-      _connectionState = 'Live';
+          // Auto-transition phase based on status
+          if (event.sessionData!.status == SessionStatus.charging &&
+              _phase == SessionPhase.checkedIn) {
+            _phase = SessionPhase.charging;
+          }
+        }
+        break;
 
-      if (updated.status == SessionStatus.completed) {
-        _stopPolling();
-        // Auto-end: create summary from session data
-        _sessionSummary = SessionSummary(
-          sessionId: updated.sessionId,
-          chargerName: updated.chargerName,
-          connectorType: updated.connectorType,
-          durationMinutes: (updated.elapsedSeconds / 60).ceil(),
-          energyKwh: updated.energyKwh,
-          totalCost: updated.runningCost,
-          date: _formatDate(DateTime.now()),
-          startTime: updated.slotStart,
-          endTime: '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-        );
-        _phase = SessionPhase.complete;
-      } else if (updated.status == SessionStatus.charging &&
-          _phase == SessionPhase.checkedIn) {
-        _phase = SessionPhase.charging;
-      }
+      case 'session_completed':
+        if (event.summary != null) {
+          _sessionSummary = event.summary;
+          _phase = SessionPhase.complete;
+          _disconnectWebSocket();
+        }
+        break;
 
-      _errorMessage = null;
-    } catch (_) {
-      _connectionState = 'Connection lost — showing last known data';
-      // Don't crash polling on transient errors
+      case 'error':
+        _errorMessage = event.errorMessage ?? 'Connection error';
+        break;
+
+      case 'pong':
+        // Keepalive acknowledged — no action needed
+        break;
     }
 
     notifyListeners();
@@ -274,21 +313,14 @@ class SessionProvider extends ChangeNotifier {
     return '${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
   }
 
-  String _formatDate(DateTime dt) {
-    const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-
   // ═══════════════════════════════════════════════════════════════════════════
   // Cleanup
   // ═══════════════════════════════════════════════════════════════════════════
 
   @override
   void dispose() {
-    _stopPolling();
+    _disconnectWebSocket();
+    _webSocket.dispose();
     super.dispose();
   }
 }

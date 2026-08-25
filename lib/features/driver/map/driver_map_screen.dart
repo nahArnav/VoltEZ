@@ -39,21 +39,18 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   // Default center: Mumbai
   static const LatLng _defaultCenter = LatLng(19.0760, 72.8777);
 
-  // Connector type display labels
-  static const Map<ConnectorType, String> _connectorLabels = {
-    ConnectorType.ccs2: 'CCS2',
-    ConnectorType.type2: 'Type 2',
-    ConnectorType.chademo: 'CHAdeMO',
-    ConnectorType.gbT: 'GB/T',
-    ConnectorType.type1: 'Type 1',
+  // Connector type display labels (backend uses plain strings)
+  static const Map<String, String> _connectorLabels = {
+    'CCS2': 'CCS2',
+    'Type2': 'Type 2',
+    'Type 2': 'Type 2',
+    'CHAdeMO': 'CHAdeMO',
+    'GB_T': 'GB/T',
+    'Type1': 'Type 1',
   };
 
   // Connector types available for filter chips
-  static const List<ConnectorType> _filterConnectorTypes = [
-    ConnectorType.ccs2,
-    ConnectorType.type2,
-    ConnectorType.chademo,
-  ];
+  static const List<String> _filterConnectorTypes = ['CCS2', 'Type2', 'CHAdeMO'];
 
   @override
   void initState() {
@@ -70,41 +67,44 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     super.dispose();
   }
 
-  // ─── Marker hue mapping ───
-  double _markerHue(ChargerStatus status) {
+  // ─── Marker hue mapping (backend status strings) ───
+  double _markerHue(String status) {
     switch (status) {
-      case ChargerStatus.available:
+      case 'active':
         return BitmapDescriptor.hueGreen;
-      case ChargerStatus.busy:
+      case 'paused':
         return BitmapDescriptor.hueOrange;
-      case ChargerStatus.offline:
-      case ChargerStatus.maintenance:
+      case 'inactive':
+        return BitmapDescriptor.hueRed;
+      default:
         return BitmapDescriptor.hueRed;
     }
   }
 
-  Color _statusColor(ChargerStatus status) {
+  Color _statusColor(String status) {
     switch (status) {
-      case ChargerStatus.available:
+      case 'active':
         return AppColors.success;
-      case ChargerStatus.busy:
+      case 'paused':
         return AppColors.warning;
-      case ChargerStatus.offline:
-      case ChargerStatus.maintenance:
+      case 'inactive':
         return AppColors.error;
+      default:
+        return AppColors.textMuted;
     }
   }
 
 
 
-  String _waitTimeEstimate(ChargerStatus status) {
+  String _waitTimeEstimate(String status) {
     switch (status) {
-      case ChargerStatus.available:
+      case 'active':
         return '< 5 min';
-      case ChargerStatus.busy:
+      case 'paused':
         return '~15 min';
-      case ChargerStatus.offline:
-      case ChargerStatus.maintenance:
+      case 'inactive':
+        return 'N/A';
+      default:
         return 'N/A';
     }
   }
@@ -179,7 +179,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     final markers = <Marker>{};
 
     // Collect recommended charger IDs so we can visually distinguish them
-    final recIds = <String>{};
+    final recIds = <int>{};
     try {
       final planner = context.read<RoutePlannerProvider>();
       for (final r in planner.recommendations) {
@@ -304,7 +304,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                               Text(charger.name,
                                   style: AppTypography.headlineSmall),
                               const SizedBox(height: 2),
-                              Text(charger.address,
+                              Text(charger.address ?? '',
                                   style: AppTypography.bodySmall,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis),
@@ -438,7 +438,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        _connectorLabels[type] ?? type.name,
+                        _connectorLabels[type] ?? type,
                         style: TextStyle(
                           color: selected
                               ? AppColors.textOnPrimary
@@ -713,7 +713,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    charger.address,
+                    charger.address ?? '',
                     style: AppTypography.bodySmall,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -768,7 +768,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                _connectorLabels[ct] ?? ct.name,
+                                connectorTypeLabel(ct.name),
                                 style: AppTypography.labelMedium.copyWith(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w800,
@@ -904,7 +904,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                         horizontal: 20, vertical: 4),
                     scrollDirection: Axis.horizontal,
                     itemCount: discovery.filteredChargers.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                         const SizedBox(width: 12),
                     itemBuilder: (context, index) {
                       final charger =
@@ -967,7 +967,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                charger.address,
+                                charger.address ?? '',
                                 style: AppTypography.bodySmall,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

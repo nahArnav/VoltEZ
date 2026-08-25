@@ -46,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen>
                 padding: const EdgeInsets.all(24),
                 child: AnimatedBuilder(
                   animation: _c,
-                  builder: (_, __) {
+                  builder: (_, _) {
                     final p = _c.value;
                     return Column(
                       children: [

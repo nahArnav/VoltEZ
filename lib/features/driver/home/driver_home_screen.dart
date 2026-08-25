@@ -552,6 +552,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             () async {
               final auth = context.read<AuthProvider>();
               await auth.logout();
+              if (!mounted) return;
               if (context.mounted) context.go('/login');
             },
           ),

@@ -6,9 +6,14 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/providers/booking_provider.dart';
 import '../../../core/network/booking_api.dart';
+import '../../../core/network/razorpay_service.dart';
 import '../../../shared/widgets/widgets.dart';
 
-/// Payment screen — shows between slot hold and booking confirmation.
+/// Razorpay API key — replace with your actual key from https://dashboard.razorpay.com/app/keys
+/// In production, store this in a backend endpoint, not in client code.
+const String kRazorpayKeyId = 'YOUR_RAZORPAY_KEY_ID';
+
+/// Payment screen — launches Razorpay checkout sheet, then verifies with backend.
 ///
 /// States: pending (select method + pay), processing (spinner),
 /// success (confirmation), failed (retry), cancelled, hold expired.
@@ -21,6 +26,7 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen> {
   String _selectedMethod = 'UPI';
+  RazorpayService? _razorpay;
 
   final List<Map<String, dynamic>> _methods = [
     {
@@ -39,6 +45,52 @@ class _PaymentScreenState extends State<PaymentScreen> {
       'subtitle': 'Balance: ₹500',
     },
   ];
+
+  @override
+  void dispose() {
+    _razorpay?.dispose();
+    super.dispose();
+  }
+
+  /// Open Razorpay checkout sheet and handle the result.
+  Future<void> _launchRazorpay(BookingProvider booking) async {
+    final hold = booking.holdResult;
+    final order = booking.paymentOrder;
+    if (hold == null || order == null) return;
+
+    _razorpay?.dispose();
+    _razorpay = RazorpayService();
+
+    final result = await _razorpay!.openCheckout(
+      razorpayKey: kRazorpayKeyId,
+      amount: (order.amount * 100).round(), // ₹ → paise
+      orderId: order.orderId,
+      name: 'VoltEZ Charging',
+      description: 'Charging at ${hold.slot.connectorLabel} · '
+          '${_formatTime(hold.slot.startTime)} – ${_formatTime(hold.slot.endTime)}',
+      prefill: RazorpayPrefill(
+        contact: '+919999999999',
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      // Razorpay payment succeeded → verify with backend
+      await booking.processPayment(
+        razorpayPaymentId: result.paymentId,
+        razorpayOrderId: result.orderId,
+      );
+    } else if (result.status == RazorpayPaymentStatus.failure) {
+      // Payment failed on Razorpay side
+      setState(() {});
+      booking.setPaymentError(result.errorMessage ?? 'Payment failed.');
+    } else {
+      // Dismissed or cancelled
+      setState(() {});
+      booking.cancelPayment();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +114,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PAYMENT PENDING — select method + pay
+  // PAYMENT PENDING — select method + pay via Razorpay
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildPending(BookingProvider booking) {
@@ -116,8 +168,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(m['label'],
                                       style:
@@ -136,6 +187,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                   );
                 }),
+
+                // Razorpay powered-by notice
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.lock_rounded,
+                        size: 14, color: AppColors.textMuted),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Secured by Razorpay',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -148,7 +216,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             children: [
               PrimaryButton(
                 text: 'PAY ₹${amount.round()}',
-                onPressed: () => booking.processPayment(),
+                onPressed: () => _launchRazorpay(booking),
                 isExpanded: true,
               ),
               const SizedBox(height: 8),
@@ -217,7 +285,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PROCESSING
+  // PROCESSING — waiting for backend verification
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildProcessing() {
@@ -227,11 +295,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
         children: [
           CircularProgressIndicator(color: AppColors.primary),
           SizedBox(height: 24),
-          Text('Processing payment…',
+          Text('Verifying payment…',
               style: AppTypography.headlineMedium),
           SizedBox(height: 8),
           Text(
-            'Verifying with backend',
+            'Confirming with backend',
             style: AppTypography.bodyMedium
                 .copyWith(color: AppColors.textMuted),
           ),
@@ -267,9 +335,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     .copyWith(color: AppColors.success)),
             const SizedBox(height: 8),
             Text(
-              '₹${booking.holdResult?.estimatedCost.round() ?? 0} charged via $_selectedMethod',
+              '₹${booking.holdResult?.estimatedCost.round() ?? 0} charged via Razorpay',
               style: AppTypography.bodyMedium,
             ),
+            if (booking.razorpayPaymentId != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Payment ID: ${booking.razorpayPaymentId}',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             Text('Booking confirmed',
                 style: AppTypography.bodySmall),

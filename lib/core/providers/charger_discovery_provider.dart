@@ -24,11 +24,11 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   bool get chargersLoading => _chargersLoading;
 
   // ─── Filters ───
-  Set<ConnectorType> _selectedConnectors = {};
+  final Set<String> _selectedConnectorStrings = {};
   RangeValues _powerRange = const RangeValues(7, 150);
   String _searchQuery = '';
 
-  Set<ConnectorType> get selectedConnectors => _selectedConnectors;
+  Set<String> get selectedConnectors => _selectedConnectorStrings;
   RangeValues get powerRange => _powerRange;
   String get searchQuery => _searchQuery;
 
@@ -40,9 +40,9 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   List<Charger> get filteredChargers {
     return _allChargers.where((c) {
       // Connector filter
-      if (_selectedConnectors.isNotEmpty) {
-        final hasMatchingConnector =
-            c.connectors.any(_selectedConnectors.contains);
+      if (_selectedConnectorStrings.isNotEmpty) {
+        final hasMatchingConnector = c.connectorTypes
+            .any(_selectedConnectorStrings.contains);
         if (!hasMatchingConnector) return false;
       }
 
@@ -55,7 +55,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         if (!c.name.toLowerCase().contains(q) &&
-            !c.address.toLowerCase().contains(q)) {
+            !(c.address ?? '').toLowerCase().contains(q)) {
           return false;
         }
       }
@@ -124,218 +124,24 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
     _chargersLoading = true;
     notifyListeners();
 
-    // In production: call ApiService.getNearbyChargers(lat, lng)
+    // In production: call ApiService.getNearbyChargers(latitude, longitude)
+    // Mock chargers use backend-aligned field names.
     _allChargers = [
-      Charger(
-        id: 'c1',
-        name: 'Phoenix Mall Charger',
-        address: 'Phoenix Mall, Lower Parel, Mumbai',
-        latitude: 19.0760,
-        longitude: 72.8777,
-        powerKw: 60,
-        pricePerKwh: 14,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.ccs2],
-        amenities: ['WiFi', 'Food Court', 'Parking'],
-        rating: 4.6,
-        totalRatings: 234,
-      ),
-      Charger(
-        id: 'c2',
-        name: 'Highway Fast Charge',
-        address: 'Mumbai-Pune Expressway, Khalapur',
-        latitude: 19.0896,
-        longitude: 72.8656,
-        powerKw: 120,
-        pricePerKwh: 18,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.ccs2, ConnectorType.chademo],
-        amenities: ['Restroom', 'Cafe'],
-        rating: 4.2,
-        totalRatings: 156,
-      ),
-      Charger(
-        id: 'c3',
-        name: 'Tech Park Station',
-        address: 'Infosys Campus, Airoli',
-        latitude: 19.0596,
-        longitude: 72.8295,
-        powerKw: 30,
-        pricePerKwh: 11,
-        status: ChargerStatus.busy,
-        connectors: [ConnectorType.type2],
-        amenities: ['WiFi'],
-        rating: 4.8,
-        totalRatings: 89,
-      ),
-      Charger(
-        id: 'c4',
-        name: 'Marine Drive AC Charger',
-        address: 'Marine Drive, Churchgate',
-        latitude: 18.9432,
-        longitude: 72.8234,
-        powerKw: 22,
-        pricePerKwh: 10,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.type2],
-        amenities: ['Parking', 'AC Lounge'],
-        rating: 4.5,
-        totalRatings: 312,
-      ),
-      Charger(
-        id: 'c5',
-        name: 'Bandra Hub DC Fast',
-        address: 'Bandra Kurla Complex, Bandra East',
-        latitude: 19.0596,
-        longitude: 72.8684,
-        powerKw: 150,
-        pricePerKwh: 22,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.ccs2, ConnectorType.chademo],
-        amenities: ['WiFi', 'Cafe', 'Parking', 'Restroom'],
-        rating: 4.9,
-        totalRatings: 501,
-      ),
-      Charger(
-        id: 'c6',
-        name: 'Thane Station AC',
-        address: 'Thane West, near Viviana Mall',
-        latitude: 19.1896,
-        longitude: 72.9596,
-        powerKw: 7,
-        pricePerKwh: 8,
-        status: ChargerStatus.busy,
-        connectors: [ConnectorType.type2],
-        amenities: ['Parking'],
-        rating: 4.1,
-        totalRatings: 67,
-      ),
-      Charger(
-        id: 'c7',
-        name: 'Navi Mumbai DC',
-        address: 'Vashi, Sector 17',
-        latitude: 19.0736,
-        longitude: 72.9988,
-        powerKw: 60,
-        pricePerKwh: 15,
-        status: ChargerStatus.offline,
-        connectors: [ConnectorType.ccs2],
-        amenities: [],
-        rating: 3.9,
-        totalRatings: 42,
-      ),
-      Charger(
-        id: 'c8',
-        name: 'Andheri Express Charger',
-        address: 'Andheri-Kurla Road, Andheri East',
-        latitude: 19.1136,
-        longitude: 72.8697,
-        powerKw: 45,
-        pricePerKwh: 13,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.ccs2, ConnectorType.type2],
-        amenities: ['WiFi', 'Food Court'],
-        rating: 4.3,
-        totalRatings: 198,
-      ),
-      Charger(
-        id: 'c9',
-        name: 'Powai Lake Charger',
-        address: 'Powai, Hiranandani Gardens',
-        latitude: 19.1187,
-        longitude: 72.9066,
-        powerKw: 22,
-        pricePerKwh: 12,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.type2],
-        amenities: ['WiFi', 'Parking'],
-        rating: 4.7,
-        totalRatings: 145,
-      ),
-      Charger(
-        id: 'c10',
-        name: 'Chembur Fast DC',
-        address: 'Chembur, near Diamond Garden',
-        latitude: 19.0520,
-        longitude: 72.8904,
-        powerKw: 90,
-        pricePerKwh: 16,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.ccs2],
-        amenities: ['Cafe', 'Restroom'],
-        rating: 4.4,
-        totalRatings: 210,
-      ),
-      Charger(
-        id: 'c11',
-        name: 'Dadar TT Circle',
-        address: 'Dadar TT Circle, Dadar West',
-        latitude: 19.0176,
-        longitude: 72.8434,
-        powerKw: 15,
-        pricePerKwh: 9,
-        status: ChargerStatus.busy,
-        connectors: [ConnectorType.type2],
-        amenities: [],
-        rating: 3.8,
-        totalRatings: 55,
-      ),
-      Charger(
-        id: 'c12',
-        name: 'Goregaon Film City',
-        address: 'Film City Road, Goregaon East',
-        latitude: 19.1664,
-        longitude: 72.8526,
-        powerKw: 60,
-        pricePerKwh: 14,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.ccs2, ConnectorType.type2],
-        amenities: ['WiFi', 'Parking', 'AC Lounge'],
-        rating: 4.6,
-        totalRatings: 278,
-      ),
-      Charger(
-        id: 'c13',
-        name: 'Mulund East Hub',
-        address: 'Mulund East, nearMarket Garden',
-        latitude: 19.1628,
-        longitude: 72.9522,
-        powerKw: 30,
-        pricePerKwh: 11,
-        status: ChargerStatus.offline,
-        connectors: [ConnectorType.type2],
-        amenities: ['Parking'],
-        rating: 4.0,
-        totalRatings: 88,
-      ),
-      Charger(
-        id: 'c14',
-        name: 'Juhu Beach Charger',
-        address: 'Juhu Tara Road, Juhu',
-        latitude: 19.1330,
-        longitude: 72.8260,
-        powerKw: 22,
-        pricePerKwh: 12,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.type2],
-        amenities: ['WiFi', 'Cafe'],
-        rating: 4.5,
-        totalRatings: 189,
-      ),
-      Charger(
-        id: 'c15',
-        name: 'Colaba Express DC',
-        address: 'Colaba Causeway, Colaba',
-        latitude: 18.9154,
-        longitude: 72.8264,
-        powerKw: 45,
-        pricePerKwh: 14,
-        status: ChargerStatus.available,
-        connectors: [ConnectorType.ccs2],
-        amenities: ['Restroom'],
-        rating: 4.2,
-        totalRatings: 134,
-      ),
+      const Charger(id: 1, businessId: 1, name: 'Phoenix Mall Charger', address: 'Phoenix Mall, Lower Parel, Mumbai', latitude: 19.0760, longitude: 72.8777, powerKw: 60, accessType: 'public', basePrice: 14, status: 'active', reliabilityScore: 0.92, amenities: 'WiFi,Food Court,Parking'),
+      const Charger(id: 2, businessId: 1, name: 'Highway Fast Charge', address: 'Mumbai-Pune Expressway, Khalapur', latitude: 19.0896, longitude: 72.8656, powerKw: 120, accessType: 'public', basePrice: 18, status: 'active', reliabilityScore: 0.84, amenities: 'Restroom,Cafe'),
+      const Charger(id: 3, businessId: 1, name: 'Tech Park Station', address: 'Infosys Campus, Airoli', latitude: 19.0596, longitude: 72.8295, powerKw: 30, accessType: 'public', basePrice: 11, status: 'active', reliabilityScore: 0.96, amenities: 'WiFi'),
+      const Charger(id: 4, businessId: 1, name: 'Marine Drive AC Charger', address: 'Marine Drive, Churchgate', latitude: 18.9432, longitude: 72.8234, powerKw: 22, accessType: 'public', basePrice: 10, status: 'active', reliabilityScore: 0.90, amenities: 'Parking,AC Lounge'),
+      const Charger(id: 5, businessId: 1, name: 'Bandra Hub DC Fast', address: 'Bandra Kurla Complex, Bandra East', latitude: 19.0596, longitude: 72.8684, powerKw: 150, accessType: 'public', basePrice: 22, status: 'active', reliabilityScore: 0.98, amenities: 'WiFi,Cafe,Parking,Restroom'),
+      const Charger(id: 6, businessId: 1, name: 'Thane Station AC', address: 'Thane West, near Viviana Mall', latitude: 19.1896, longitude: 72.9596, powerKw: 7, accessType: 'public', basePrice: 8, status: 'active', reliabilityScore: 0.82, amenities: 'Parking'),
+      const Charger(id: 7, businessId: 1, name: 'Navi Mumbai DC', address: 'Vashi, Sector 17', latitude: 19.0736, longitude: 72.9988, powerKw: 60, accessType: 'public', basePrice: 15, status: 'inactive', reliabilityScore: 0.78, amenities: ''),
+      const Charger(id: 8, businessId: 1, name: 'Andheri Express Charger', address: 'Andheri-Kurla Road, Andheri East', latitude: 19.1136, longitude: 72.8697, powerKw: 45, accessType: 'public', basePrice: 13, status: 'active', reliabilityScore: 0.86, amenities: 'WiFi,Food Court'),
+      const Charger(id: 9, businessId: 1, name: 'Powai Lake Charger', address: 'Powai, Hiranandani Gardens', latitude: 19.1187, longitude: 72.9066, powerKw: 22, accessType: 'public', basePrice: 12, status: 'active', reliabilityScore: 0.94, amenities: 'WiFi,Parking'),
+      const Charger(id: 10, businessId: 1, name: 'Chembur Fast DC', address: 'Chembur, near Diamond Garden', latitude: 19.0520, longitude: 72.8904, powerKw: 90, accessType: 'public', basePrice: 16, status: 'active', reliabilityScore: 0.88, amenities: 'Cafe,Restroom'),
+      const Charger(id: 11, businessId: 1, name: 'Dadar TT Circle', address: 'Dadar TT Circle, Dadar West', latitude: 19.0176, longitude: 72.8434, powerKw: 15, accessType: 'public', basePrice: 9, status: 'active', reliabilityScore: 0.76, amenities: ''),
+      const Charger(id: 12, businessId: 1, name: 'Goregaon Film City', address: 'Film City Road, Goregaon East', latitude: 19.1664, longitude: 72.8526, powerKw: 60, accessType: 'public', basePrice: 14, status: 'active', reliabilityScore: 0.92, amenities: 'WiFi,Parking,AC Lounge'),
+      const Charger(id: 13, businessId: 1, name: 'Mulund East Hub', address: 'Mulund East, near Market Garden', latitude: 19.1628, longitude: 72.9522, powerKw: 30, accessType: 'public', basePrice: 11, status: 'inactive', reliabilityScore: 0.80, amenities: 'Parking'),
+      const Charger(id: 14, businessId: 1, name: 'Juhu Beach Charger', address: 'Juhu Tara Road, Juhu', latitude: 19.1330, longitude: 72.8260, powerKw: 22, accessType: 'public', basePrice: 12, status: 'active', reliabilityScore: 0.90, amenities: 'WiFi,Cafe'),
+      const Charger(id: 15, businessId: 1, name: 'Colaba Express DC', address: 'Colaba Causeway, Colaba', latitude: 18.9154, longitude: 72.8264, powerKw: 45, accessType: 'public', basePrice: 14, status: 'active', reliabilityScore: 0.84, amenities: 'Restroom'),
     ];
 
     _chargersLoading = false;
@@ -343,17 +149,17 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   }
 
   // ─── Filter Mutators ───
-  void toggleConnector(ConnectorType type) {
-    if (_selectedConnectors.contains(type)) {
-      _selectedConnectors.remove(type);
+  void toggleConnector(String connectorType) {
+    if (_selectedConnectorStrings.contains(connectorType)) {
+      _selectedConnectorStrings.remove(connectorType);
     } else {
-      _selectedConnectors.add(type);
+      _selectedConnectorStrings.add(connectorType);
     }
     notifyListeners();
   }
 
   void clearConnectorFilter() {
-    _selectedConnectors.clear();
+    _selectedConnectorStrings.clear();
     notifyListeners();
   }
 
