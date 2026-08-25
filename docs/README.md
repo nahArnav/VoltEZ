@@ -23,6 +23,7 @@ not belong in this directory.
 | FastAPI handoff | `backend_fastapi_handoff.md` | Exact Model 1/2 integration contract for the Backend branch |
 | Two-model analysis | `../output/pdf/VoltEZ_Models_1_and_2_Logical_Analysis.pdf` | Visual explanation of Model 1 and Model 2 logic, evidence, and deployment |
 | Model 5 Step 1 | `model5_route_energy_design.md` | Route-energy physics, dataset contract, synthetic truth, leakage, and evaluation plan |
+| Model 5 Step 2 | `model5_route_energy_step2.md` | Public vehicle profiles, immutable route snapshots, route diversity, and validation |
 
 The repository root `README.md` remains the short operational entry point. This index keeps the
 detailed engineering narrative discoverable without crowding the root.

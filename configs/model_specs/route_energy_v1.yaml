@@ -3,6 +3,8 @@ model:
   name: route_energy_prediction
   version: v1
   stage: design_only
+  data_stage: public_planning_inputs_implemented
+  training_stage: not_started
   city: Pune
   row_grain: one vehicle and one immutable route snapshot for one planned route leg
   primary_target: actual_battery_energy_kwh
@@ -26,6 +28,12 @@ physics_baseline:
   relative_borderline_buffer_fraction: 0.03
 
 dataset:
+  public_application_tables:
+    - vehicle_energy_profiles
+    - route_snapshots
+    - trips
+    - trip_charger_options
+  step_two_label_policy: no realized energy labels or hidden truth are generated
   feature_cutoff_rule: every feature must be known at or before route_snapshot_at
   label_sources:
     telemetry_battery_energy:

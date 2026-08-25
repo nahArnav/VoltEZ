@@ -194,6 +194,42 @@ class SyntheticSafeguards(StrictConfigModel):
     keep_latent_variables_out_of_features: bool = True
 
 
+class RouteEnergySyntheticSettings(StrictConfigModel):
+    """Public, planning-time inputs for Model 5 synthetic development."""
+
+    enabled: bool = True
+    maximum_candidate_snapshots_per_trip: int = Field(default=5, ge=1, le=20)
+    coverage_trips_per_vehicle: int = Field(default=1, ge=0, le=10)
+    profile_source_mix: dict[str, float] = Field(
+        default_factory=lambda: {
+            "catalogue": 0.72,
+            "owner_declared": 0.18,
+            "class_default": 0.10,
+        }
+    )
+    missing_elevation_probability: float = Field(default=0.08, ge=0, le=1)
+    missing_weather_probability: float = Field(default=0.10, ge=0, le=1)
+    steep_route_probability: float = Field(default=0.08, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_profile_source_mix(self) -> RouteEnergySyntheticSettings:
+        required_sources = {"catalogue", "owner_declared", "class_default"}
+        if set(self.profile_source_mix) != required_sources:
+            raise ValueError(
+                "route-energy profile_source_mix must contain exactly catalogue, "
+                "owner_declared, and class_default"
+            )
+        if any(probability < 0 for probability in self.profile_source_mix.values()):
+            raise ValueError("route-energy profile source probabilities cannot be negative")
+        total_probability = sum(self.profile_source_mix.values())
+        if abs(total_probability - 1.0) > 1e-9:
+            raise ValueError(
+                "route-energy profile source probabilities must sum to 1.0, "
+                f"received {total_probability}"
+            )
+        return self
+
+
 class SyntheticSettings(StrictConfigModel):
     profile_name: str
     generator_version: str
@@ -208,6 +244,9 @@ class SyntheticSettings(StrictConfigModel):
     availability: AvailabilitySyntheticSettings
     supply: SupplySyntheticSettings
     behaviour: BehaviourSyntheticSettings
+    route_energy: RouteEnergySyntheticSettings = Field(
+        default_factory=RouteEnergySyntheticSettings
+    )
     safeguards: SyntheticSafeguards
 
     @model_validator(mode="after")
@@ -221,6 +260,14 @@ class SyntheticSettings(StrictConfigModel):
             )
         if self.charger_count < self.business_count:
             raise ValueError("charger_count must be at least business_count in pune_v1")
+        if (
+            self.route_energy.enabled
+            and self.route_energy.maximum_candidate_snapshots_per_trip
+            < self.behaviour.recommendations_per_request
+        ):
+            raise ValueError(
+                "maximum_candidate_snapshots_per_trip must cover every recommended charger"
+            )
         return self
 
 

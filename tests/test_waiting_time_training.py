@@ -9,11 +9,12 @@ import pytest
 
 from voltez_ml.synthetic.io import file_sha256, write_manifest
 from voltez_ml.training.waiting_time import (
+    TARGET,
     HurdleWaitingTimeRegressor,
     WaitingTimeTrainingSettings,
     train_hurdle_waiting_time_model,
-    TARGET
 )
+
 
 class _OccurrenceStub:
     classes_ = np.array([0, 1])
@@ -81,11 +82,17 @@ def _suite(tmp_path: Path) -> Path:
             }
         )
     readiness_path = tmp_path / "training_readiness.json"
-    write_manifest({"models": {"waiting_time": {"status": "ready", "failures": []}}}, readiness_path)
+    write_manifest(
+        {"models": {"waiting_time": {"status": "ready", "failures": []}}},
+        readiness_path,
+    )
     manifest_path = tmp_path / "feature_suite_manifest.json"
     write_manifest(
         {
-            "training_readiness": {"path": readiness_path.name, "sha256": file_sha256(readiness_path)},
+            "training_readiness": {
+                "path": readiness_path.name,
+                "sha256": file_sha256(readiness_path),
+            },
             "datasets": entries,
         },
         manifest_path,

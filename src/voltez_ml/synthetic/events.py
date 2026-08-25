@@ -13,6 +13,7 @@ import pandas as pd
 
 from voltez_ml.config import VoltEZConfig
 from voltez_ml.geography import haversine_km, nearest_neighbor_ids
+from voltez_ml.route_energy.synthetic import generate_route_snapshots
 from voltez_ml.synthetic.randomness import (
     named_rng,
     negative_binomial_parameters,
@@ -1604,6 +1605,17 @@ def generate_event_tables(
         config, run_id, bookings, booking_events, static, outages, status_reports
     )
     trips, trip_charger_options = _generate_trips_and_options(run_id, requests, impressions, static)
+    route_snapshots, trips, trip_charger_options = generate_route_snapshots(
+        config,
+        run_id,
+        requests,
+        trips,
+        trip_charger_options,
+        static["chargers"],
+        static["vehicles"],
+        static["zones"],
+        scenario_lookup,
+    )
     availability_observations, latent_availability = _availability_observations(
         config,
         run_id,
@@ -1674,6 +1686,7 @@ def generate_event_tables(
         "context_events": context_events,
         "charging_requests": pd.DataFrame(requests),
         "trips": trips,
+        "route_snapshots": route_snapshots,
         "trip_charger_options": trip_charger_options,
         "recommendation_impressions": pd.DataFrame(impressions),
         "bookings": bookings_frame,

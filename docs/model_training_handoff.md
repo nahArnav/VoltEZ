@@ -89,7 +89,7 @@ the hidden port-health probability that generated the fault.
 
 ## Why the feature suite is partitioned
 
-The conservative plan estimates about 2.87 million raw rows per 90-day world. Combining the four
+The conservative plan estimates about 3.47 million raw rows per 90-day world. Combining the four
 ordinary worlds before feature construction could exceed 26 GB, above the project's 10 GB working
 budget on a 16 GB M4.
 

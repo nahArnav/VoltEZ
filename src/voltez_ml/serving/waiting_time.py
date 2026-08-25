@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import json
-import math
 import warnings
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal, Self
-from zoneinfo import ZoneInfo
+from typing import Any, Literal
 
 import joblib  # type: ignore[import-untyped]
 import numpy as np
@@ -16,7 +14,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from voltez_ml.synthetic.io import file_sha256, write_manifest
-from voltez_ml.training.waiting_time import TARGET, _load_suite, _load_role
+from voltez_ml.training.waiting_time import _load_role, _load_suite
 
 BINARY_FEATURES = {
     "target_is_weekend",

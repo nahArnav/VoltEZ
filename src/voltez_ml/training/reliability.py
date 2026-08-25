@@ -877,6 +877,7 @@ def train_reliability_model(
         "device": "cpu",
         "hardware_note": "scikit-learn histogram boosting uses the Apple M4 CPU, not MPS",
         "locked_test_unlocked": unlock_test,
+        "locked_test_accessed": unlock_test,
         "training_rows": len(train),
         "training_worlds": int(train["simulation_run_id"].nunique()),
         "training_unreliable_prevalence": train_prevalence,
@@ -961,6 +962,7 @@ def train_reliability_model(
         "code_state": code_state,
         "device": "cpu",
         "locked_test_unlocked": unlock_test,
+        "locked_test_accessed": unlock_test,
     }
     write_manifest(manifest, incomplete / "manifest.json")
     incomplete.rename(output_dir)

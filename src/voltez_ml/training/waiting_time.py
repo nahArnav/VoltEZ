@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from sklearn.base import BaseEstimator, RegressorMixin  # type: ignore[import-untyped]
+from sklearn.compose import ColumnTransformer  # type: ignore[import-untyped]
 from sklearn.ensemble import (  # type: ignore[import-untyped]
     HistGradientBoostingClassifier,
     HistGradientBoostingRegressor,
@@ -26,8 +27,7 @@ from sklearn.metrics import (  # type: ignore[import-untyped]
     mean_absolute_error,
     roc_auc_score,
 )
-from sklearn.compose import ColumnTransformer # type: ignore[import-untyped]
-from sklearn.preprocessing import OrdinalEncoder # type: ignore[import-untyped]
+from sklearn.preprocessing import OrdinalEncoder  # type: ignore[import-untyped]
 
 from voltez_ml.synthetic.io import file_sha256, write_manifest
 
@@ -184,20 +184,28 @@ class HurdleWaitingTimeRegressor(RegressorMixin, BaseEstimator):  # type: ignore
         df = self._prepare_data(frame)
 
         values = np.asarray(target, dtype="float64")
-        
+
         occurrence = (values > 0).astype("int8")
         positive = occurrence == 1
 
         self.preprocessor = ColumnTransformer(
             transformers=[
-                ("cat", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1, encoded_missing_value=-1), self.categorical_features),
-                ("num", "passthrough", self.numeric_features)
+                (
+                    "cat",
+                    OrdinalEncoder(
+                        handle_unknown="use_encoded_value",
+                        unknown_value=-1,
+                        encoded_missing_value=-1,
+                    ),
+                    self.categorical_features,
+                ),
+                ("num", "passthrough", self.numeric_features),
             ]
         )
 
         X_processed = self.preprocessor.fit_transform(df)
         X_processed = np.asarray(X_processed, dtype="float32")
-        
+
         new_cat_indices = list(range(len(self.categorical_features)))
 
         self.occurrence_model_ = HistGradientBoostingClassifier(
@@ -298,14 +306,18 @@ def _stage_report(
     positive_mean = model.predict_positive_mean(frame)
     expected_wait = probability * positive_mean
     positive = truth > 0
-    
+
     zero_pred = np.zeros_like(truth)
-    
+
     return {
         "hurdle_expected_wait": _metrics(truth, expected_wait),
         "zero_prediction_baseline_mae": float(mean_absolute_error(truth, zero_pred)),
         "occurrence_classifier": _binary_stage_metrics(truth, probability),
-        "positive_wait_regressor": _metrics(truth[positive], positive_mean[positive]) if positive.any() else None,
+        "positive_wait_regressor": (
+            _metrics(truth[positive], positive_mean[positive])
+            if positive.any()
+            else None
+        ),
         "formula_integrity_max_absolute_error": float(
             np.max(np.abs(model.predict(frame) - expected_wait))
         ),
@@ -331,8 +343,14 @@ def train_hurdle_waiting_time_model(
 
     suite, readiness = _load_suite(suite_manifest_path)
     train = _load_role(suite, "train")
-    if model_settings.maximum_training_rows > 0 and len(train) > model_settings.maximum_training_rows:
-        train = train.sample(n=model_settings.maximum_training_rows, random_state=model_settings.random_seed).sort_index()
+    if (
+        model_settings.maximum_training_rows > 0
+        and len(train) > model_settings.maximum_training_rows
+    ):
+        train = train.sample(
+            n=model_settings.maximum_training_rows,
+            random_state=model_settings.random_seed,
+        ).sort_index()
 
     validation = _load_role(suite, "validation")
     numeric, categorical = _feature_spec(train)

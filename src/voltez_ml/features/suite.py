@@ -228,8 +228,12 @@ def build_feature_suite(
     portable_entries = [
         {
             **entry,
-            "source_manifest": os.path.relpath(entry["source_manifest"], output_root).replace("\\", "/"),
-            "feature_manifest": os.path.relpath(entry["feature_manifest"], output_root).replace("\\", "/"),
+            "source_manifest": os.path.relpath(
+                entry["source_manifest"], output_root
+            ).replace("\\", "/"),
+            "feature_manifest": os.path.relpath(
+                entry["feature_manifest"], output_root
+            ).replace("\\", "/"),
             "tables": {
                 name: os.path.relpath(path, output_root).replace("\\", "/")
                 for name, path in entry["tables"].items()

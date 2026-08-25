@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from voltez_ml.config import VoltEZConfig
+from voltez_ml.route_energy.synthetic import generate_vehicle_energy_profiles
 from voltez_ml.synthetic.entities import generate_static_entities
 from voltez_ml.synthetic.events import generate_event_tables
 from voltez_ml.synthetic.io import (
@@ -46,6 +47,7 @@ SORT_KEYS: dict[str, list[str]] = {
     "connector_types": ["connector_type_id"],
     "vehicle_connectors": ["vehicle_id", "connector_type_id"],
     "vehicles": ["vehicle_id"],
+    "vehicle_energy_profiles": ["vehicle_id", "effective_from"],
     "businesses": ["business_id"],
     "business_hours": ["business_id", "day_of_week"],
     "business_hour_exceptions": ["business_id", "date"],
@@ -60,6 +62,7 @@ SORT_KEYS: dict[str, list[str]] = {
     "context_events": ["starts_at", "zone_id"],
     "charging_requests": ["requested_at", "request_id"],
     "trips": ["trip_id"],
+    "route_snapshots": ["route_snapshot_at", "trip_id", "leg_type"],
     "trip_charger_options": ["trip_id", "rank"],
     "recommendation_impressions": ["shown_at", "request_id", "rank"],
     "bookings": ["created_at", "booking_id"],
@@ -124,7 +127,12 @@ def _generator_source_fingerprint(project_root: Path) -> str:
 
     source_root = project_root / "src" / "voltez_ml" / "synthetic"
     digest = hashlib.sha256()
-    source_paths = [*source_root.glob("*.py"), project_root / "src" / "voltez_ml" / "geography.py"]
+    route_energy_sources = (project_root / "src" / "voltez_ml" / "route_energy").glob("*.py")
+    source_paths = [
+        *source_root.glob("*.py"),
+        *route_energy_sources,
+        project_root / "src" / "voltez_ml" / "geography.py",
+    ]
     for path in sorted(source_paths):
         digest.update(str(path.relative_to(project_root)).encode("utf-8"))
         digest.update(path.read_bytes())
@@ -164,6 +172,9 @@ def generate_dataset(
     generator_source_hash = _generator_source_fingerprint(project_root)
     run_id, snapshot_id, configuration_hash = _simulation_identity(config, generator_source_hash)
     static_tables = generate_static_entities(config, run_id)
+    static_tables["vehicle_energy_profiles"] = generate_vehicle_energy_profiles(
+        config, run_id, static_tables["vehicles"]
+    )
     event_tables = generate_event_tables(config, run_id, snapshot_id, static_tables)
     tables = _sort_tables({**static_tables, **event_tables})
     validate_dataset(config, tables)

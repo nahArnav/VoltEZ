@@ -33,13 +33,16 @@ def estimate_planned_rows(config: VoltEZConfig) -> int:
         + settings.business_count * 8
         + settings.charger_count
         + maximum_ports * (2 + settings.days)
-        + settings.driver_count * 3
+        + settings.driver_count * 4
         + 5
     )
-    per_request_rows = 8 + settings.behaviour.recommendations_per_request * 3
+    per_request_rows = 9 + settings.behaviour.recommendations_per_request * 4
     event_rows = grid_rows * 2 + expected_requests_with_headroom * per_request_rows
+    route_coverage_rows = (
+        settings.driver_count * settings.route_energy.coverage_trips_per_vehicle * 2
+    )
     status_headroom = maximum_ports * (1 + settings.days * 2)
-    return static_rows + event_rows + status_headroom
+    return static_rows + event_rows + route_coverage_rows + status_headroom
 
 
 def _require_foreign_keys(
@@ -100,6 +103,7 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         "connector_types",
         "vehicle_connectors",
         "vehicles",
+        "vehicle_energy_profiles",
         "businesses",
         "business_hours",
         "business_hour_exceptions",
@@ -113,6 +117,7 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         "tariffs",
         "charging_requests",
         "trips",
+        "route_snapshots",
         "trip_charger_options",
         "recommendation_impressions",
         "bookings",
@@ -165,12 +170,28 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
     _require_foreign_keys(tables["tariffs"], "port_id", tables["charger_ports"], "port_id")
     _require_foreign_keys(tables["vehicles"], "user_id", tables["users"], "user_id")
     _require_foreign_keys(
+        tables["vehicle_energy_profiles"], "vehicle_id", tables["vehicles"], "vehicle_id"
+    )
+    _require_foreign_keys(
         tables["charging_requests"], "vehicle_id", tables["vehicles"], "vehicle_id"
     )
     _require_foreign_keys(tables["charging_requests"], "user_id", tables["users"], "user_id")
     _require_foreign_keys(tables["charging_requests"], "zone_id", tables["zones"], "zone_id")
     _require_foreign_keys(tables["trips"], "user_id", tables["users"], "user_id")
     _require_foreign_keys(tables["trips"], "vehicle_id", tables["vehicles"], "vehicle_id")
+    _require_foreign_keys(tables["route_snapshots"], "trip_id", tables["trips"], "trip_id")
+    _require_foreign_keys(
+        tables["route_snapshots"], "request_id", tables["charging_requests"], "request_id"
+    )
+    _require_foreign_keys(
+        tables["route_snapshots"], "vehicle_id", tables["vehicles"], "vehicle_id"
+    )
+    candidate_snapshots = tables["route_snapshots"][
+        tables["route_snapshots"]["candidate_charger_id"].notna()
+    ]
+    _require_foreign_keys(
+        candidate_snapshots, "candidate_charger_id", tables["chargers"], "charger_id"
+    )
     _require_foreign_keys(tables["charging_requests"], "trip_id", tables["trips"], "trip_id")
     _require_foreign_keys(tables["trip_charger_options"], "trip_id", tables["trips"], "trip_id")
     _require_foreign_keys(
@@ -213,8 +234,10 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         ("charger_ports", "port_id"),
         ("parking_spaces", "parking_space_id"),
         ("vehicles", "vehicle_id"),
+        ("vehicle_energy_profiles", "vehicle_energy_profile_id"),
         ("charging_requests", "request_id"),
         ("trips", "trip_id"),
+        ("route_snapshots", "route_snapshot_id"),
         ("bookings", "booking_id"),
         ("charging_sessions", "session_id"),
         ("availability_observations", "observation_id"),
@@ -259,6 +282,13 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
     ]
     if bool(non_route_requests["trip_id"].notna().any()):
         raise DatasetValidationError("only route-planning requests may reference a trip")
+    trip_ownership = tables["trips"][["user_id", "vehicle_id"]].merge(
+        tables["vehicles"][["vehicle_id", "user_id"]],
+        on="vehicle_id",
+        suffixes=("_trip", "_vehicle"),
+    )
+    if bool((trip_ownership["user_id_trip"] != trip_ownership["user_id_vehicle"]).any()):
+        raise DatasetValidationError("trip user does not own the referenced vehicle")
     if bool((tables["trip_charger_options"]["estimated_detour_km"] < 0).any()):
         raise DatasetValidationError("trip detour cannot be negative")
     if bool((tables["trip_charger_options"]["estimated_total_cost"] < 0).any()):
@@ -268,6 +298,211 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         ["trip_id", "charger_id"],
         "trip_charger_options",
     )
+
+    profiles = tables["vehicle_energy_profiles"]
+    route_snapshots = tables["route_snapshots"]
+    if config.synthetic.route_energy.enabled:
+        if len(profiles) != len(tables["vehicles"]):
+            raise DatasetValidationError("every vehicle requires one active energy profile")
+        _require_unique(profiles, ["vehicle_id"], "vehicle_energy_profiles")
+        if bool(profiles["effective_from"].isna().any()):
+            raise DatasetValidationError("vehicle energy profiles require effective_from")
+        ended_profiles = profiles[profiles["effective_to"].notna()]
+        if not ended_profiles.empty:
+            effective_to = pd.to_datetime(ended_profiles["effective_to"], utc=True)
+            effective_from = pd.to_datetime(ended_profiles["effective_from"], utc=True)
+            if bool((effective_to <= effective_from).any()):
+                raise DatasetValidationError(
+                    "vehicle energy profile validity interval is invalid"
+                )
+        expected_profile_sources = {"catalogue", "owner_declared", "class_default"}
+        if not set(profiles["source"].astype(str)).issubset(expected_profile_sources):
+            raise DatasetValidationError("vehicle energy profile source is invalid")
+        bounded_profile_columns = {
+            "confidence": (0.0, 1.0),
+            "curb_mass_kg": (80.0, 3_100.0),
+            "default_payload_kg": (0.0, 900.0),
+            "drag_area_m2": (0.3, 2.0),
+            "rolling_resistance_coefficient": (0.005, 0.04),
+            "drivetrain_efficiency": (0.5, 1.0),
+            "regenerative_braking_efficiency": (0.0, 0.95),
+            "usable_capacity_fraction": (0.5, 1.0),
+            "battery_health_fraction": (0.5, 1.0),
+        }
+        for column, (minimum, maximum) in bounded_profile_columns.items():
+            if bool(((profiles[column] < minimum) | (profiles[column] > maximum)).any()):
+                raise DatasetValidationError(
+                    f"vehicle energy profile {column} is outside its physical bounds"
+                )
+
+        expected_snapshot_count = len(tables["trips"]) + len(tables["trip_charger_options"])
+        if len(route_snapshots) != expected_snapshot_count:
+            raise DatasetValidationError(
+                "route snapshots must cover every direct trip and candidate charger option"
+            )
+        snapshot_vehicle_alignment = route_snapshots[["trip_id", "vehicle_id"]].merge(
+            tables["trips"][["trip_id", "vehicle_id"]],
+            on="trip_id",
+            suffixes=("_snapshot", "_trip"),
+            validate="many_to_one",
+        )
+        if bool(
+            (
+                snapshot_vehicle_alignment["vehicle_id_snapshot"]
+                != snapshot_vehicle_alignment["vehicle_id_trip"]
+            ).any()
+        ):
+            raise DatasetValidationError("route snapshot vehicle does not match its trip")
+        request_snapshots = route_snapshots[route_snapshots["request_id"].notna()]
+        request_alignment = request_snapshots[["trip_id", "request_id"]].merge(
+            tables["charging_requests"][["request_id", "trip_id"]],
+            on="request_id",
+            suffixes=("_snapshot", "_request"),
+            validate="many_to_one",
+        )
+        if bool(
+            (
+                request_alignment["trip_id_snapshot"]
+                != request_alignment["trip_id_request"]
+            ).any()
+        ):
+            raise DatasetValidationError("route snapshot request does not match its trip")
+        if bool(tables["trips"]["direct_route_snapshot_id"].isna().any()):
+            raise DatasetValidationError("every trip requires a direct route snapshot")
+        if bool(tables["trip_charger_options"]["route_snapshot_id"].isna().any()):
+            raise DatasetValidationError("every charger option requires a route snapshot")
+        _require_foreign_keys(
+            tables["trips"],
+            "direct_route_snapshot_id",
+            route_snapshots,
+            "route_snapshot_id",
+        )
+        _require_foreign_keys(
+            tables["trip_charger_options"],
+            "route_snapshot_id",
+            route_snapshots,
+            "route_snapshot_id",
+        )
+
+        direct_snapshots = route_snapshots[route_snapshots["leg_type"] == "destination"]
+        candidate_snapshots = route_snapshots[
+            route_snapshots["leg_type"] == "candidate_charger"
+        ]
+        if len(direct_snapshots) != len(tables["trips"]):
+            raise DatasetValidationError("each trip must have exactly one destination snapshot")
+        if len(candidate_snapshots) != len(tables["trip_charger_options"]):
+            raise DatasetValidationError("each charger option must have one candidate snapshot")
+        if bool(direct_snapshots["candidate_charger_id"].notna().any()):
+            raise DatasetValidationError("destination snapshots cannot reference a charger")
+        if bool(candidate_snapshots["candidate_charger_id"].isna().any()):
+            raise DatasetValidationError("candidate snapshots require a charger")
+        candidate_alignment = tables["trip_charger_options"][
+            ["route_snapshot_id", "charger_id"]
+        ].merge(
+            candidate_snapshots[["route_snapshot_id", "candidate_charger_id"]],
+            on="route_snapshot_id",
+            validate="one_to_one",
+        )
+        if bool(
+            (
+                candidate_alignment["charger_id"]
+                != candidate_alignment["candidate_charger_id"]
+            ).any()
+        ):
+            raise DatasetValidationError(
+                "charger option and route snapshot reference different chargers"
+            )
+
+        if bool(
+            (route_snapshots["requested_at"] > route_snapshots["route_snapshot_at"]).any()
+        ):
+            raise DatasetValidationError("route snapshot cannot predate its request")
+        if bool((route_snapshots["route_snapshot_at"] >= route_snapshots["expires_at"]).any()):
+            raise DatasetValidationError("route snapshot expiry must follow generation")
+        if bool((route_snapshots["distance_km"] <= 0).any()):
+            raise DatasetValidationError("route snapshot distance must be positive")
+        if bool((route_snapshots["normal_duration_minutes"] <= 0).any()):
+            raise DatasetValidationError("route normal duration must be positive")
+        if bool(
+            (
+                route_snapshots["traffic_duration_minutes"]
+                < route_snapshots["normal_duration_minutes"]
+            ).any()
+        ):
+            raise DatasetValidationError("traffic duration cannot be shorter than normal duration")
+        reconciled_traffic_duration = (
+            route_snapshots["normal_duration_minutes"]
+            * route_snapshots["traffic_delay_ratio"]
+        )
+        ratio_rounding_tolerance = (
+            0.00051 * (route_snapshots["traffic_delay_ratio"] + 1.0)
+            + route_snapshots["normal_duration_minutes"] * 0.0000051
+        )
+        if bool(
+            (reconciled_traffic_duration - route_snapshots["traffic_duration_minutes"])
+            .abs()
+            .gt(ratio_rounding_tolerance)
+            .any()
+        ):
+            raise DatasetValidationError("route traffic delay ratio does not match durations")
+        if bool(
+            (
+                route_snapshots["urban_fraction"]
+                + route_snapshots["highway_fraction"]
+                - 1.0
+            )
+            .abs()
+            .gt(0.00001)
+            .any()
+        ):
+            raise DatasetValidationError("urban and highway route fractions must sum to one")
+        if bool((route_snapshots["estimated_full_stop_count"] < 0).any()):
+            raise DatasetValidationError("route stop count cannot be negative")
+
+        elevation_columns = [
+            "elevation_gain_m",
+            "elevation_loss_m",
+            "mean_grade_percent",
+            "maximum_grade_percent",
+        ]
+        elevation_missing = route_snapshots["elevation_source_quality"] == "missing"
+        if bool(route_snapshots.loc[elevation_missing, elevation_columns].notna().any().any()):
+            raise DatasetValidationError("missing elevation context must not contain values")
+        if bool(route_snapshots.loc[~elevation_missing, elevation_columns].isna().any().any()):
+            raise DatasetValidationError("known elevation context requires all summary values")
+        weather_columns = [
+            "ambient_temperature_c",
+            "precipitation_mm_h",
+            "headwind_mps",
+            "air_density_kg_m3",
+            "weather_observed_at",
+            "weather_ingested_at",
+        ]
+        weather_missing = route_snapshots["weather_source_quality"] == "missing"
+        if bool(route_snapshots.loc[weather_missing, weather_columns].notna().any().any()):
+            raise DatasetValidationError("missing weather context must not contain values")
+        if bool(route_snapshots.loc[~weather_missing, weather_columns].isna().any().any()):
+            raise DatasetValidationError("known weather context requires all values")
+        if bool(
+            (
+                route_snapshots.loc[~weather_missing, "weather_ingested_at"]
+                < route_snapshots.loc[~weather_missing, "weather_observed_at"]
+            ).any()
+        ):
+            raise DatasetValidationError("weather cannot be ingested before observation")
+
+        forbidden_route_fields = {
+            "actual_battery_energy_kwh",
+            "actual_arrival_soc_percent",
+            "qa_driver_aggressiveness",
+            "qa_true_vehicle_coefficients",
+            "qa_segment_speed_trace",
+        }
+        leaked_route_fields = forbidden_route_fields.intersection(route_snapshots.columns)
+        if leaked_route_fields:
+            raise DatasetValidationError(
+                f"Step 3 truth leaked into Step 2 route snapshots: {sorted(leaked_route_fields)}"
+            )
 
     if not tables["bookings"].empty:
         _require_foreign_keys(

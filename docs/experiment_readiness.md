@@ -79,7 +79,7 @@ baseline run into pandas at once is conservatively estimated above the 10 GB pro
 
 ## 4. M4 / 16 GB interpretation
 
-The current full profile estimates about 2.87 million raw and derived rows per run. The preflight
+The current full profile estimates about 3.47 million raw and derived rows per run. The preflight
 uses 2,500 bytes per planned row as a deliberately conservative working-memory ceiling. This is
 not a measured Parquet size and should not be presented as a benchmark.
 

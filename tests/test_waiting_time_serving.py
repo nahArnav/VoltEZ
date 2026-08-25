@@ -1,12 +1,13 @@
-import pytest
 from datetime import datetime
+
+import pytest
 from pydantic import ValidationError
 
 from voltez_ml.serving.waiting_time import (
     WaitingTimeFeatureRequest,
-    WaitingTimePredictionResponse,
     WaitingTimeOODPolicy,
 )
+
 
 def test_waiting_time_feature_request_validation() -> None:
     # Missing timezone

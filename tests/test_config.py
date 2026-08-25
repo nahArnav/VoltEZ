@@ -106,6 +106,27 @@ def test_cancellation_and_no_show_probabilities_leave_room_for_attendance() -> N
         VoltEZConfig.model_validate(values)
 
 
+def test_route_energy_candidate_limit_must_cover_recommendations() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    values = config.model_dump()
+    values["synthetic"]["route_energy"]["maximum_candidate_snapshots_per_trip"] = 2
+
+    with pytest.raises(ValidationError, match="must cover every recommended charger"):
+        VoltEZConfig.model_validate(values)
+
+
+def test_route_energy_profile_source_mix_must_be_complete_and_normalized() -> None:
+    config = load_config(project_root=PROJECT_ROOT)
+    values = config.model_dump()
+    values["synthetic"]["route_energy"]["profile_source_mix"] = {
+        "catalogue": 0.9,
+        "class_default": 0.1,
+    }
+
+    with pytest.raises(ValidationError, match="must contain exactly"):
+        VoltEZConfig.model_validate(values)
+
+
 def test_feature_split_fractions_must_sum_to_one() -> None:
     config = load_config(project_root=PROJECT_ROOT)
     values = config.model_dump()

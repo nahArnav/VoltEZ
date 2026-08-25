@@ -33,6 +33,7 @@ contain `source_snapshot_id`. These are ML-lab lineage fields, not application c
 | Availability labels | Use `available`, `unavailable`, or `unknown` explicitly | Unknown is a third state and is never coerced to unavailable |
 | Queue evidence | Add `queue_joined_at` and `service_ready_at` to charging sessions | Measures waiting without confusing setup delay or charger faults |
 | Service analytics | Add waiting-time and reliability observation tables | Keeps Models 3 and 4 labels explicit, auditable, and separate from availability |
+| Route energy | Add versioned vehicle energy profiles and immutable direct/candidate route snapshots | Preserves the planning inputs used for Model 5 and its deterministic fallback |
 
 ## Two necessary additive application links
 
@@ -46,7 +47,9 @@ v1.1 extensions:
    app cannot guarantee the separately promised parking resource or reject overlapping parking
    reservations.
 
-Both links should be reviewed with the backend team before migrations are frozen.
+Supporting Model 5 adds two further links: `trips.direct_route_snapshot_id` for the destination leg
+and `trip_charger_options.route_snapshot_id` for the origin-to-candidate leg. All four additive links
+should be reviewed with the backend team before migrations are frozen.
 
 ## Point-in-time ML rules that override convenient shortcuts
 
@@ -71,10 +74,11 @@ one physical append-only table viewed from two domains, not two database tables.
 
 The generator materializes the tables required to build and validate the first four models:
 
-- identity and compatibility: `users`, `vehicles`, `connector_types`, `vehicle_connectors`;
+- identity and compatibility: `users`, `vehicles`, `vehicle_energy_profiles`, `connector_types`,
+  `vehicle_connectors`;
 - geography and hosts: `zones`, `businesses`, schedules, amenities, offers;
 - supply: `chargers`, `charger_ports`, `parking_spaces`, `availability_windows`, `tariffs`;
-- demand and journey: `charging_requests`, `trips`, `trip_charger_options`,
+- demand and journey: `charging_requests`, `trips`, `route_snapshots`, `trip_charger_options`,
   `recommendation_impressions`;
 - outcomes: `bookings`, `booking_events`, `charging_sessions`, `charger_status_events`;
 - analytics: `demand_buckets`, `availability_observations`, `waiting_time_observations`,

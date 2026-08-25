@@ -39,6 +39,18 @@ synthetic:
     maximum_queue_wait_minutes: 45
     session_duration_log_sigma: 0.28
 
+  route_energy:
+    enabled: true
+    maximum_candidate_snapshots_per_trip: 5
+    coverage_trips_per_vehicle: 1
+    profile_source_mix:
+      catalogue: 0.72
+      owner_declared: 0.18
+      class_default: 0.10
+    missing_elevation_probability: 0.08
+    missing_weather_probability: 0.10
+    steep_route_probability: 0.08
+
   safeguards:
     maximum_generated_rows: 5000000
     require_reproducible_manifest: true
