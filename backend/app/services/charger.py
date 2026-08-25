@@ -3,6 +3,7 @@ from typing import List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from geoalchemy2 import Geometry as GeometryType
+from geoalchemy2.types import Geography
 
 from database.models.charger import Charger
 from app.schemas.charger import ChargerCreate
@@ -65,7 +66,7 @@ class ChargerService:
                 func.ST_Y(Charger.location.cast(GeometryType)).label("latitude"),
                 func.ST_X(Charger.location.cast(GeometryType)).label("longitude"),
             )
-            .where(func.ST_DWithin(Charger.location, driver_location, radius_meters))
+            .where(func.ST_DWithin(Charger.location.cast(Geography), driver_location, radius_meters))
         )
 
         result = await db.execute(query)

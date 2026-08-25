@@ -6,12 +6,8 @@ from datetime import datetime
 
 # Shared properties
 class ReviewBase(BaseModel):
-    rating: float = Field(..., ge=1.0, le=5.0, description="Rating from 1.0 to 5.0")
+    rating: int = Field(..., ge=1, le=5, description="Rating from 1 to 5")
     comment: Optional[str] = None
-    issue_flags: Optional[List[str]] = Field(
-        default=None, 
-        description="List of predefined tags e.g., ['charger_broken', 'wrong_connector', 'dirty']"
-    )
 
 
 # Properties received from the driver after a session

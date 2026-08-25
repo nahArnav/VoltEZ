@@ -8,8 +8,9 @@ from datetime import datetime
 class VehicleBase(BaseModel):
     make: str = Field(..., examples=["Tata"])
     model: str = Field(..., examples=["Nexon EV"])
+    vehicle_class: str
     battery_kwh: float = Field(..., gt=0.0, description="Total battery capacity in kWh")
-    connector_types: List[str] = Field(..., min_length=1, description="List of supported connectors, e.g. ['CCS2', 'Type2']")
+    connector_type_ids: List[int] = Field(..., min_length=1, description="List of supported connector type IDs")
     max_ac_kw: Optional[float] = Field(default=None, gt=0.0, description="Max supported AC charging speed in kW")
     max_dc_kw: Optional[float] = Field(default=None, gt=0.0, description="Max supported DC fast-charging speed in kW")
     estimated_range_km: Optional[float] = Field(default=None, gt=0.0, description="Rated or real-world range in km")
@@ -24,8 +25,9 @@ class VehicleCreate(VehicleBase):
 class VehicleUpdate(BaseModel):
     make: Optional[str] = None
     model: Optional[str] = None
+    vehicle_class: Optional[str] = None
     battery_kwh: Optional[float] = Field(default=None, gt=0.0)
-    connector_types: Optional[List[str]] = Field(default=None, min_length=1)
+    connector_type_ids: Optional[List[int]] = Field(default=None, min_length=1)
     max_ac_kw: Optional[float] = Field(default=None, gt=0.0)
     max_dc_kw: Optional[float] = Field(default=None, gt=0.0)
     estimated_range_km: Optional[float] = Field(default=None, gt=0.0)

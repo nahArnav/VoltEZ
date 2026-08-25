@@ -1,9 +1,10 @@
 from uuid import UUID
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from app.websockets.manager import manager
+from app.core.security import decode_access_token
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ws", tags=["WebSockets"])
@@ -13,18 +14,31 @@ router = APIRouter(prefix="/ws", tags=["WebSockets"])
 async def websocket_endpoint(
     websocket: WebSocket, 
     user_id: UUID,
-    # In a real app we'd validate the WS token:
-    # current_user = Depends(get_current_user_ws)
+    token: str = Query(None)
 ):
     """
     WebSocket endpoint for real-time updates.
-    Clients connect to ws://{host}/api/v1/ws/{user_id}
+    Clients connect to ws://{host}/api/v1/ws/{user_id}?token=...
     """
+    await websocket.accept()
+
+    if not token:
+        await websocket.close(code=1008, reason="Missing token")
+        return
+        
+    try:
+        payload = decode_access_token(token)
+        token_sub = payload.get("sub")
+        if not token_sub or str(user_id) != token_sub:
+            await websocket.close(code=1008, reason="Invalid user token")
+            return
+    except Exception:
+        await websocket.close(code=1008, reason="Invalid token")
+        return
+
     await manager.connect(websocket, user_id)
     try:
         while True:
-            # We don't expect the client to send much data, but we need to keep the connection open
-            # and listen for disconnects. We can also handle ping/pong if needed.
             data = await websocket.receive_text()
             logger.info(f"Received message from WS user {user_id}: {data}")
     except WebSocketDisconnect:

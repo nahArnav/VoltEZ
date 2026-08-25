@@ -6,25 +6,21 @@ from datetime import datetime
 # Shared properties
 class BusinessBase(BaseModel):
     name: str
-    category: Optional[str] = Field(default=None, description="e.g., mall, office, apartment")
-    address: Optional[str] = None
-    opening_hours: Optional[Dict[str, Any]] = Field(
-        default=None, 
-        description="JSON mapping of days to hours, e.g., {'mon': {'open': '09:00', 'close': '21:00'}}"
-    )
+    category: str = Field(description="e.g., mall, office, apartment")
+    address_text: Optional[str] = None
 
 # Properties to receive via API on creation
 class BusinessCreate(BusinessBase):
+    zone_id: UUID
     # The API receives lat/lng, the backend converts this to PostGIS POINT
-    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
+    latitude: float = Field(..., ge=-90.0, le=90.0)
+    longitude: float = Field(..., ge=-180.0, le=180.0)
 
 # Properties to receive via API on update
 class BusinessUpdate(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
-    address: Optional[str] = None
-    opening_hours: Optional[Dict[str, Any]] = None
+    address_text: Optional[str] = None
     latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
     longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
 

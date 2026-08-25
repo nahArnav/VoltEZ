@@ -55,7 +55,7 @@ def require_role(*roles: UserRole):
     Dependency factory: ensures the current user has one of the required roles.
 
     Usage:
-        current_user: User = Depends(require_role(UserRole.OWNER.ADMIN))
+        current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN))
     """
     async def _check_role(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in roles:

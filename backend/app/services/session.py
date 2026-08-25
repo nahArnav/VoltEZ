@@ -30,7 +30,7 @@ class SessionService:
         if booking_user_id != user_id:
             raise ForbiddenError(message="Not authorized to check in for this booking.")
 
-        booking_status = cast(booking.status)
+        booking_status = BookingStatus(cast(str, booking.status))
         if booking_status != BookingStatus.CONFIRMED:
             raise BadRequestError(
                 message=f"Cannot check in. Booking is {booking_status.value}, expected CONFIRMED.",
@@ -39,7 +39,7 @@ class SessionService:
 
         # 2. Transition booking to CHECKED_IN
         old_status = booking_status.value
-        setattr(booking, "status".CHECKED_IN)
+        setattr(booking, "status", BookingStatus.CHECKED_IN.value)
         db.add(booking)
 
         # 3. Write audit event (BR-009)
@@ -54,17 +54,19 @@ class SessionService:
         # 4. Create the session record
         now = datetime.now(timezone.utc)
         new_session = ChargingSession(
+            charger_port_id=booking.charger_port_id,
+            user_id=user_id,
             booking_id=booking.id,
-            check_in_at=now,
-            status="checked_in",
+            reserved_at=now,
+            status="reserved",
         )
         db.add(new_session)
 
         # 5. Record trust event
         port = await charger_port_repo.get(db, id=booking.charger_port_id)
         if port:
-            port_charger_id = port.charger_id
-            port_id = port.id
+            port_charger_id = cast(UUID, port.charger_id)
+            port_id = cast(UUID, port.id)
             await trust_service.record_event(
                 db,
                 charger_id=port_charger_id,
@@ -103,9 +105,9 @@ class SessionService:
             raise NotFoundError(resource="ChargingSession")
 
         session_status = cast(str, session.status)
-        if session_status != "checked_in":
+        if session_status != "reserved":
             raise BadRequestError(
-                message=f"Cannot start charging. Session is {session_status}, expected checked_in.",
+                message=f"Cannot start charging. Session is {session_status}, expected reserved.",
                 code="INVALID_STATE_TRANSITION",
             )
 
@@ -119,21 +121,15 @@ class SessionService:
 
         # 1. Update session
         now = datetime.now(timezone.utc)
-        setattr(session, "start_at", now)
+        setattr(session, "started_at", now)
         setattr(session, "status", "charging")
         db.add(session)
 
         # 2. Update booking status
-        booking_status = cast(booking.status)
+        booking_status = BookingStatus(cast(str, booking.status))
         old_status = booking_status.value
-        setattr(booking, "status".CHARGING)
+        setattr(booking, "status", BookingStatus.CHARGING.value)
         db.add(booking)
-
-        # 3. Update port status
-        port = await charger_port_repo.get(db, id=booking.charger_port_id)
-        if port:
-            setattr(port, "status", "occupied")
-            db.add(port)
 
         # 4. Audit event (BR-009)
         event = BookingEvent(
@@ -189,33 +185,25 @@ class SessionService:
         if energy_kwh < 0:
             raise BadRequestError(message="Energy delivered cannot be negative.")
 
-        # 1. Calculate cost from the charger's base_price
-        # In production this would come from the quote_snapshot or charger settings
-        port = await charger_port_repo.get(db, id=booking.charger_port_id)
+        # 1. Calculate cost (pricing should come from another domain)
         rate_per_kwh = 12.0  # fallback rate in INR
-        if port and port.charger:
-            charger_base_price = cast(float, port.charger.base_price)
-            rate_per_kwh = charger_base_price or rate_per_kwh
         total_cost = round(energy_kwh * rate_per_kwh, 2)
 
         # 2. Finalize session
         now = datetime.now(timezone.utc)
-        setattr(session, "end_at", now)
+        setattr(session, "ended_at", now)
         setattr(session, "energy_kwh", energy_kwh)
-        setattr(session, "final_amount", total_cost)
+        setattr(session, "amount", total_cost)
         setattr(session, "status", "completed")
         db.add(session)
 
         # 3. Complete the booking
-        booking_status = cast(booking.status)
+        booking_status = BookingStatus(cast(str, booking.status))
         old_status = booking_status.value
-        setattr(booking, "status".COMPLETED)
+        setattr(booking, "status", BookingStatus.COMPLETED.value)
         db.add(booking)
 
-        # 4. Free up the port
-        if port:
-            setattr(port, "status", "available")
-            db.add(port)
+        port = await charger_port_repo.get(db, id=booking.charger_port_id)
 
         # 5. Audit event (BR-009)
         event = BookingEvent(
@@ -229,8 +217,8 @@ class SessionService:
 
         # 6. Record trust event
         if port:
-            port_charger_id = port.charger_id
-            port_id = port.id
+            port_charger_id = cast(UUID, port.charger_id)
+            port_id = cast(UUID, port.id)
             await trust_service.record_event(
                 db,
                 charger_id=port_charger_id,

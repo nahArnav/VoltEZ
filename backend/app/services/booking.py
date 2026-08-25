@@ -40,7 +40,7 @@ class BookingService:
         # 3. Prevent Double-Bookings (Time Conflict Check)
         current_time = datetime.now(timezone.utc)
         active_bookings = await booking_repo.get_active_by_port(
-            db, port_id=port.id, current_time=current_time
+            db, port_id=cast(UUID, port.id), current_time=current_time
         )
 
         for existing_booking in active_bookings:

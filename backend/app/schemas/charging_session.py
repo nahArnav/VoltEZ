@@ -3,36 +3,35 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, Optional
 from datetime import datetime
 
-
 # Shared properties
 class ChargingSessionBase(BaseModel):
     energy_kwh: Optional[float] = Field(default=None, ge=0.0, description="Total energy delivered in kWh")
-    final_amount: Optional[float] = Field(default=None, ge=0.0, description="Calculated total charge amount in INR")
-    status: Literal["checked_in", "charging", "completed", "failed"] = "checked_in"
-
+    amount: Optional[float] = Field(default=None, ge=0.0, description="Calculated total charge amount in INR")
+    status: Literal["reserved", "charging", "completed", "failed"] = "reserved"
 
 # Properties received to initiate a session upon arrival/check-in
 class ChargingSessionCreate(BaseModel):
-    booking_id: UUID
-    check_in_at: Optional[datetime] = None
-
+    charger_port_id: UUID
+    user_id: UUID
+    booking_id: Optional[UUID] = None
+    reserved_at: Optional[datetime] = None
 
 # Properties received for session telemetry updates or session completion
 class ChargingSessionUpdate(BaseModel):
-    start_at: Optional[datetime] = None
-    end_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
     energy_kwh: Optional[float] = Field(default=None, ge=0.0)
-    final_amount: Optional[float] = Field(default=None, ge=0.0)
+    amount: Optional[float] = Field(default=None, ge=0.0)
     status: Optional[str] = None
-
 
 # Properties returned to client
 class ChargingSessionResponse(ChargingSessionBase):
     id: UUID
-    booking_id: UUID
-    check_in_at: Optional[datetime] = None
-    start_at: Optional[datetime] = None
-    end_at: Optional[datetime] = None
-    created_at: datetime
+    charger_port_id: UUID
+    user_id: UUID
+    booking_id: Optional[UUID] = None
+    reserved_at: datetime
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

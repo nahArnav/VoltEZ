@@ -27,11 +27,6 @@ class BookingBase(BaseModel):
 # Properties to receive via API on booking creation
 class BookingCreate(BookingBase):
     charger_port_id: UUID
-    vehicle_id: Optional[int] = None
-    idempotency_key: Optional[str] = Field(
-        default=None, 
-        description="Client-generated UUID to prevent duplicate booking submissions"
-    )
 
 
 # Properties to receive via API on state transitions
@@ -44,14 +39,9 @@ class BookingStatusUpdate(BaseModel):
 class BookingResponse(BookingBase):
     id: UUID
     user_id: UUID
-    vehicle_id: Optional[int] = None
     charger_port_id: UUID
     status: BookingStatus
-    hold_expires_at: Optional[datetime] = None
-    quote_snapshot: Optional[Dict[str, Any]] = None
-    idempotency_key: Optional[str] = None
     created_at: datetime
-    updated_at: datetime
 
     class Config:
         from_attributes = True

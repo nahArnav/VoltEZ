@@ -13,6 +13,7 @@ from database.models.business_amenity import BusinessAmenity
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
 from database.models.charger_availability import ChargerAvailability
+from database.models.payment import Payment
 from database.models.charging_session import ChargingSession
 from database.models.booking import Booking
 from database.models.booking_event import BookingEvent

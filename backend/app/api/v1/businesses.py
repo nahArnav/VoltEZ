@@ -14,7 +14,7 @@ router = APIRouter(prefix="/businesses", tags=["Businesses"])
 
 @router.get("/", response_model=List[BusinessResponse])
 async def list_businesses(
-    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     """List all businesses for the current owner."""
@@ -25,7 +25,7 @@ async def list_businesses(
 @router.post("/", response_model=BusinessResponse, status_code=status.HTTP_201_CREATED)
 async def create_business(
     business_in: BusinessCreate,
-    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     """Register a new business."""
@@ -38,7 +38,7 @@ async def create_business(
         business_data["location"] = f"SRID=4326;POINT({lon} {lat})"
         
     business_data["owner_id"] = current_user.id
-    business_data["verification_status"] = "PENDING"
+    business_data["verification_status"] = "pending"
     
     business = await business_repo.create(db, obj_in=business_data)
     
@@ -64,7 +64,7 @@ async def get_business(
 async def update_business(
     business_id: UUID,
     business_in: BusinessUpdate,
-    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     business = await business_repo.get(db, id=business_id)
@@ -77,7 +77,7 @@ async def update_business(
 @router.delete("/{business_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_business(
     business_id: UUID,
-    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     business = await business_repo.get(db, id=business_id)

@@ -16,7 +16,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     # Lock down the role to only these two options. Reject anything else.
-    role: Literal["DRIVER", "OWNER"] = "DRIVER" 
+    role: Literal["driver", "owner"] = "driver" 
     phone: Optional[str] = None
 
 # Properties to receive via API on update (PATCH /users/me)
