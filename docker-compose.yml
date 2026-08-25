@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    container_name: voltez_db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    ports:
+      - "${POSTGRES_PORT}:5432"
+
+    volumes:
+      - voltez_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  voltez_postgres_data:
