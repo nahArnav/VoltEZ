@@ -1,14 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-
-// Screens
-import '../dashboard/dashboard_screen.dart';
-import '../dashboard/availability_scheduler_screen.dart';
-import '../earnings/earnings_screen.dart';
-import '../dashboard/ai_recommendations_screen.dart';
-import '../profile/profile_screen.dart';
+import 'package:go_router/go_router.dart';
 import '../../widgets/ai_copilot_drawer.dart';
-import '../../services/business_api.dart';
 
 const Color _bg = Color(0xFF05090E);
 const Color _panel = Color(0xFF0B141C);
@@ -17,64 +10,32 @@ const Color _lime = Color(0xFFC9FF58);
 const Color _text = Color(0xFFF1F8FF);
 const Color _muted = Color(0xFF7990A1);
 
-class MainShellScreen extends StatefulWidget {
-  final int initialIndex;
-  final BusinessApi? api;
+class MainShellScaffold extends StatelessWidget {
+  final StatefulNavigationShell navigationShell;
 
-  const MainShellScreen({
+  const MainShellScaffold({
     super.key,
-    this.initialIndex = 0,
-    this.api,
+    required this.navigationShell,
   });
 
-  @override
-  State<MainShellScreen> createState() => _MainShellScreenState();
-}
-
-class _MainShellScreenState extends State<MainShellScreen> {
-  late int _currentIndex;
-  late final BusinessApi _api;
-  late final List<Widget> _screens;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-    _api = widget.api ??
-        BusinessApi(
-          baseUrl: 'https://api.yourdomain.com',
-          getAuthToken: () => '',
-        );
-
-    // Initialized once and preserved in IndexedStack
-    _screens = [
-      DashboardScreen(),
-      AvailabilitySchedulerScreen(api: _api),
-      const EarningsScreen(),
-      const AiRecommendationsScreen(),
-      const ProfileScreen(),
-    ];
-  }
-
   void _onTabSelected(int index) {
-    if (_currentIndex == index) return;
-    setState(() => _currentIndex = index);
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
-      extendBody: true, // Allows content to flow behind glass bottom bar
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: _buildFloatingBottomNav(),
+      extendBody: true,
+      body: navigationShell,
+      bottomNavigationBar: _buildFloatingBottomNav(context),
     );
   }
 
-  Widget _buildFloatingBottomNav() {
+  Widget _buildFloatingBottomNav(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       height: 68,
@@ -107,7 +68,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
             children: [
               _navItem(0, Icons.dashboard_rounded, "Overview"),
               _navItem(1, Icons.schedule_rounded, "Dispatch"),
-              _centerCopilotButton(),
+              _centerCopilotButton(context),
               _navItem(2, Icons.account_balance_wallet_rounded, "Earnings"),
               _navItem(3, Icons.auto_awesome_rounded, "AI Insights"),
               _navItem(4, Icons.person_rounded, "Profile"),
@@ -119,7 +80,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
   }
 
   Widget _navItem(int index, IconData icon, String label) {
-    final bool isSelected = _currentIndex == index;
+    final bool isSelected = navigationShell.currentIndex == index;
     final Color activeColor = index == 3 ? _cyan : (index == 2 ? _lime : _cyan);
 
     return InkWell(
@@ -178,7 +139,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     );
   }
 
-  Widget _centerCopilotButton() {
+  Widget _centerCopilotButton(BuildContext context) {
     return GestureDetector(
       onTap: () => AiCopilotSheet.show(context),
       child: Container(

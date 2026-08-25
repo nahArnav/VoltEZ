@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'screens/shell/main_screen_screen.dart';
+import 'routes/app_router.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const VoltezApp());
 }
 
@@ -10,13 +11,13 @@ class VoltezApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Voltez Station Intelligence',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF05090E),
       ),
-      home: const MainShellScreen(),
+      routerConfig: AppRouter.router,
     );
   }
 }
