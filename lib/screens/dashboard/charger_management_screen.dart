@@ -4,15 +4,15 @@ import 'availability_scheduler_screen.dart';
 import '../chargers/add_edit_chargers_screen.dart';
 import '../../services/business_api.dart';
 
-const _bg = Color(0xFF05090E);
-const _panel = Color(0xFF0B141C);
-const _cyan = Color(0xFF50F5FF);
-const _lime = Color(0xFFC9FF58);
-const _violet = Color(0xFF9678FF);
-const _text = Color(0xFFF1F8FF);
-const _muted = Color(0xFF7990A1);
-const _danger = Color(0xFFFF5F6D);
-const _amber = Color(0xFFFFC857);
+const Color _bg = Color(0xFF05090E);
+const Color _panel = Color(0xFF0B141C);
+const Color _cyan = Color(0xFF50F5FF);
+const Color _lime = Color(0xFFC9FF58);
+const Color _violet = Color(0xFF9678FF);
+const Color _text = Color(0xFFF1F8FF);
+const Color _muted = Color(0xFF7990A1);
+const Color _danger = Color(0xFFFF5F6D);
+const Color _amber = Color(0xFFFFC857);
 
 class ChargerManagementScreen extends StatefulWidget {
   final BusinessApi api;
@@ -22,7 +22,7 @@ class ChargerManagementScreen extends StatefulWidget {
     BusinessApi? api,
   }) : api = api ??
             BusinessApi(
-              baseUrl: 'https://api.yourdomain.com', // Replace with your base URL
+              baseUrl: 'https://api.yourdomain.com',
               getAuthToken: () => '',
             );
 
@@ -62,10 +62,8 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     setState(() => _updatingIds.add(charger.id));
 
     try {
-      // Call the live API
       await widget.api.updateChargerStatus(charger.id, newStatus);
 
-      // Optimistic local state update
       final index = _allChargers.indexWhere((c) => c.id == charger.id);
       if (index != -1) {
         setState(() {
@@ -104,7 +102,8 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
             backgroundColor: _panel,
             content: Row(
               children: [
-                const Icon(Icons.error_outline_rounded, color: _danger, size: 18),
+                const Icon(Icons.error_outline_rounded,
+                    color: _danger, size: 18),
                 const SizedBox(width: 8),
                 Text("Failed to update status: $e",
                     style: const TextStyle(color: _text)),
@@ -120,9 +119,141 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     }
   }
 
-  // ============================================================
-  // STATUS COLOR
-  // ============================================================
+  void _deleteCharger(Charger charger, int index) {
+    setState(() => _allChargers.removeAt(index));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: _panel,
+        content: Text("${charger.name} removed from bay list.",
+            style: const TextStyle(color: _danger)),
+        action: SnackBarAction(
+          label: 'UNDO',
+          textColor: _cyan,
+          onPressed: () => setState(() => _allChargers.insert(index, charger)),
+        ),
+      ),
+    );
+  }
+
+  void _showEditBayModal(Charger charger, int index) {
+    final nameCtrl = TextEditingController(text: charger.name);
+    final powerCtrl = TextEditingController(text: charger.power.toString());
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _panel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          20,
+          24,
+          MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.edit_note_rounded, color: _cyan, size: 22),
+                const SizedBox(width: 10),
+                const Text(
+                  "Edit Hardware Spec",
+                  style: TextStyle(
+                      color: _text, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, color: _muted),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameCtrl,
+              style: const TextStyle(color: _text, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: "CHARGER BAY LABEL",
+                labelStyle: const TextStyle(color: _muted, fontSize: 10),
+                prefixIcon:
+                    const Icon(Icons.label_outline_rounded, color: _cyan, size: 18),
+                filled: true,
+                fillColor: _bg,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: powerCtrl,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: _text, fontSize: 13),
+              decoration: InputDecoration(
+                labelText: "POWER CAPACITY (KW)",
+                labelStyle: const TextStyle(color: _muted, fontSize: 10),
+                prefixIcon: const Icon(Icons.bolt_rounded, color: _cyan, size: 18),
+                filled: true,
+                fillColor: _bg,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _lime,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  final newPower = int.tryParse(powerCtrl.text.trim()) ?? charger.power;
+                  setState(() {
+                    _allChargers[index] = Charger(
+                      id: charger.id,
+                      name: nameCtrl.text.trim(),
+                      power: newPower,
+                      status: charger.status,
+                      reliability: charger.reliability,
+                      ports: charger.ports,
+                    );
+                  });
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: _panel,
+                      content: Text("Charger specs updated successfully!",
+                          style: TextStyle(color: _lime)),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: const Text(
+                  "SAVE BAY CONFIGURATION",
+                  style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                      letterSpacing: 1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Color statusColor(String status) {
     switch (status.toLowerCase()) {
@@ -137,10 +268,6 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     }
   }
 
-  // ============================================================
-  // BUILD
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -150,7 +277,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
           children: [
             _buildHeader(),
             _buildSearch(),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             Expanded(
               child: RefreshIndicator(
                 color: _cyan,
@@ -182,14 +309,28 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                       return _buildEmptyState();
                     }
 
+                    final totalPower = _allChargers.fold<int>(
+                        0, (sum, c) => sum + c.power);
+                    final onlineCount = _allChargers
+                        .where((c) => c.status.toLowerCase() == 'active')
+                        .length;
+
                     return ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(
                         parent: BouncingScrollPhysics(),
                       ),
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
-                      itemCount: filteredChargers.length,
+                      itemCount: filteredChargers.length + 1,
                       itemBuilder: (context, index) {
-                        return _buildChargerCard(filteredChargers[index]);
+                        if (index == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _buildCapacityHero(onlineCount, totalPower),
+                          );
+                        }
+                        final chargerIndex = index - 1;
+                        return _buildChargerCard(
+                            filteredChargers[chargerIndex], chargerIndex);
                       },
                     );
                   },
@@ -199,10 +340,6 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
           ],
         ),
       ),
-
-      // ========================================================
-      // ADD CHARGER BUTTON
-      // ========================================================
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: _lime,
         foregroundColor: Colors.black,
@@ -246,10 +383,6 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     );
   }
 
-  // ============================================================
-  // HEADER
-  // ============================================================
-
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
@@ -278,7 +411,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                   "Charger Fleet",
                   style: TextStyle(
                     color: _text,
-                    fontSize: 25,
+                    fontSize: 24,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -288,13 +421,11 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
           IconButton(
             onPressed: _fetchChargers,
             icon: Container(
-              padding: const EdgeInsets.all(11),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: _panel,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _cyan.withValues(alpha: .18),
-                ),
+                border: Border.all(color: _cyan.withOpacity(.18)),
               ),
               child: const Icon(
                 Icons.refresh_rounded,
@@ -308,10 +439,6 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     );
   }
 
-  // ============================================================
-  // SEARCH
-  // ============================================================
-
   Widget _buildSearch() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -319,18 +446,19 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
         onChanged: (val) => setState(() => _searchQuery = val),
         style: const TextStyle(color: _text),
         decoration: InputDecoration(
-          hintText: "Search charger network, ports...",
+          hintText: "Search charger bays, connector ports...",
           hintStyle: const TextStyle(color: _muted, fontSize: 12),
           prefixIcon: const Icon(Icons.search_rounded, color: _cyan),
           filled: true,
           fillColor: _panel,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: _cyan.withValues(alpha: .08)),
+            borderSide: BorderSide(color: _cyan.withOpacity(.08)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: _cyan.withValues(alpha: .08)),
+            borderSide: BorderSide(color: _cyan.withOpacity(.08)),
           ),
           focusedBorder: const OutlineInputBorder(
             borderRadius: BorderRadius.all(Radius.circular(14)),
@@ -341,11 +469,59 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     );
   }
 
-  // ============================================================
-  // CHARGER CARD
-  // ============================================================
+  Widget _buildCapacityHero(int onlineCount, int totalPower) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cyan.withOpacity(0.18)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "TOTAL STATION CAPACITY",
+                  style: TextStyle(
+                      color: _muted,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "$totalPower kW Power",
+                  style: const TextStyle(
+                      color: _text, fontSize: 22, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  "$onlineCount of ${_allChargers.length} Dispensers Active",
+                  style: const TextStyle(
+                      color: _lime, fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _cyan.withOpacity(0.08),
+              border: Border.all(color: _cyan.withOpacity(0.25)),
+            ),
+            child: const Icon(Icons.bolt_rounded, color: _cyan, size: 26),
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _buildChargerCard(Charger charger) {
+  Widget _buildChargerCard(Charger charger, int index) {
     final String status = charger.status;
     final Color color = statusColor(status);
     final bool isUpdating = _updatingIds.contains(charger.id);
@@ -356,14 +532,11 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: color.withValues(alpha: .16),
-        ),
+        border: Border.all(color: color.withOpacity(.16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // TOP SECTION
           Row(
             children: [
               _chargerIcon(color),
@@ -394,15 +567,12 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
               _statusBadge(status, color),
             ],
           ),
-
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           Container(
             height: 1,
-            color: Colors.white.withValues(alpha: .06),
+            color: Colors.white.withOpacity(.06),
           ),
-          const SizedBox(height: 17),
-
-          // METRICS
+          const SizedBox(height: 16),
           Row(
             children: [
               _metric(
@@ -413,7 +583,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
               ),
               _metric(
                 "${charger.ports.length}",
-                "ACTIVE PORTS",
+                "PORTS",
                 Icons.power_rounded,
                 _text,
               ),
@@ -425,23 +595,17 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
               ),
             ],
           ),
-
-          const SizedBox(height: 17),
-
-          // PORTS / CONNECTORS
-          if (charger.ports.isNotEmpty)
+          if (charger.ports.isNotEmpty) ...[
+            const SizedBox(height: 16),
             Wrap(
               spacing: 7,
               runSpacing: 7,
               children: charger.ports.map((p) => _portBadge(p)).toList(),
             ),
-
+          ],
           const SizedBox(height: 18),
-
-          // ACTION BUTTONS (Row 1: DETAILS & SCHEDULE)
           Row(
             children: [
-              // DETAILS
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
@@ -457,12 +621,10 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _cyan,
-                    side: BorderSide(
-                      color: _cyan.withValues(alpha: .4),
-                    ),
-                    minimumSize: const Size.fromHeight(40),
+                    side: BorderSide(color: _cyan.withOpacity(.4)),
+                    minimumSize: const Size.fromHeight(38),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(11),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   child: const Text(
@@ -476,8 +638,6 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-
-              // SCHEDULE & RATES
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
@@ -493,12 +653,10 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _lime,
-                    side: BorderSide(
-                      color: _lime.withValues(alpha: .4),
-                    ),
-                    minimumSize: const Size.fromHeight(40),
+                    side: BorderSide(color: _lime.withOpacity(.4)),
+                    minimumSize: const Size.fromHeight(38),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(11),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   child: const Text(
@@ -513,27 +671,22 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
               ),
             ],
           ),
-
           const SizedBox(height: 6),
-
-          // ACTION BUTTONS (Row 2: PAUSE/RESUME & DUPLICATE)
           Row(
             children: [
-              // PAUSE / RESUME (WITH LOADING SPINNER)
               Expanded(
                 child: ElevatedButton(
                   onPressed: isUpdating
                       ? null
                       : () => _toggleChargerStatus(charger),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: status.toLowerCase() == "active"
-                        ? _amber
-                        : _lime,
+                    backgroundColor:
+                        status.toLowerCase() == "active" ? _amber : _lime,
                     foregroundColor: Colors.black,
                     elevation: 0,
-                    minimumSize: const Size.fromHeight(40),
+                    minimumSize: const Size.fromHeight(38),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(11),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   child: isUpdating
@@ -557,49 +710,19 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-
-              // DUPLICATE / CLONE
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {
-                    final newCharger = Charger(
-                      id: '${charger.id}_copy',
-                      name: "${charger.name} (Copy)",
-                      power: charger.power,
-                      status: charger.status,
-                      reliability: charger.reliability,
-                      ports: charger.ports,
-                    );
-
-                    setState(() => _allChargers.add(newCharger));
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: _panel,
-                        content: Row(
-                          children: [
-                            const Icon(Icons.copy_rounded,
-                                color: _lime, size: 18),
-                            const SizedBox(width: 8),
-                            Text("Duplicated ${charger.name}",
-                                style: const TextStyle(color: _text)),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: () => _showEditBayModal(charger, index),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: _muted,
-                    side: BorderSide(
-                      color: _muted.withValues(alpha: .4),
-                    ),
-                    minimumSize: const Size.fromHeight(40),
+                    foregroundColor: _violet,
+                    side: BorderSide(color: _violet.withOpacity(.4)),
+                    minimumSize: const Size.fromHeight(38),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(11),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   child: const Text(
-                    "DUPLICATE",
+                    "EDIT HARDWARE",
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w900,
@@ -608,6 +731,12 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                   ),
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded,
+                    color: _danger, size: 18),
+                onPressed: () => _deleteCharger(charger, index),
+                tooltip: "Delete bay",
+              ),
             ],
           ),
         ],
@@ -615,25 +744,19 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     );
   }
 
-  // ============================================================
-  // UI HELPERS
-  // ============================================================
-
   Widget _chargerIcon(Color color) {
     return Container(
-      width: 50,
-      height: 50,
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .08),
+        color: color.withOpacity(.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: color.withValues(alpha: .2),
-        ),
+        border: Border.all(color: color.withOpacity(.2)),
       ),
       child: Icon(
         Icons.ev_station_rounded,
         color: color,
-        size: 25,
+        size: 24,
       ),
     );
   }
@@ -642,7 +765,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .08),
+        color: color.withOpacity(.08),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -680,13 +803,13 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: color, size: 19),
-          const SizedBox(height: 6),
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 5),
           Text(
             value,
             style: const TextStyle(
               color: _text,
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -721,11 +844,11 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .035),
+        color: Colors.white.withOpacity(.035),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: portColor.withValues(alpha: .2)),
+        border: Border.all(color: portColor.withOpacity(.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -763,7 +886,8 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
             const SizedBox(height: 12),
             const Text(
               "Failed to load chargers",
-              style: TextStyle(color: _text, fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(
+                  color: _text, fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 6),
             Text(
@@ -795,7 +919,8 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
           SizedBox(height: 12),
           Text(
             "No chargers found",
-            style: TextStyle(color: _text, fontWeight: FontWeight.bold, fontSize: 15),
+            style: TextStyle(
+                color: _text, fontWeight: FontWeight.bold, fontSize: 15),
           ),
           SizedBox(height: 4),
           Text(
