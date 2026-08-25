@@ -1,0 +1,16 @@
+{
+    "executionEnvironments": [
+        {
+            "root": "scripts",
+            "extraPaths": [
+                "backend"
+            ]
+        },
+        {
+            "root": "backend",
+            "extraPaths": [
+                "backend"
+            ]
+        }
+    ]
+}
