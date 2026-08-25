@@ -8,7 +8,8 @@ from app.db.session import get_db
 from app.schemas.charger import ChargerCreate, ChargerResponse
 from app.services.charger import charger_service
 from database.models.user import User
-from app.api.v1.deps import require_role
+from app.api.v1.deps import require_role, get_current_user
+from database.models.charger_search_event import ChargerSearchEvent
 
 router = APIRouter(prefix="/chargers", tags=["Chargers"])
 
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/chargers", tags=["Chargers"])
 @router.post("/", response_model=ChargerResponse, status_code=status.HTTP_201_CREATED)
 async def create_charger(
     charger_in: ChargerCreate,
-    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -35,21 +36,33 @@ async def get_nearby_chargers(
     longitude: float = Query(..., description="Driver's current longitude", ge=-180.0, le=180.0),
     radius_meters: int = Query(5000, description="Search radius in meters", gt=0),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Find all chargers within a given radius using PostGIS spatial queries.
-    Public endpoint — no auth required.
+    Logs telemetry for ML demand forecasting (Model 1).
     """
     chargers = await charger_service.get_nearby_chargers(
         db=db, latitude=latitude, longitude=longitude, radius_meters=radius_meters
     )
+    
+    # Telemetry
+    search_event = ChargerSearchEvent(
+        user_id=current_user.id,
+        search_location=f"SRID=4326;POINT({longitude} {latitude})",
+        search_radius_km=radius_meters / 1000.0,
+        chargers_found=len(chargers)
+    )
+    db.add(search_event)
+    await db.commit()
+    
     return chargers
 
 
 @router.post("/{charger_id}/report-issue", status_code=status.HTTP_204_NO_CONTENT)
 async def report_charger_issue(
     charger_id: UUID,
-    current_user: User = Depends(require_role(UserRole.DRIVER.ADMIN.OWNER)),
+    current_user: User = Depends(require_role(UserRole.DRIVER, UserRole.ADMIN, UserRole.OWNER)),
     db: AsyncSession = Depends(get_db),
 ):
     """

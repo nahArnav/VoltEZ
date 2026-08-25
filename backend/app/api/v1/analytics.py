@@ -20,9 +20,12 @@ class RecommendationResponse(BaseModel):
     suggested_discount_pct: int
     confidence: float
 
+from fastapi import Request
+
 @router.get("/businesses/{business_id}/recommendations", response_model=List[RecommendationResponse])
 async def get_business_recommendations(
     business_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -30,7 +33,7 @@ async def get_business_recommendations(
     Derived Business Intelligence:
     Queries ML demand forecasting to recommend dynamic availability/pricing to owners.
     """
-    if current_user.role not in [UserRole.OWNER.value, UserRole.ADMIN.value]:
+    if current_user.role not in [UserRole.OWNER, UserRole.ADMIN]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
         
     # Get all chargers for this business
@@ -40,14 +43,20 @@ async def get_business_recommendations(
         
     recommendations = []
     
+    demand_model = getattr(request.app.state, "demand_model", None)
+    
     for charger in chargers:
         # Call Model A (Demand Forecast)
-        forecast = await ml_adapter.predict_demand(db, charger_id=charger.id)
+        forecast = await ml_adapter.predict_demand(
+            db, 
+            charger_id=charger.id, 
+            model=demand_model
+        )
         expected = forecast["expected_demand"]
         confidence = forecast["confidence"]
         
-        # Derive intelligence logic
-        if expected < 2.0:
+        # Derive intelligence logic based on Model 1 target distribution (mean ~0.9, p99 = 5.0)
+        if expected < 0.5:
             # Low demand -> suggest discount
             recommendations.append(
                 RecommendationResponse(
@@ -59,7 +68,7 @@ async def get_business_recommendations(
                     confidence=confidence
                 )
             )
-        elif expected > 4.0:
+        elif expected > 2.0:
             # High demand -> surge pricing or hold slots
             recommendations.append(
                 RecommendationResponse(

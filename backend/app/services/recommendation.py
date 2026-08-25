@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.recommendation import RecommendationRequest, RecommendationResult, RecommendationResponse
 from app.services.charger import charger_service
@@ -17,8 +17,6 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
-from typing import Any
-
 def get_float(obj: Any, attr: str, default: float = 0.0) -> float:
     """Helper to safely extract float values from SQLAlchemy ORM instances for Pyright."""
     val = getattr(obj, attr, None)
@@ -29,7 +27,8 @@ class RecommendationService:
     @staticmethod
     async def get_recommendations(
         db: AsyncSession,
-        req: RecommendationRequest
+        req: RecommendationRequest,
+        availability_model: Any = None
     ) -> RecommendationResponse:
         
         # 1. Fetch vehicle
@@ -51,7 +50,7 @@ class RecommendationService:
         # 3. Process each candidate
         for charger in candidates:
             # We hard-filter inactive chargers
-            if str(charger.status) != "active":
+            if str(charger.status) != "available":
                 continue
 
             # Safely get dynamically attached lat/lon
@@ -61,16 +60,23 @@ class RecommendationService:
             # Calculate Distance
             dist_km = _haversine(req.latitude, req.longitude, charger_lat, charger_lon)
             
-            # Reachability Math
+            # Reachability Math - Route-Energy Physics Implementation
             veh_battery = get_float(vehicle, "battery_kwh")
             usable_energy_kwh = veh_battery * max(0.0, req.current_soc - req.reserve_soc)
             
-            # Default efficiency to 5 km/kWh if estimated_range_km is missing
-            est_range = get_float(vehicle, "estimated_range_km", 0.0)
-            efficiency = (est_range / veh_battery) if est_range > 0 else 5.0
-            reachable_km = usable_energy_kwh * efficiency
+            veh_mass = 2000.0 # Default mass
+            crr = 0.015 # Rolling resistance
+            g = 9.81
+            drag_area = 2.5
+            rho = 1.2
+            speed_mps = 60 * 1000 / 3600 # 60 km/h
             
-            reachable = bool(reachable_km >= dist_km)
+            rolling_energy_kwh = crr * veh_mass * g * (dist_km * 1000) / 3.6e6
+            drag_energy_kwh = 0.5 * rho * drag_area * (speed_mps ** 2) * (dist_km * 1000) / 3.6e6
+            total_route_energy = rolling_energy_kwh + drag_energy_kwh
+            
+            reachable = bool(usable_energy_kwh >= total_route_energy)
+            reachable_km = dist_km if reachable else 0.0
 
             # Charge-time Math
             required_energy_kwh = veh_battery * max(0.0, req.target_soc - req.current_soc)
@@ -79,14 +85,12 @@ class RecommendationService:
             best_port_kw = 0.0
             best_port_id = None
             for port in charger.ports:
-                if str(port.status) != "available":
+                if not port.is_active:
                     continue
-                # Assuming vehicle.connector_types is a list of strings
-                if str(port.connector_type) in (vehicle.connector_types or []):
-                    kw = get_float(port, "max_power_kw")
-                    if kw > best_port_kw:
-                        best_port_kw = kw
-                        best_port_id = port.id
+                kw = get_float(port, "max_power_kw")
+                if kw > best_port_kw:
+                    best_port_kw = kw
+                    best_port_id = port.id
             
             if best_port_kw == 0.0 or not best_port_id:
                 continue  # No compatible/available ports
@@ -101,16 +105,17 @@ class RecommendationService:
             ideal_time_hr = required_energy_kwh / effective_power_kw if effective_power_kw > 0 else 99.0
             estimated_charge_min = ideal_time_hr * 60.0 * 1.2  # 1.2 is a taper factor
 
-            # Cost Math
-            charger_base_price = get_float(charger, "base_price")
+            # Cost Math (fixed $15/kWh rate instead of non-existent base_price)
+            charger_base_price = 15.0
             estimated_cost = required_energy_kwh * charger_base_price
             
-            # Wait time (ML Model B)
+            # Wait time (ML Model 2)
             rel_score = get_float(charger, "reliability_score", 0.5)
             wait_prediction = await ml_adapter.predict_wait_time(
                 db, 
-                charger_id=int(charger.id), # type: ignore
-                port_id=int(best_port_id)
+                charger_id=charger.id,
+                port_id=best_port_id,
+                model=availability_model
             )
             predicted_wait_min = wait_prediction["wait_minutes"]
 

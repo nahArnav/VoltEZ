@@ -13,10 +13,30 @@ from contextlib import asynccontextmanager
 # Initialize structured logging
 setup_logging()
 logger = get_logger("main")
+import joblib
+from pathlib import Path
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Connecting to Redis for background tasks...")
     app.state.redis = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
+    
+    logger.info("Loading ML models...")
+    try:
+        base_dir = Path(__file__).parent.parent.parent.parent
+        demand_path = base_dir / "models" / "demand" / "voltez-demand-60m-pune-v1" / "model.joblib"
+        avail_path = base_dir / "models" / "availability" / "voltez-availability-pune-v1" / "model.joblib"
+        
+        app.state.demand_model = joblib.load(demand_path)
+        app.state.availability_model = joblib.load(avail_path)
+        app.state.ml_ready = True
+        logger.info("ML models loaded successfully.")
+    except Exception as e:
+        logger.error(f"Failed to load ML models: {e}")
+        app.state.demand_model = None
+        app.state.availability_model = None
+        app.state.ml_ready = False
+
     yield
     logger.info("Disconnecting from Redis...")
     await app.state.redis.close()
@@ -77,8 +97,11 @@ def create_app() -> FastAPI:
         return {"status": "alive"}
 
     @app.get("/health/ready", tags=["System"])
-    async def readiness():
-        return {"status": "ready"}
+    async def readiness(request: Request):
+        return {
+            "status": "ready",
+            "ml_ready": getattr(request.app.state, "ml_ready", False)
+        }
 
     @app.get("/version", tags=["System"])
     async def version():
