@@ -15,5 +15,6 @@ from database.models.charger_port import ChargerPort
 from database.models.charger_availability import ChargerAvailability
 from database.models.charging_session import ChargingSession
 from database.models.booking import Booking
+from database.models.booking_event import BookingEvent
 from database.models.charger_search_event import ChargerSearchEvent
 from database.models.charger_search_result import ChargerSearchResult 

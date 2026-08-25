@@ -16,7 +16,9 @@ class BookingService:
 
     # Valid cancellation source statuses (BR-008)
     CANCELLABLE_STATUSES = {
-        BookingStatus.PENDING.HELD.PAYMENT_PENDING.CONFIRMED,
+        BookingStatus.PENDING,
+        BookingStatus.HELD,
+        BookingStatus.CONFIRMED,
     }
 
     @staticmethod
@@ -29,17 +31,16 @@ class BookingService:
             raise NotFoundError(resource="ChargerPort")
 
         # 2. Check if the port is currently operational
-        port_status = cast(str, port.status)
-        if port_status != "available":
+        if not port.is_active:
             raise BadRequestError(
-                message=f"This port is currently {port_status} and cannot be booked.",
+                message="This port is not currently active and cannot be booked.",
                 code="PORT_NOT_AVAILABLE",
             )
 
         # 3. Prevent Double-Bookings (Time Conflict Check)
         current_time = datetime.now(timezone.utc)
         active_bookings = await booking_repo.get_active_by_port(
-            db, charger_port_id=port.id, current_time=current_time
+            db, port_id=port.id, current_time=current_time
         )
 
         for existing_booking in active_bookings:
@@ -92,7 +93,7 @@ class BookingService:
         if booking_user_id != user_id:
             raise ForbiddenError(message="Not authorized to cancel this booking.")
 
-        booking_status = cast(booking.status)
+        booking_status = BookingStatus(cast(str, booking.status))
         if booking_status not in BookingService.CANCELLABLE_STATUSES:
             raise BadRequestError(
                 message=f"Cannot cancel a booking that is {booking_status.value}.",
@@ -100,7 +101,7 @@ class BookingService:
             )
 
         old_status = booking_status.value
-        setattr(booking, "status".CANCELLED)
+        setattr(booking, "status", BookingStatus.CANCELLED.value)
         db.add(booking)
 
         # Write audit event (BR-009)

@@ -40,8 +40,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import all models so autogenerate can detect them
-# This import triggers app/models/__init__.py which imports all model files
-from app.models import Base  # noqa: E402
+# This import triggers database/base.py which imports all model files
+from database.base import Base  # noqa: E402
 
 target_metadata = Base.metadata
 
