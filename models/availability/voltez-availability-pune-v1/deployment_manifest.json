@@ -1,0 +1,34 @@
+{
+  "bundle_id": "voltez-availability-pune-v1",
+  "model_id": "availability-hgb-calibrated-97315b1cdaf67db4",
+  "model_type": "charger_availability_prediction",
+  "deployment_stage": "shadow",
+  "backend_ready": true,
+  "locked_test_evaluated": false,
+  "real_world_data_validated": false,
+  "decision_states": [
+    "available",
+    "unknown",
+    "unavailable"
+  ],
+  "positive_class": "unavailable",
+  "artifact_sha256": "3813d8867eb9042c3931e63cae2e882d2b28311797f5e466a6d49b87fea35e82",
+  "feature_contract_sha256": "b720f368dbab65e9b62fc7e5fdbf57640247bd95076679a9b9d78f3ecdc2943f",
+  "training_commit": "7ad207a3dc98c6df1540ae7606a98bdc027d8f49",
+  "training_commit_dirty": false,
+  "runtime": {
+    "python": "3.12.14",
+    "scikit_learn": "1.9.0",
+    "numpy": "2.5.2",
+    "pandas": "2.3.3",
+    "joblib": "1.5.3"
+  },
+  "serving_contract": "voltez-availability-serving-v1",
+  "fastapi_endpoint": "/api/v1/internal/ml/availability",
+  "safety_policy": "Apply deterministic eligibility gates first; return unknown for missing status, major distribution shift, or calibrated uncertainty.",
+  "promotion_requirements": [
+    "Run the one-time locked-test evaluation only after explicit approval",
+    "Shadow against real VoltEZ traffic before affecting user-visible availability",
+    "Monitor unsafe-available rate, abstention rate, calibration, latency, and feature drift"
+  ]
+}

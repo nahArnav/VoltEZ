@@ -1,0 +1,6 @@
+project:
+  seed: 20260821
+
+experiment:
+  name: train_seed_01
+  evaluation_role: train

@@ -1,0 +1,53 @@
+{
+  "adversarial": {
+    "calendar_mismatch_rejected": true,
+    "missing_feature_rejected": true,
+    "multi_feature_shift_uses_fallback": true,
+    "negative_count_rejected": true,
+    "repeated_batch_is_deterministic": true
+  },
+  "audit_type": "voltez-demand-serving-robustness-v1",
+  "checks": {
+    "all_adversarial_checks_pass": true,
+    "all_predictions_finite_nonnegative": true,
+    "serving_matches_estimator": true,
+    "stress_fallback_below_5_percent": true,
+    "validation_fallback_below_1_percent": true
+  },
+  "feature_contract_sha256": "82496465fc11b28f195d3698341889773ee7d58ed4fcdbfed4562e2038f82937",
+  "feature_suite_manifest_sha256": "2b752d819b45fa41f88663564d2bbfba359e2ee390d9991fd369225822bfba02",
+  "model_artifact_sha256": "82418d51b203e4a7b8e4e7fe94133700c393ddbd80564e59696855197fba5e29",
+  "model_id": "demand-window-60m-hgbr-bdb1d74f9ce09d73",
+  "passed": true,
+  "roles": {
+    "stress_test": {
+      "fallback_rate": 0.0,
+      "finite_nonnegative_predictions": true,
+      "max_model_vs_serving_difference": 0.0,
+      "quality_counts": {
+        "in_domain": 4929,
+        "warning": 71
+      },
+      "rows": 5000
+    },
+    "validation": {
+      "fallback_rate": 0.0,
+      "finite_nonnegative_predictions": true,
+      "max_model_vs_serving_difference": 0.0,
+      "quality_counts": {
+        "in_domain": 4952,
+        "warning": 48
+      },
+      "rows": 5000
+    }
+  },
+  "settings": {
+    "locked_test_touched": false,
+    "random_seed": 20260821,
+    "roles": [
+      "validation",
+      "stress_test"
+    ],
+    "sample_rows_per_role": 5000
+  }
+}

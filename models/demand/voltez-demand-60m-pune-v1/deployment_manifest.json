@@ -1,0 +1,71 @@
+{
+  "bundle_id": "voltez-demand-60m-pune-v1",
+  "bundle_schema": "voltez-model-bundle-v1",
+  "created_at": "2026-08-22T07:23:13.474318+00:00",
+  "files": {
+    "feature_contract.json": {
+      "bytes": 17839,
+      "sha256": "82496465fc11b28f195d3698341889773ee7d58ed4fcdbfed4562e2038f82937"
+    },
+    "locked_test_evaluation.json": {
+      "bytes": 43993,
+      "sha256": "89bc1830148557ccfd53fef3e2711713cce77df6509bbcaa2b1c48291bdbe065"
+    },
+    "manifest.json": {
+      "bytes": 1064,
+      "sha256": "cc7a7693670c3134dc5fb9e29d74c3fdb61b85f6d7d4cdf4e184531854ff634f"
+    },
+    "model.joblib": {
+      "bytes": 923728,
+      "sha256": "82418d51b203e4a7b8e4e7fe94133700c393ddbd80564e59696855197fba5e29"
+    },
+    "robustness_audit.json": {
+      "bytes": 1595,
+      "sha256": "e046a5e566194f4db3a63d34fd09a7d25b50e3b309bb71b2c22e1b554eab19da"
+    },
+    "selection_manifest.json": {
+      "bytes": 2322,
+      "sha256": "660cbc9cadc5b0ceb08e8628daf86ce0650025b92b23d022c2294cac2b51b2ba"
+    },
+    "training_evaluation.json": {
+      "bytes": 2992,
+      "sha256": "9907d040d4d2b8d3840a224aad2f3ebf8c37dd1acc877764ba3673af4c0aee07"
+    }
+  },
+  "limitations": [
+    "trained and evaluated on synthetic Pune worlds, not production VoltEZ traffic",
+    "returns conditional expected demand and smooths rare demand spikes",
+    "requires shadow monitoring and real-label collection before production promotion"
+  ],
+  "locked_test_metrics": {
+    "bias_prediction_minus_truth": 0.002126164908429304,
+    "mae": 0.739427597278037,
+    "mean_poisson_deviance": 1.0823160515753676,
+    "nonzero_mae": 0.8168941531180103,
+    "nonzero_underprediction_rate": 0.7473715385754479,
+    "prediction_mean": 0.8982590498806,
+    "rmse": 0.9900426884867836,
+    "truth_mean": 0.8961328849721707,
+    "wape": 0.8251316402711857,
+    "within_half_request_rate": 0.4497139764996908,
+    "within_one_request_rate": 0.7588899196042053,
+    "zero_target_mae": 0.6548195345920692
+  },
+  "model_artifact_sha256": "82418d51b203e4a7b8e4e7fe94133700c393ddbd80564e59696855197fba5e29",
+  "model_id": "demand-window-60m-hgbr-bdb1d74f9ce09d73",
+  "serving_class": "voltez_ml.serving.demand.DemandPredictor",
+  "serving_code": {
+    "commit": "61a4a2d2f419c33df8b72d82e18a979908cddd43",
+    "demand_source_sha256": "9efd723643863f669365d99d675d0eeb65a41de2e940b2b096a5277ad3095c40",
+    "dirty": false,
+    "promotion_source_sha256": "4e470f07b3140ee8ad1453b2551ca34b435e5ca251910385a994e87170922896"
+  },
+  "stage": "synthetic_validated",
+  "target_spec": {
+    "bucket_minutes": 15,
+    "forecast_lead_minutes": 15,
+    "kind": "rolling_sum",
+    "window_minutes": 60
+  },
+  "timezone": "Asia/Kolkata"
+}

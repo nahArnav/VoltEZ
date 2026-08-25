@@ -1,0 +1,23 @@
+{
+  "artifact": {
+    "path": "model.joblib",
+    "sha256": "3813d8867eb9042c3931e63cae2e882d2b28311797f5e466a6d49b87fea35e82"
+  },
+  "code_state": {
+    "commit": "7ad207a3dc98c6df1540ae7606a98bdc027d8f49",
+    "dirty": false
+  },
+  "created_at": "2026-08-22T09:31:20.810014+00:00",
+  "device": "cpu",
+  "evaluation_report": {
+    "path": "evaluation_report.json",
+    "sha256": "e20d70627282aed14356edaf7a8276a42007f764bb84d59c03d598ff7fd9cbfc"
+  },
+  "feature_suite_manifest": "../../../data/final/pune_v4/features/feature_suite_manifest.json",
+  "feature_suite_manifest_sha256": "63df64b9676786cdf4bae045959c943117c51af0a381088261ac9090abee10b1",
+  "locked_test_accessed": false,
+  "model_id": "availability-hgb-calibrated-97315b1cdaf67db4",
+  "model_name": "charger_availability_prediction",
+  "model_version": "v1",
+  "trainer_source_sha256": "d75a4c6fa0be3de4b30c41e694ba3d34b888c6e330f15b356f4c665232c08b71"
+}

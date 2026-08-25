@@ -1,0 +1,29 @@
+{
+  "artifact": {
+    "path": "model.joblib",
+    "sha256": "71cdeedae3d7b036c667790b4d9a1476f574b196be9433d92d769b64d4d9e2ba"
+  },
+  "created_at": "2026-08-21T21:03:57.516976+00:00",
+  "device": "cpu",
+  "evaluation_report": {
+    "path": "evaluation_report.json",
+    "sha256": "6d26231a02fa4c5305ea11cbe6887482544aa3c78b73c7055c43755dc59288b7"
+  },
+  "feature_suite_manifest": "../../../data/final/pune_v1/features/feature_suite_manifest.json",
+  "feature_suite_manifest_sha256": "9d9fca7621b0635f013f3ff4d3a5f4920ffb7b80a9a2d8b6965be33b1b771bf9",
+  "locked_test_unlocked": false,
+  "model_id": "demand-window-60m-hgbr-82c4859a54924cc8",
+  "model_name": "demand_forecasting_rolling_window",
+  "model_version": "v1-experiment",
+  "target_spec": {
+    "bucket_minutes": 15,
+    "forecast_lead_minutes": 15,
+    "kind": "rolling_sum",
+    "window_minutes": 60
+  },
+  "trainer_source_sha256": "73ea08fe50b8b9f69058218f73cdeb5f8e034eae6bee4071c08351633636d02d",
+  "training_code": {
+    "commit": "1cf5a809f40e057dc28764108ba48039d033b25a",
+    "dirty": false
+  }
+}

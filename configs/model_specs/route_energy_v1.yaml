@@ -1,0 +1,189 @@
+# Machine-readable design contract. No training is authorized by this file.
+model:
+  name: route_energy_prediction
+  version: v1
+  stage: design_only
+  data_stage: public_planning_inputs_implemented
+  training_stage: not_started
+  city: Pune
+  row_grain: one vehicle and one immutable route snapshot for one planned route leg
+  primary_target: actual_battery_energy_kwh
+  residual_target: actual_battery_energy_kwh_minus_physics_baseline_kwh
+  outputs:
+    - expected_energy_kwh
+    - conservative_p90_energy_kwh
+    - expected_arrival_soc_percent
+    - conservative_arrival_soc_percent
+    - reachability_state
+    - safety_margin_kwh
+    - prediction_quality
+
+physics_baseline:
+  implementation: voltez_ml.route_energy.physics.estimate_physics_energy
+  joules_per_kwh: 3600000.0
+  standard_gravity_m_s2: 9.80665
+  default_air_density_kg_m3: 1.225
+  default_auxiliary_power_kw: 0.7
+  minimum_borderline_buffer_kwh: 0.5
+  relative_borderline_buffer_fraction: 0.03
+
+dataset:
+  public_application_tables:
+    - vehicle_energy_profiles
+    - route_snapshots
+    - trips
+    - trip_charger_options
+  step_two_label_policy: no realized energy labels or hidden truth are generated
+  feature_cutoff_rule: every feature must be known at or before route_snapshot_at
+  label_sources:
+    telemetry_battery_energy:
+      confidence: 1.0
+    bms_soc_delta_with_capacity:
+      confidence: 0.7
+    synthetic_segment_simulation:
+      confidence: 1.0
+      qa_only_truth_engine: true
+  unknown_label_policy: exclude from supervised fitting and retain for coverage analysis
+  required_lineage:
+    - observation_id
+    - trip_id
+    - route_snapshot_id
+    - simulation_run_id
+    - feature_view_version
+    - label_definition_version
+    - route_snapshot_at
+    - feature_cutoff
+    - evaluation_role
+
+feature_groups:
+  vehicle:
+    - vehicle_class
+    - battery_capacity_kwh
+    - usable_capacity_fraction
+    - total_mass_kg
+    - drag_area_m2
+    - rolling_resistance_coefficient
+    - drivetrain_efficiency
+    - regenerative_braking_efficiency
+    - battery_health_fraction
+    - current_soc_percent
+    - reserve_soc_percent
+  route:
+    - distance_km
+    - duration_minutes
+    - traffic_delay_ratio
+    - elevation_gain_m
+    - elevation_loss_m
+    - full_stop_count
+    - urban_fraction
+    - highway_fraction
+    - mean_grade_percent
+    - maximum_grade_percent
+  environment:
+    - ambient_temperature_c
+    - precipitation_mm_h
+    - headwind_mps
+    - air_density_kg_m3
+    - auxiliary_power_kw
+    - road_surface_state
+  baseline:
+    - nominal_efficiency_energy_kwh
+    - physics_baseline_energy_kwh
+    - physics_rolling_kwh
+    - physics_aerodynamic_kwh
+    - physics_climbing_kwh
+    - physics_stop_start_kwh
+    - physics_auxiliary_kwh
+    - physics_regen_credit_kwh
+
+forbidden_training_columns:
+  - observation_id
+  - trip_id
+  - vehicle_id
+  - user_id
+  - route_snapshot_id
+  - charger_id
+  - port_id
+  - simulation_run_id
+  - evaluation_role
+  - actual_battery_energy_kwh
+  - actual_arrival_soc_percent
+  - ended_at
+  - label_source
+  - label_confidence
+  - qa_driver_aggressiveness
+  - qa_true_vehicle_coefficients
+  - qa_segment_speed_trace
+  - qa_unobserved_hvac_load_kw
+  - qa_true_wind_profile
+
+synthetic_truth:
+  generator_kind: hidden_segment_level_energy_simulator
+  public_baseline_kind: aggregate_route_physics
+  segment_seconds: 30
+  preserve_hidden_variables_in_qa_only_tables: true
+  required_variation:
+    - correlated vehicle archetypes and manufacturing variation
+    - payload and passenger mass
+    - urban, highway, mixed, and steep route profiles
+    - congestion and stop-start speed traces
+    - monsoon road resistance and auxiliary load
+    - headwind, tailwind, and elevation uncertainty
+    - battery health and usable-capacity variation
+    - driver aggressiveness hidden from training
+    - SOC-dependent regenerative braking limits
+    - noisy route-provider duration and elevation estimates
+    - missing optional weather and elevation context
+
+splits:
+  train_worlds: 2
+  validation_worlds: 1
+  locked_test_worlds: 1
+  stress_worlds: 1
+  locked_test_policy: inaccessible until candidate, thresholds, and evaluation code are frozen
+  required_slices:
+    - vehicle_class
+    - route_distance_band
+    - current_soc_band
+    - urban_highway_mix
+    - elevation_band
+    - traffic_band
+    - normal_monsoon
+    - battery_health_band
+    - cold_start_vehicle_profile
+
+evaluation:
+  baselines:
+    - vehicle_nominal_efficiency_wh_per_km
+    - deterministic_aggregate_physics
+  planned_candidates:
+    - histogram_gradient_boosting_residual_mean
+    - histogram_gradient_boosting_residual_p50
+    - histogram_gradient_boosting_residual_p90
+  metrics:
+    - mae_kwh
+    - rmse_kwh
+    - wape
+    - signed_bias_kwh
+    - arrival_soc_mae_percentage_points
+    - p90_interval_coverage
+    - p90_interval_width_kwh
+    - reachability_false_safe_rate
+    - borderline_rate
+    - prediction_fallback_rate
+  provisional_development_gates:
+    candidate_mae_improvement_over_nominal_efficiency_minimum: 0.05
+    candidate_mae_improvement_over_physics_minimum: 0.03
+    absolute_mean_bias_fraction_of_mean_target_maximum: 0.02
+    p90_coverage_minimum: 0.88
+    p90_coverage_maximum: 0.94
+    validation_false_safe_reachability_rate_maximum: 0.01
+    stress_false_safe_reachability_rate_maximum: 0.02
+    finite_nonnegative_prediction_rate_minimum: 1.0
+    minimum_rows_per_reported_slice: 250
+
+hardware:
+  local_machine: Apple Silicon M4 with 16 GB RAM
+  planned_training_device: cpu
+  mps_policy: do not claim or enable MPS for scikit-learn estimators
+  memory_budget_gb: 10

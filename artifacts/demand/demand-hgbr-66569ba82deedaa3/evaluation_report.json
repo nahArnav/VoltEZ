@@ -1,0 +1,74 @@
+{
+  "algorithm": "HistGradientBoostingRegressor(loss=poisson)",
+  "data_readiness": {
+    "failures": [],
+    "status": "ready"
+  },
+  "device": "cpu",
+  "feature_count": 30,
+  "features": [
+    "request_lag_1",
+    "search_lag_1",
+    "unserved_lag_1",
+    "booking_lag_1",
+    "session_lag_1",
+    "listed_ports_lag_1",
+    "available_ports_lag_1",
+    "occupancy_lag_1",
+    "request_lag_same_time_yesterday",
+    "request_lag_same_time_last_week",
+    "missing_lag_yesterday",
+    "missing_lag_last_week",
+    "request_sum_prior_1_buckets",
+    "request_sum_prior_2_buckets",
+    "request_sum_prior_4_buckets",
+    "request_sum_prior_24_buckets",
+    "request_mean_prior_window",
+    "request_std_prior_window",
+    "request_ewm_prior",
+    "no_candidate_rate_prior_hour",
+    "neighbor_request_lag_1",
+    "history_bucket_count",
+    "centroid_latitude",
+    "centroid_longitude",
+    "horizon_minutes",
+    "target_hour_sin",
+    "target_hour_cos",
+    "target_day_sin",
+    "target_day_cos",
+    "target_is_weekend"
+  ],
+  "hardware_note": "scikit-learn does not use Apple MPS; the M4 CPU is the correct device",
+  "locked_test_unlocked": false,
+  "model": "demand_forecasting",
+  "settings": {
+    "l2_regularization": 0.2,
+    "learning_rate": 0.05,
+    "max_iter": 250,
+    "max_leaf_nodes": 31,
+    "maximum_training_rows": 1500000,
+    "random_seed": 20260821
+  },
+  "training_rows": 1500000,
+  "validation": {
+    "poisson_hist_gradient_boosting": {
+      "mae": 0.3496142294392671,
+      "mean_poisson_deviance": 0.7284376624045383,
+      "nonzero_mae": 0.9206951166026909,
+      "prediction_mean": 0.22811774527081188,
+      "rmse": 0.5137765654722919,
+      "truth_mean": 0.23508870724287673,
+      "wape": 1.4871587561118829
+    },
+    "seasonal_naive": {
+      "mae": 0.3750134743480055,
+      "mean_poisson_deviance": 5.020131486988701,
+      "nonzero_mae": 1.0178354905625775,
+      "prediction_mean": 0.23398197957774422,
+      "rmse": 0.726336500129574,
+      "truth_mean": 0.23508870724287673,
+      "wape": 1.5951998662384435
+    }
+  },
+  "validation_rows": 1033512
+}

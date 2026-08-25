@@ -1,0 +1,9 @@
+environment:
+  name: development
+  fail_on_validation_error: true
+
+execution:
+  memory_budget_gb: 10.0
+
+data:
+  overwrite_existing_run: false

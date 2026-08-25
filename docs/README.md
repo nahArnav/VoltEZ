@@ -1,0 +1,29 @@
+# VoltEZ ML documentation map
+
+Read these documents in build order. Generated datasets, feature snapshots, and model artifacts do
+not belong in this directory.
+
+| Stage | Document | Purpose |
+|---|---|---|
+| Foundation | `project_foundation.md` | Repository layout, configuration layers, and local workflow |
+| Environment | `local_environment.md` | Apple M4 setup and hardware verification |
+| Backend contract | `database_schema.md` | Full application schema and invariants |
+| Schema update | `schema_reconciliation_v1_1.md` | Mapping from schema v1.1 to synthetic and ML tables |
+| ML contract | `ml_data_contract.md` | Labels, cutoffs, features, and serving contract |
+| Step 5 | `synthetic_generator.md` | Synthetic-world logic and validation |
+| Step 6 | `feature_engineering.md` | Point-in-time features and leakage prevention |
+| Step 7 | `experiment_readiness.md` | Independent seeds and evaluation-role isolation |
+| Step 8 | `rehearsal_results.md` | Five-world rehearsal measurements and next gates |
+| Step 9 | `model_training_handoff.md` | Models 3/4 data, final suite, and Model 1 training |
+| Steps 10B–10C | `demand_evaluation.md` | 60-minute evaluation plus structural/context correction |
+| Steps 13B–13C | `demand_hurdle.md` | Poisson diagnosis and two-stage hurdle candidate |
+| Model 1 final | `model1_model_card.md` | Frozen champion, final metrics, limitations, and rollout |
+| Model 1 API | `model1_fastapi_integration.md` | Backend loading, request/response, fallback, and monitoring |
+| Model 2 training | `model2_availability_training.md` | Hybrid decision boundary, calibration, metrics, and local command |
+| FastAPI handoff | `backend_fastapi_handoff.md` | Exact Model 1/2 integration contract for the Backend branch |
+| Two-model analysis | `../output/pdf/VoltEZ_Models_1_and_2_Logical_Analysis.pdf` | Visual explanation of Model 1 and Model 2 logic, evidence, and deployment |
+| Model 5 Step 1 | `model5_route_energy_design.md` | Route-energy physics, dataset contract, synthetic truth, leakage, and evaluation plan |
+| Model 5 Step 2 | `model5_route_energy_step2.md` | Public vehicle profiles, immutable route snapshots, route diversity, and validation |
+
+The repository root `README.md` remains the short operational entry point. This index keeps the
+detailed engineering narrative discoverable without crowding the root.

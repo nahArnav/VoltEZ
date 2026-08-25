@@ -1,0 +1,50 @@
+project:
+  name: voltez-ml
+  # Freezes Pune's geography, hosts, chargers, tariffs, and inherent port health.
+  structural_seed: 20260821
+  # Varies demand, drivers, disruptions, requests, bookings, sessions, and reports.
+  seed: 20260821
+  timezone: Asia/Kolkata
+  city: Pune
+
+experiment:
+  name: development
+  evaluation_role: development
+
+paths:
+  data_root: data
+  artifact_root: artifacts
+  report_root: reports
+
+execution:
+  device: cpu
+  thread_count: -1
+  memory_budget_gb: 10.0
+  deterministic: true
+
+time:
+  bucket_minutes: 15
+  demand_horizons_minutes: [15, 30, 60, 120, 360]
+  availability_eta_buckets_minutes: [15, 30, 60, 120]
+
+data:
+  source: synthetic
+  output_format: parquet
+  include_personal_data: false
+  feature_view_version: v3
+  label_definition_version: v1.3
+
+features:
+  demand_recent_windows_buckets: [1, 2, 4, 24]
+  demand_ewm_span_buckets: 8
+  demand_minimum_history_buckets: 4
+  availability_history_hours: 24
+  waiting_history_hours: 168
+  reliability_history_days: 30
+  reliability_prior_successes: 2.0
+  reliability_prior_failures: 2.0
+  cold_start_evidence_threshold: 5
+  split:
+    train_fraction: 0.70
+    validation_fraction: 0.15
+    test_fraction: 0.15

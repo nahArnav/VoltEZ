@@ -1,43 +1,61 @@
-# Environments
+# Environments and local secrets
 .env
 .env.*
 !.env.example
-.venv
+.venv/
 venv/
 ENV/
 env.bak/
 venv.bak/
 
-# Python
+# Python caches
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 *.py.class
 .pytest_cache/
-
-# Node
-node_modules/
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Build / distribution
-build/
-dist/
-*.egg-info/
+.mypy_cache/
+.ruff_cache/
 
 # Coverage
 .coverage
 htmlcov/
-.pytest_cache/
 
-# Local databases / runtime
+# Generated data and model artifacts
+data/raw/
+data/interim/
+data/processed/
+data/synthetic/
+data/rehearsals/
+data/final/
+artifacts/
+models/
+reports/figures/
+reports/metrics/
+reports/demand/
+
+# Notebook state
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build and distribution
+build/
+dist/
+*.egg-info/
+
+# Local databases and runtime files
 *.db
 *.sqlite
 *.sqlite3

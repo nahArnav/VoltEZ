@@ -1,0 +1,6 @@
+project:
+  seed: 20261109
+
+experiment:
+  name: test_seed_01
+  evaluation_role: test

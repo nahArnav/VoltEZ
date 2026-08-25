@@ -1,0 +1,58 @@
+synthetic:
+  profile_name: pune_test
+  generator_version: v1.3
+  start_date: 2026-01-01
+  days: 2
+  zone_count: 4
+  business_count: 8
+  charger_count: 10
+  driver_count: 80
+  scenario_mix:
+    normal_weekday: 0.58
+    weekend_retail: 0.20
+    monsoon_disruption: 0.08
+    local_event_spike: 0.06
+    outage_cluster: 0.04
+    stale_status_reports: 0.04
+
+  demand:
+    average_requests_per_zone_per_day: 10.0
+    negative_binomial_dispersion: 4.0
+    spatial_spillover_weight: 0.15
+
+  availability:
+    # Deliberately stressful so tests exercise failure labels; pune_v1 remains 0.96.
+    base_operational_probability: 0.70
+    owner_report_error_probability: 0.08
+    user_report_error_probability: 0.04
+    median_status_ttl_minutes: 30
+    availability_tolerance_minutes: 10
+
+  supply:
+    minimum_ports_per_charger: 1
+    maximum_ports_per_charger: 2
+
+  behaviour:
+    recommendations_per_request: 3
+    selection_probability: 0.78
+    cancellation_probability: 0.08
+    no_show_probability: 0.07
+    maximum_queue_wait_minutes: 25
+    session_duration_log_sigma: 0.35
+
+  route_energy:
+    enabled: true
+    maximum_candidate_snapshots_per_trip: 3
+    coverage_trips_per_vehicle: 1
+    profile_source_mix:
+      catalogue: 0.72
+      owner_declared: 0.18
+      class_default: 0.10
+    missing_elevation_probability: 0.12
+    missing_weather_probability: 0.12
+    steep_route_probability: 0.12
+
+  safeguards:
+    maximum_generated_rows: 100000
+    require_reproducible_manifest: true
+    keep_latent_variables_out_of_features: true
