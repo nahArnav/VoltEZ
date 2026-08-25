@@ -29,7 +29,7 @@ class AppRouter {
     initialLocation: '/dashboard',
     routes: [
       // -----------------------------------------------------------------------
-      // AUTHENTICATION & ONBOARDING ROUTES (Full Screen / Slide Transitions)
+      // AUTHENTICATION & ONBOARDING ROUTES
       // -----------------------------------------------------------------------
       GoRoute(
         path: '/login',
@@ -68,7 +68,7 @@ class AppRouter {
       ),
 
       // -----------------------------------------------------------------------
-      // HARDWARE & MODAL ROUTES (Deep Linked)
+      // HARDWARE ROUTES
       // -----------------------------------------------------------------------
       GoRoute(
         path: '/chargers',
@@ -92,7 +92,7 @@ class AppRouter {
       ),
 
       // -----------------------------------------------------------------------
-      // PERSISTENT BOTTOM NAV SHELL (Stateful Nested Routes)
+      // PERSISTENT BOTTOM NAV SHELL (Removed 'const' from NoTransitionPage)
       // -----------------------------------------------------------------------
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -105,7 +105,7 @@ class AppRouter {
               GoRoute(
                 path: '/dashboard',
                 name: 'dashboard',
-                pageBuilder: (context, state) => const NoTransitionPage(
+                pageBuilder: (context, state) => NoTransitionPage(
                   child: DashboardScreen(),
                 ),
               ),
@@ -174,7 +174,7 @@ class AppRouter {
     ],
   );
 
-  // Custom Cyberpunk Slide & Fade Transition
+  // Custom Slide & Fade Transition
   static CustomTransitionPage<void> _buildCustomTransitionPage({
     required GoRouterState state,
     required Widget child,
