@@ -20,8 +20,6 @@ async def websocket_endpoint(
     WebSocket endpoint for real-time updates.
     Clients connect to ws://{host}/api/v1/ws/{user_id}?token=...
     """
-    await websocket.accept()
-
     if not token:
         await websocket.close(code=1008, reason="Missing token")
         return

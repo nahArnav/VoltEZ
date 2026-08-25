@@ -26,7 +26,7 @@ async def get_recommendations(
 @router.get("/business/{business_id}")
 async def get_business_recommendations(
     business_id: UUID,
-    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     """

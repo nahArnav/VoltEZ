@@ -85,3 +85,8 @@ class Booking(Base):
     ForeignKey("app.charger_search_results.id"),
     nullable=True,
     )
+
+    hold_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )

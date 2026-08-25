@@ -1,6 +1,6 @@
 from app.schemas.enums import UserRole
 from uuid import UUID
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Literal, Optional
 from datetime import datetime
 
@@ -52,5 +52,4 @@ class UserResponse(UserBase):
     created_at: datetime
 
     # This tells Pydantic to read data directly from the SQLAlchemy model
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

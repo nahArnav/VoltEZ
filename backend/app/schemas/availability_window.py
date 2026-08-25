@@ -1,5 +1,5 @@
 from uuid import UUID
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from typing import Optional
 from datetime import time
 
@@ -38,5 +38,4 @@ class AvailabilityWindowResponse(AvailabilityWindowBase):
     id: UUID
     charger_port_id: UUID
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

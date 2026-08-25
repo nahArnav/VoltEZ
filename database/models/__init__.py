@@ -13,6 +13,7 @@ from database.models.charger_port import ChargerPort
 from database.models.charger_availability import ChargerAvailability
 from database.models.charging_session import ChargingSession
 from database.models.booking import Booking
+from database.models.booking_event import BookingEvent
 from database.models.charger_search_event import ChargerSearchEvent
 from database.models.charger_search_result import ChargerSearchResult
 from database.models.notification import Notification
@@ -20,6 +21,12 @@ from database.models.review import Review
 from database.models.demand_history import DemandHistory
 from database.models.ml_prediction import MLPrediction
 from database.models.charger_status_event import ChargerStatusEvent
+from database.models.context_event import ContextEvent
+from database.models.ml_feature_snapshot import FeatureSnapshot
+from database.models.ml_model_registry import ModelRegistry
+from database.models.ml_simulation_run import SimulationRun
+from database.models.analytics_demand_bucket import DemandBucket
+from database.models.analytics_availability_observation import AvailabilityObservation
 
 __all__ = [
     "User",
@@ -37,10 +44,17 @@ __all__ = [
     "ChargerAvailability",
     "ChargingSession",
     "Booking",
+    "BookingEvent",
     "ChargerSearchResult",
     "Notification",
     "Review",
     "DemandHistory",
     "MLPrediction",
     "ChargerStatusEvent",
+    "ContextEvent",
+    "FeatureSnapshot",
+    "ModelRegistry",
+    "SimulationRun",
+    "DemandBucket",
+    "AvailabilityObservation",
 ]

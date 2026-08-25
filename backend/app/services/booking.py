@@ -58,7 +58,7 @@ class BookingService:
         # 4. Create the booking record
         booking_data = booking_in.model_dump()
         booking_data["user_id"] = user_id
-        booking_data["status"] = BookingStatus.HELD
+        booking_data["status"] = BookingStatus.HELD.value
         
         # Set the 10-minute hold expiry
         booking_data["hold_expires_at"] = current_time + timedelta(minutes=10)

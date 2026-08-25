@@ -53,7 +53,7 @@ data/synthetic/
 data/rehearsals/
 data/final/
 artifacts/
-models/
+/models/
 reports/figures/
 reports/metrics/
 reports/demand/

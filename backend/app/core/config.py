@@ -37,8 +37,8 @@ class Settings(BaseSettings):
             return ["*"]
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
-    # This tells Pydantic to read from the .env file
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # This tells Pydantic to read from .env or backend/.env file
+    model_config = SettingsConfigDict(env_file=(".env", "backend/.env"), env_file_encoding="utf-8", extra="ignore")
 
 
 # Create a global instance of the settings to use throughout the app
