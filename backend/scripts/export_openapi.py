@@ -3,7 +3,7 @@ import sys
 import os
 
 # Add backend to PYTHONPATH so we can import the app
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../backend"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.main import app
 from fastapi.openapi.utils import get_openapi
@@ -19,7 +19,7 @@ def export_openapi():
     )
     
     # Write it to docs/openapi.json
-    output_path = os.path.join(os.path.dirname(__file__), "../docs/openapi.json")
+    output_path = os.path.join(os.path.dirname(__file__), "../../docs/openapi.json")
     output_path = os.path.abspath(output_path)
     with open(output_path, "w") as f:
         json.dump(openapi_schema, f, indent=2)

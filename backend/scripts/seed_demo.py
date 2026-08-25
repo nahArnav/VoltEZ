@@ -19,7 +19,7 @@ import random
 from datetime import datetime, timedelta, timezone
 
 # Add the backend directory to the path so we can import app modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "services", "api"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy import text
 from app.db.session import AsyncSessionLocal
