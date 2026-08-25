@@ -74,3 +74,9 @@ class Zone(Base):
         nullable=False,
         default=True,
     )
+
+    zone_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="commercial",
+    )
