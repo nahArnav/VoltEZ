@@ -62,5 +62,5 @@ python-multipart==0.0.32
 razorpay==1.4.1
 joblib
 scikit-learn
-setuptools
+setuptools==68.2.2
 pandas
