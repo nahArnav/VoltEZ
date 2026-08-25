@@ -13,14 +13,19 @@ const _text = Color(0xFFF1F7FA);
 const _muted = Color(0xFF7D909D);
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final ProfileService? service;
+
+  const ProfileScreen({
+    super.key,
+    this.service,
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final ProfileService _service = ProfileService();
+  late final ProfileService _service;
 
   UserProfile? _profile;
   bool _isLoading = true;
@@ -30,6 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _service = widget.service ?? ProfileService();
     _loadProfile();
   }
 

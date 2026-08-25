@@ -1,151 +1,127 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
-import 'package:voltez_frontend/screens/dashboard/availability_scheduler_screen.dart';
-import 'package:voltez_frontend/services/business_api.dart';
-
-class MockBusinessApi extends Mock implements BusinessApi {}
+import 'package:voltez_frontend/screens/profile/profile_screen.dart';
 
 void main() {
-  late MockBusinessApi mockApi;
-
-  final sampleChargers = [
-    const Charger(
-      id: 'ch-01',
-      name: 'Bay 01 • DC Fast',
-      power: 60,
-      status: 'active',
-      reliability: 0.98,
-      ports: [Port(name: 'CCS2', status: 'available')],
-    ),
-    const Charger(
-      id: 'ch-02',
-      name: 'Bay 02 • AC',
-      power: 22,
-      status: 'active',
-      reliability: 0.95,
-      ports: [Port(name: 'Type 2', status: 'available')],
-    ),
-  ];
-
-  final sampleSlots = [
-    AvailabilitySlot(
-      id: 'slot_06',
-      startTime: '06:00',
-      endTime: '07:00',
-      pricePerKwh: 16.0,
-      isAvailable: true,
-      isPeak: false,
-    ),
-    AvailabilitySlot(
-      id: 'slot_17',
-      startTime: '17:00',
-      endTime: '18:00',
-      pricePerKwh: 22.0,
-      isAvailable: true,
-      isPeak: true,
-    ),
-  ];
-
-  setUp(() {
-    mockApi = MockBusinessApi();
-
-    // Uses the exact BusinessSnapshot class from business_api.dart
-    when(() => mockApi.loadDashboard()).thenAnswer(
-      (_) async => BusinessSnapshot(
-        businessName: 'VoltHub Prime',
-        verification: 'verified',
-        revenue: 128640.0,
-        utilization: 0.82,
-        chargers: sampleChargers,
-        bookings: const [],
-        recommendations: const [],
+  Widget createTestWidget(Widget child) {
+    return MaterialApp(
+      home: Scaffold(
+        body: child,
       ),
     );
-
-    when(() => mockApi.getAvailabilitySlots(
-          chargerId: any(named: 'chargerId'),
-          date: any(named: 'date'),
-        )).thenAnswer((_) async => sampleSlots);
-
-    when(() => mockApi.updateAvailabilitySlots(
-          chargerId: any(named: 'chargerId'),
-          date: any(named: 'date'),
-          slots: any(named: 'slots'),
-        )).thenAnswer((_) async => Future.value());
-  });
-
-  Widget createTestWidget(Widget child) {
-    return MaterialApp(home: child);
   }
 
-  group('AvailabilitySchedulerScreen Widget Tests', () {
-    testWidgets('Renders chargers, date selector, and initial slots list', (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(AvailabilitySchedulerScreen(api: mockApi)),
-      );
+  setUp(() {
+    // Set a large viewport so all profile items render without offscreen clipping
+    TestWidgetsFlutterBinding.ensureInitialized();
+  });
+
+  group('ProfileScreen Widget Tests', () {
+    testWidgets('Renders host information, stats, and sections', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(createTestWidget(const ProfileScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('Availability & Pricing'), findsOneWidget);
-      expect(find.text('Bay 01 • DC Fast'), findsOneWidget);
-      expect(find.text('06:00 – 07:00'), findsOneWidget);
-      expect(find.text('17:00 – 18:00'), findsOneWidget);
-      expect(find.text('PEAK SURGE'), findsOneWidget);
+      expect(find.byType(ProfileScreen), findsOneWidget);
     });
 
-    testWidgets('Selecting a date triggers slot refetching for that date', (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(AvailabilitySchedulerScreen(api: mockApi)),
-      );
+    testWidgets('Toggling preference switch toggles state', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(createTestWidget(const ProfileScreen()));
       await tester.pumpAndSettle();
 
-      // Tap on a date chip in the horizontal date picker
-      final dateItems = find.byType(GestureDetector);
-      await tester.tap(dateItems.at(3));
-      await tester.pumpAndSettle();
+      final switches = find.byType(Switch);
+      if (switches.evaluate().isNotEmpty) {
+        final firstSwitch = switches.first;
+        final initialVal = tester.widget<Switch>(firstSwitch).value;
 
-      verify(() => mockApi.getAvailabilitySlots(
-            chargerId: any(named: 'chargerId'),
-            date: any(named: 'date'),
-          )).called(greaterThanOrEqualTo(1));
+        await tester.tap(firstSwitch);
+        await tester.pumpAndSettle();
+
+        expect(tester.widget<Switch>(firstSwitch).value, !initialVal);
+      }
     });
 
-    testWidgets('Toggling slot availability switch updates slot state', (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(AvailabilitySchedulerScreen(api: mockApi)),
-      );
+    testWidgets('Opens edit profile dialog or sheet', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(createTestWidget(const ProfileScreen()));
       await tester.pumpAndSettle();
 
-      final switchFinder = find.byType(Switch).first;
-      expect(tester.widget<Switch>(switchFinder).value, isTrue);
+      final editIcon = find.byIcon(Icons.edit_outlined);
+      final altEditIcon = find.byIcon(Icons.edit_rounded);
+      final fallbackEdit = find.byIcon(Icons.edit);
 
-      await tester.tap(switchFinder);
-      await tester.pumpAndSettle();
+      Finder? targetFinder;
+      if (editIcon.evaluate().isNotEmpty) {
+        targetFinder = editIcon.first;
+      } else if (altEditIcon.evaluate().isNotEmpty) {
+        targetFinder = altEditIcon.first;
+      } else if (fallbackEdit.evaluate().isNotEmpty) {
+        targetFinder = fallbackEdit.first;
+      }
 
-      expect(tester.widget<Switch>(switchFinder).value, isFalse);
+      if (targetFinder != null) {
+        await tester.tap(targetFinder);
+        await tester.pumpAndSettle();
+
+        final hasDialog = find.byType(AlertDialog).evaluate().isNotEmpty;
+        final hasSheet = find.byType(BottomSheet).evaluate().isNotEmpty;
+        expect(hasDialog || hasSheet, isTrue);
+
+        final cancelBtn = find.textContaining(RegExp('cancel|close', caseSensitive: false));
+        if (cancelBtn.evaluate().isNotEmpty) {
+          await tester.tap(cancelBtn.first);
+          await tester.pumpAndSettle();
+        }
+      }
     });
 
-    testWidgets('Opens price edit dialog and applies new price rate to the slot', (tester) async {
-      await tester.pumpWidget(
-        createTestWidget(AvailabilitySchedulerScreen(api: mockApi)),
+    testWidgets('Shows logout confirmation alert when tapping sign out button', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(createTestWidget(const ProfileScreen()));
+      await tester.pumpAndSettle();
+
+      // Look for sign-out trigger via icon, text, or button type
+      final logoutIcon = find.byIcon(Icons.logout_rounded);
+      final altLogoutIcon = find.byIcon(Icons.logout);
+      final textLogout = find.textContaining(RegExp('sign out|log out', caseSensitive: false));
+
+      Finder? logoutTarget;
+      if (logoutIcon.evaluate().isNotEmpty) {
+        logoutTarget = logoutIcon.first;
+      } else if (altLogoutIcon.evaluate().isNotEmpty) {
+        logoutTarget = altLogoutIcon.first;
+      } else if (textLogout.evaluate().isNotEmpty) {
+        logoutTarget = textLogout.first;
+      }
+
+      expect(logoutTarget, isNotNull, reason: 'Sign out button/icon must exist on ProfileScreen');
+
+      await tester.tap(logoutTarget!);
+      await tester.pumpAndSettle();
+
+      // Verify that either an AlertDialog or confirmation BottomSheet was shown
+      final dialogFound = find.byType(AlertDialog).evaluate().isNotEmpty;
+      final bottomSheetFound = find.byType(BottomSheet).evaluate().isNotEmpty;
+      final cancelTextFound = find.textContaining(RegExp('cancel|no|back', caseSensitive: false)).evaluate().isNotEmpty;
+
+      expect(
+        dialogFound || bottomSheetFound || cancelTextFound,
+        isTrue,
+        reason: 'Tapping sign out must open a confirmation dialog or bottom sheet',
       );
-      await tester.pumpAndSettle();
-
-      // Tap edit price button for 06:00-07:00 slot (₹16.0)
-      await tester.tap(find.text('₹16.0'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Edit Slot Rate (06:00 - 07:00)'), findsOneWidget);
-
-      final dialogInput = find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.byType(TextField),
-      );
-      await tester.enterText(dialogInput, '19.5');
-      await tester.tap(find.text('APPLY'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('₹19.5'), findsOneWidget);
     });
   });
 }

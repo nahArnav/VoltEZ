@@ -12,7 +12,7 @@ import '../screens/dashboard/availability_scheduler_screen.dart';
 import '../screens/earnings/earnings_screen.dart';
 import '../screens/dashboard/ai_recommendations_screen.dart';
 import '../screens/profile/profile_screen.dart';
-import '../screens/chargers/charger_management_screen.dart';
+import '../screens/dashboard/charger_management_screen.dart';
 import '../screens/chargers/add_edit_chargers_screen.dart';
 import '../services/business_api.dart';
 
