@@ -24,7 +24,9 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  mocktail: ^1.0.4 # or mockito
+  dio: ^5.7.0
   flutter_lints: ^3.0.0
-
+  
 flutter:
   uses-material-design: true
