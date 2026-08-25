@@ -1,0 +1,44 @@
+name: voltez_frontend
+description: VoltEZ — Smart EV Charging Platform
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.9
+
+  # State management
+  provider: ^6.1.5
+
+  # Navigation
+  go_router: ^14.8.1
+
+  # Network
+  dio: ^5.11.0
+
+  # Storage
+  shared_preferences: ^2.5.5
+
+  # Location
+  geolocator: ^14.0.3
+  geocoding: ^4.0.0
+
+  # Maps
+  google_maps_flutter: ^2.18.0
+
+  # UI
+  flutter_svg: ^2.3.0
+  shimmer: ^3.0.0
+  cached_network_image: ^3.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

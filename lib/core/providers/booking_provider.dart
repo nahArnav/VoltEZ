@@ -1,0 +1,296 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import '../../shared/models/models.dart';
+import '../network/booking_api.dart';
+
+/// Phase of the booking flow.
+enum BookingPhase {
+  /// Showing available slots.
+  idle,
+
+  /// Slot selected, hold request in flight.
+  holding,
+
+  /// Hold succeeded — countdown active, waiting for payment.
+  held,
+
+  /// Hold expired.
+  expired,
+
+  /// Payment order created, waiting for user action.
+  paymentPending,
+
+  /// Payment processing (verification in flight).
+  paymentProcessing,
+
+  /// Payment succeeded — confirmation screen.
+  confirmed,
+
+  /// Payment failed — can retry or cancel.
+  paymentFailed,
+
+  /// Payment cancelled by user.
+  paymentCancelled,
+}
+
+/// Manages the full driver booking flow:
+/// charger → slots → hold → countdown → payment → confirmation.
+///
+/// Inject [MockBookingApi] for dev/testing, swap to [LiveBookingApi]
+/// when the backend is ready.
+class BookingProvider extends ChangeNotifier {
+  BookingProvider({BookingApi? bookingApi})
+      : _api = bookingApi ?? MockBookingApi();
+
+  final BookingApi _api;
+
+  // ─── Current charger context ───
+  Charger? _selectedCharger;
+  Charger? get selectedCharger => _selectedCharger;
+
+  // ─── Phase ───
+  BookingPhase _phase = BookingPhase.idle;
+  BookingPhase get phase => _phase;
+
+  // ─── Slots ───
+  List<SlotInfo> _slots = [];
+  List<SlotInfo> get slots => _slots;
+  bool _slotsLoading = false;
+  bool get slotsLoading => _slotsLoading;
+  String? _slotsError;
+  String? get slotsError => _slotsError;
+
+  SlotInfo? _selectedSlot;
+  SlotInfo? get selectedSlot => _selectedSlot;
+
+  // ─── Hold ───
+  HoldResult? _holdResult;
+  HoldResult? get holdResult => _holdResult;
+  int _countdownSeconds = 0;
+  int get countdownSeconds => _countdownSeconds;
+  Timer? _countdownTimer;
+
+  // ─── Payment ───
+  PaymentOrder? _paymentOrder;
+  PaymentOrder? get paymentOrder => _paymentOrder;
+
+  // ─── Confirmation ───
+  ConfirmedBooking? _confirmedBooking;
+  ConfirmedBooking? get confirmedBooking => _confirmedBooking;
+
+  // ─── Error ───
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
+
+  // ─── History ───
+  List<ConfirmedBooking> _bookingHistory = [];
+  List<ConfirmedBooking> get bookingHistory => _bookingHistory;
+  bool _historyLoading = false;
+  bool get historyLoading => _historyLoading;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Actions
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Set the charger context for this booking flow.
+  void setCharger(Charger charger) {
+    _selectedCharger = charger;
+    notifyListeners();
+  }
+
+  /// Load available slots for the current charger.
+  Future<void> loadSlots() async {
+    if (_selectedCharger == null) return;
+
+    _slotsLoading = true;
+    _slotsError = null;
+    _slots = [];
+    notifyListeners();
+
+    try {
+      _slots = await _api.getAvailability(
+        _selectedCharger!.id,
+        DateTime.now(),
+      );
+    } catch (e) {
+      _slotsError = e.toString();
+    }
+
+    _slotsLoading = false;
+    notifyListeners();
+  }
+
+  /// Select a slot and initiate the hold.
+  Future<void> selectAndHoldSlot(SlotInfo slot) async {
+    if (_selectedCharger == null) return;
+
+    _selectedSlot = slot;
+    _phase = BookingPhase.holding;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _holdResult = await _api.holdSlot(
+        chargerId: _selectedCharger!.id,
+        slotId: slot.id,
+        connectorType: slot.connectorType,
+      );
+
+      _countdownSeconds = _holdResult!.secondsRemaining;
+      _phase = BookingPhase.held;
+      _startCountdown();
+    } on SlotTakenException catch (e) {
+      _errorMessage = e.message;
+      _phase = BookingPhase.idle;
+      _selectedSlot = null;
+      // Reload slots to reflect updated availability
+      await loadSlots();
+    } catch (e) {
+      _errorMessage = 'Failed to hold slot. Please try again.';
+      _phase = BookingPhase.idle;
+      _selectedSlot = null;
+    }
+
+    notifyListeners();
+  }
+
+  /// Proceed to payment after hold is confirmed.
+  Future<void> proceedToPayment() async {
+    if (_holdResult == null) return;
+
+    _phase = BookingPhase.paymentPending;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _paymentOrder = await _api.createPaymentOrder(
+        bookingId: _holdResult!.bookingId,
+        amount: _holdResult!.estimatedCost,
+      );
+    } catch (e) {
+      _errorMessage = 'Failed to create payment order.';
+      _phase = BookingPhase.held;
+    }
+
+    notifyListeners();
+  }
+
+  /// Process payment — verify with backend.
+  Future<void> processPayment() async {
+    if (_paymentOrder == null || _holdResult == null) return;
+
+    _phase = BookingPhase.paymentProcessing;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _confirmedBooking = await _api.verifyPayment(
+        orderId: _paymentOrder!.orderId,
+        bookingId: _holdResult!.bookingId,
+      );
+
+      _stopCountdown();
+      _phase = BookingPhase.confirmed;
+    } on PaymentFailedException catch (e) {
+      _errorMessage = e.message;
+      _phase = BookingPhase.paymentFailed;
+    } catch (e) {
+      _errorMessage = 'Payment verification failed. Please retry.';
+      _phase = BookingPhase.paymentFailed;
+    }
+
+    notifyListeners();
+  }
+
+  /// Retry payment after failure.
+  void retryPayment() {
+    _errorMessage = null;
+    _paymentOrder = null;
+    _phase = BookingPhase.held;
+    notifyListeners();
+  }
+
+  /// Cancel payment and release the hold.
+  void cancelPayment() {
+    _stopCountdown();
+    _errorMessage = null;
+    _paymentOrder = null;
+    _holdResult = null;
+    _selectedSlot = null;
+    _phase = BookingPhase.paymentCancelled;
+    notifyListeners();
+  }
+
+  /// Go back to slot selection (from any terminal state).
+  void resetToSlots() {
+    _stopCountdown();
+    _selectedSlot = null;
+    _holdResult = null;
+    _paymentOrder = null;
+    _confirmedBooking = null;
+    _errorMessage = null;
+    _phase = BookingPhase.idle;
+    notifyListeners();
+    loadSlots();
+  }
+
+  /// Load booking history.
+  Future<void> loadHistory() async {
+    _historyLoading = true;
+    notifyListeners();
+
+    try {
+      _bookingHistory = await _api.getBookingHistory();
+    } catch (_) {
+      _bookingHistory = [];
+    }
+
+    _historyLoading = false;
+    notifyListeners();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Countdown
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_countdownSeconds > 0) {
+        _countdownSeconds--;
+        notifyListeners();
+      } else {
+        timer.cancel();
+        _phase = BookingPhase.expired;
+        _selectedSlot = null;
+        _holdResult = null;
+        _paymentOrder = null;
+        _errorMessage = 'Your hold has expired. Please select another slot.';
+        notifyListeners();
+      }
+    });
+  }
+
+  void _stopCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+  }
+
+  String get formattedCountdown {
+    final m = _countdownSeconds ~/ 60;
+    final s = _countdownSeconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  bool get isCountdownUrgent => _countdownSeconds < 120; // < 2 min
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Cleanup
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @override
+  void dispose() {
+    _stopCountdown();
+    super.dispose();
+  }
+}

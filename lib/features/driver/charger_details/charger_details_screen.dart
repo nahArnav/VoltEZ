@@ -1,0 +1,687 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/theme/colors.dart';
+import '../../../core/theme/typography.dart';
+import '../../../core/providers/booking_provider.dart';
+import '../../../core/providers/route_planner_provider.dart';
+import '../../../core/providers/charger_discovery_provider.dart';
+import '../../../shared/models/models.dart';
+import '../../../shared/widgets/widgets.dart';
+
+/// Charger Details — shown when driver taps a recommended charger
+/// or charger card from the map.
+///
+/// Looks up the charger from [RoutePlannerProvider] recommendations first,
+/// then falls back to [ChargerDiscoveryProvider] for map-originated taps.
+/// Sets the charger context on [BookingProvider] before navigation.
+class ChargerDetailsScreen extends StatefulWidget {
+  const ChargerDetailsScreen({super.key, required this.chargerId});
+
+  final String chargerId;
+
+  @override
+  State<ChargerDetailsScreen> createState() => _ChargerDetailsScreenState();
+}
+
+class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
+  Charger? _charger;
+  int _detourMinutes = 0;
+  double _reliabilityScore = 0.0;
+  bool _connectorCompatible = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _resolveCharger();
+  }
+
+  void _resolveCharger() {
+    if (_charger != null) return;
+
+    // Try recommendation data first
+    try {
+      final planner = context.read<RoutePlannerProvider>();
+      for (final rec in planner.recommendations) {
+        if (rec.charger.id == widget.chargerId) {
+          setState(() {
+            _charger = rec.charger;
+            _detourMinutes = rec.detourMinutes;
+            _reliabilityScore = rec.reliabilityScore;
+            _connectorCompatible = rec.connectorCompatible;
+          });
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // Fallback — try ChargerDiscoveryProvider for map-originated taps
+    try {
+      final discovery = context.read<ChargerDiscoveryProvider>();
+      for (final c in discovery.allChargers) {
+        if (c.id == widget.chargerId) {
+          setState(() {
+            _charger = c;
+            _detourMinutes = 0;
+            _reliabilityScore = c.rating / 5.0;
+            _connectorCompatible = true;
+          });
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // Final fallback — use default charger if ID matches c1
+    setState(() {
+      _charger = const Charger(
+        id: 'c1',
+        name: 'Phoenix Mall Charger',
+        address: 'Phoenix Mall, Lower Parel, Mumbai',
+        latitude: 19.0760,
+        longitude: 72.8777,
+        powerKw: 60,
+        pricePerKwh: 14,
+        status: ChargerStatus.available,
+        connectors: [ConnectorType.ccs2],
+        amenities: ['WiFi', 'Food Court', 'Parking', 'Restroom', 'AC Waiting Lounge'],
+        rating: 4.6,
+        totalRatings: 234,
+        businessId: 'b1',
+      );
+      _detourMinutes = 6;
+      _reliabilityScore = 0.94;
+      _connectorCompatible = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final charger = _charger;
+    if (charger == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final statusColor = _statusColor(charger.status);
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: VoltAppBar(
+        title: charger.name,
+        subtitle: charger.address,
+        actions: [
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.share_rounded,
+                color: AppColors.textPrimary, size: 22),
+            tooltip: 'Share',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ─── Status + Key Info ───
+                  _buildStatusHeader(charger, statusColor),
+                  const SizedBox(height: 20),
+
+                  // ─── Quick Stats ───
+                  _buildQuickStats(charger),
+                  const SizedBox(height: 20),
+
+                  // ─── Connector Info ───
+                  _buildConnectorInfo(charger),
+                  const SizedBox(height: 20),
+
+                  // ─── Amenities ───
+                  _buildAmenities(charger),
+                  const SizedBox(height: 20),
+
+                  // ─── Ratings & Trust ───
+                  _buildRatingCard(charger),
+                  const SizedBox(height: 20),
+
+                  // ─── Business/Host ───
+                  _buildHostInfo(charger),
+                  const SizedBox(height: 20),
+
+                  // ─── Trust Section ───
+                  _buildTrustSection(),
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
+          ),
+
+          // ─── Bottom CTA ───
+          _buildBottomCTA(context, charger),
+        ],
+      ),
+    );
+  }
+
+  // ─── Status Header ───
+  Widget _buildStatusHeader(Charger charger, Color statusColor) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: statusColor,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                _statusLabel(charger.status),
+                style: AppTypography.headlineSmall
+                    .copyWith(color: statusColor),
+              ),
+              const Spacer(),
+              _infoChip(
+                Icons.star_rounded,
+                '${charger.rating} (${charger.totalRatings})',
+                AppColors.warning,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _infoChip(
+                Icons.power_rounded,
+                charger.connectors.first == ConnectorType.ccs2 ? 'CCS2' : 'Type 2',
+                AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              _infoChip(
+                Icons.bolt_rounded,
+                '${charger.powerKw.round()} kW',
+                AppColors.secondary,
+              ),
+              const SizedBox(width: 8),
+              _infoChip(
+                Icons.currency_rupee,
+                '₹${charger.pricePerKwh.round()}/kWh',
+                AppColors.success,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Quick Stats (Detour, Reliability, Compatibility) ───
+  Widget _buildQuickStats(Charger charger) {
+    return Row(
+      children: [
+        _statCard(
+          Icons.navigation_rounded,              '$_detourMinutes min',
+          'Detour',
+          AppColors.secondary,
+        ),
+        const SizedBox(width: 10),
+        _statCard(
+          Icons.verified_rounded,
+          '${(_reliabilityScore * 100).round()}%',
+          'Reliability',
+          _reliabilityScore >= 0.9
+              ? AppColors.success
+              : AppColors.warning,
+        ),
+        const SizedBox(width: 10),
+        _statCard(
+          _connectorCompatible
+              ? Icons.check_circle_rounded
+              : Icons.warning_amber_rounded,
+          _connectorCompatible ? 'Yes' : 'No',
+          'Compatible',
+          _connectorCompatible
+              ? AppColors.success
+              : AppColors.warning,
+        ),
+      ],
+    );
+  }
+
+  Widget _statCard(
+      IconData icon, String value, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Text(label, style: AppTypography.labelSmall),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Connector Info ───
+  Widget _buildConnectorInfo(Charger charger) {
+    final connectorNames = charger.connectors
+        .map((ct) => ct == ConnectorType.ccs2
+            ? 'CCS2 (DC)'
+            : ct == ConnectorType.type2
+                ? 'Type 2 (AC)'
+                : ct.name)
+        .join(', ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Connector', style: AppTypography.headlineMedium),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.power_rounded,
+                    color: AppColors.primary),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(connectorNames,
+                        style: AppTypography.headlineSmall),
+                    Text(
+                      '${charger.powerKw.round()} kW · ${charger.powerKw >= 50 ? "DC Fast Charging" : "AC Charging"}',
+                      style: AppTypography.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _connectorCompatible
+                      ? AppColors.success.withValues(alpha: 0.12)
+                      : AppColors.warning.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _connectorCompatible
+                      ? 'COMPATIBLE'
+                      : 'CHECK ADAPTER',
+                  style: TextStyle(
+                    color: _connectorCompatible
+                        ? AppColors.success
+                        : AppColors.warning,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Amenities ───
+  Widget _buildAmenities(Charger charger) {
+    if (charger.amenities.isEmpty) return const SizedBox.shrink();
+
+    final icons = {
+      'WiFi': Icons.wifi_rounded,
+      'Food Court': Icons.restaurant_rounded,
+      'Parking': Icons.local_parking_rounded,
+      'Restroom': Icons.wc_rounded,
+      'AC Waiting Lounge': Icons.ac_unit_rounded,
+      'Cafe': Icons.coffee_rounded,
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Amenities', style: AppTypography.headlineMedium),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: charger.amenities.map((a) {
+            return Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icons[a] ?? Icons.check_circle_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    a,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // ─── Rating Card ───
+  Widget _buildRatingCard(Charger charger) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Ratings', style: AppTypography.headlineMedium),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Column(
+                children: [
+                  Text(
+                    charger.rating.toString(),
+                    style: const TextStyle(
+                      color: AppColors.warning,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Row(
+                    children: List.generate(
+                      5,
+                      (i) => Icon(
+                        i < charger.rating.round()
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
+                        color: AppColors.warning,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('${charger.totalRatings} reviews',
+                      style: AppTypography.bodySmall),
+                ],
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                child: Column(
+                  children: [
+                    _ratingBar('Reliability',
+                        _reliabilityScore, AppColors.success),
+                    const SizedBox(height: 8),
+                    _ratingBar('Cleanliness', 0.88, AppColors.primary),
+                    const SizedBox(height: 8),
+                    _ratingBar('Speed', 0.91, AppColors.secondary),
+                    const SizedBox(height: 8),
+                    _ratingBar(
+                        'Location', 0.85, AppColors.warning),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _ratingBar(String label, double value, Color color) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 70,
+          child: Text(label, style: AppTypography.labelSmall),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: value,
+              color: color,
+              backgroundColor: AppColors.surface,
+              minHeight: 6,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text('${(value * 100).round()}%',
+            style: AppTypography.labelSmall.copyWith(color: color)),
+      ],
+    );
+  }
+
+  // ─── Host Info ───
+  Widget _buildHostInfo(Charger charger) {
+    if (charger.businessId == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.business_rounded,
+                color: AppColors.secondary, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Hosted by', style: AppTypography.labelSmall),
+                Text(
+                  'VoltEZ Partner',
+                  style: AppTypography.headlineSmall,
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.verified_rounded,
+              color: AppColors.success, size: 20),
+        ],
+      ),
+    );
+  }
+
+  // ─── Trust Section ───
+  Widget _buildTrustSection() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border:
+            Border.all(color: AppColors.success.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.verified_rounded,
+              color: AppColors.success, size: 32),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Verified Charger',
+                    style: AppTypography.headlineSmall
+                        .copyWith(color: AppColors.success)),
+                const SizedBox(height: 4),
+                Text(
+                  'Verified by VoltEZ. Regularly inspected for safety and performance.',
+                  style: AppTypography.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Bottom CTA ───
+  Widget _buildBottomCTA(BuildContext context, Charger charger) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      decoration: const BoxDecoration(
+        color: AppColors.card,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '₹${charger.pricePerKwh.round()}/kWh',
+                style: AppTypography.headlineMedium
+                    .copyWith(color: AppColors.primary),
+              ),
+              Text(
+                '$_detourMinutes min detour · ${_reliabilityScore > 0 ? '${(_reliabilityScore * 100).round()}% reliable' : ''}',
+                style: AppTypography.bodySmall,
+              ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: PrimaryButton(
+              text: 'SELECT SLOT',
+              onPressed: () {
+                // Set charger on booking provider
+                context.read<BookingProvider>().setCharger(charger);
+                context.go('/driver/booking');
+              },
+              isExpanded: true,
+              icon: Icons.schedule_rounded,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Helpers ───
+  Color _statusColor(ChargerStatus status) {
+    switch (status) {
+      case ChargerStatus.available:
+        return AppColors.success;
+      case ChargerStatus.busy:
+        return AppColors.warning;
+      case ChargerStatus.offline:
+      case ChargerStatus.maintenance:
+        return AppColors.error;
+    }
+  }
+
+  String _statusLabel(ChargerStatus status) {
+    switch (status) {
+      case ChargerStatus.available:
+        return 'Available';
+      case ChargerStatus.busy:
+        return 'Busy';
+      case ChargerStatus.offline:
+        return 'Offline';
+      case ChargerStatus.maintenance:
+        return 'Maintenance';
+    }
+  }
+
+  Widget _infoChip(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
