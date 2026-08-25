@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../widgets/ai_copilot_drawer.dart';
+import 'recommendation_model.dart';
+import 'recommendation_service.dart';
 
 class AiRecommendationsScreen extends StatefulWidget {
   const AiRecommendationsScreen({super.key});
 
   @override
-  State<AiRecommendationsScreen> createState() =>
-      _AiRecommendationsScreenState();
+  State<AiRecommendationsScreen> createState() => _AiRecommendationsScreenState();
 }
 
-class _AiRecommendationsScreenState
-    extends State<AiRecommendationsScreen> {
+class _AiRecommendationsScreenState extends State<AiRecommendationsScreen> {
   static const Color bg = Color(0xFF0A0F1F);
   static const Color panel = Color(0xFF111827);
   static const Color cyan = Color(0xFF00E5FF);
@@ -18,38 +18,75 @@ class _AiRecommendationsScreenState
   static const Color amber = Color(0xFFF59E0B);
   static const Color red = Color(0xFFFB7185);
 
-  final List<Map<String, dynamic>> recommendations = [
-    {
-      "id": "rec-123",
-      "type": "availability_and_pricing",
-      "date": "Tuesday • 25 Aug",
-      "start": "14:00",
-      "end": "17:00",
-      "price": 20,
-      "forecast": 18,
-      "nearby": 5,
-      "utilization": 0.82,
-      "confidence": 0.91,
-      "reason":
-          "Demand is forecast to rise while nearby charging supply remains low.",
-      "status": "pending",
-    },
-    {
-      "id": "rec-124",
-      "type": "availability_and_pricing",
-      "date": "Thursday • 27 Aug",
-      "start": "18:00",
-      "end": "21:00",
-      "price": 22,
-      "forecast": 24,
-      "nearby": 7,
-      "utilization": 0.88,
-      "confidence": 0.87,
-      "reason":
-          "Evening demand is expected to increase due to high traffic in the area.",
-      "status": "pending",
-    },
-  ];
+  final RecommendationService _service = RecommendationService();
+  
+  List<Recommendation> _recommendations = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  final Set<String> _updatingIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final data = await _service.fetchRecommendations();
+      setState(() {
+        _recommendations = data;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _handleStatusUpdate(
+    Recommendation rec,
+    String newStatus, {
+    double? newPrice,
+  }) async {
+    setState(() => _updatingIds.add(rec.id));
+
+    try {
+      final success = await _service.updateStatus(
+        rec.id,
+        newStatus,
+        updatedPrice: newPrice,
+      );
+
+      if (success) {
+        setState(() {
+          rec.status = newStatus;
+          if (newPrice != null) rec.price = newPrice;
+        });
+
+        final messageColor = newStatus == 'accepted'
+            ? green
+            : newStatus == 'rejected'
+                ? red
+                : amber;
+
+        _showMessage("Recommendation ${newStatus.toLowerCase()}", messageColor);
+      } else {
+        _showMessage("Failed to update status on server", red);
+      }
+    } catch (e) {
+      _showMessage("Error updating recommendation", red);
+    } finally {
+      setState(() => _updatingIds.remove(rec.id));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,49 +125,116 @@ class _AiRecommendationsScreenState
           style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-
-            const SizedBox(height: 24),
-
-            const Text(
-              "Recommended Actions",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            ...recommendations.map(
-              (recommendation) => Padding(
-                padding: const EdgeInsets.only(bottom: 18),
-                child: _buildRecommendationCard(
-                  recommendation,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            _buildHowItWorks(),
-
-            const SizedBox(height: 30),
-          ],
-        ),
+      body: RefreshIndicator(
+        color: cyan,
+        backgroundColor: panel,
+        onRefresh: _fetchData,
+        child: _buildBody(),
       ),
     );
   }
 
-  // ------------------------------------------------------------
-  // HEADER
-  // ------------------------------------------------------------
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: cyan),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded, color: red, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: cyan,
+                  foregroundColor: Colors.black,
+                ),
+                onPressed: _fetchData,
+                icon: const Icon(Icons.refresh),
+                label: const Text("Retry"),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeader(),
+          const SizedBox(height: 24),
+          const Text(
+            "Recommended Actions",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (_recommendations.isEmpty)
+            _buildEmptyState()
+          else
+            ..._recommendations.map(
+              (rec) => Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: _buildRecommendationCard(rec),
+              ),
+            ),
+          const SizedBox(height: 10),
+          _buildHowItWorks(),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: const Column(
+        children: [
+          Icon(Icons.check_circle_outline, color: green, size: 40),
+          SizedBox(height: 12),
+          Text(
+            "All Caught Up!",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            "No pending recommendations available.",
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildHeader() {
     return Container(
@@ -139,9 +243,7 @@ class _AiRecommendationsScreenState
       decoration: BoxDecoration(
         color: panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: cyan.withOpacity(.18),
-        ),
+        border: Border.all(color: cyan.withOpacity(.18)),
         boxShadow: [
           BoxShadow(
             color: cyan.withOpacity(.04),
@@ -157,9 +259,7 @@ class _AiRecommendationsScreenState
             decoration: BoxDecoration(
               color: cyan.withOpacity(.09),
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(
-                color: cyan.withOpacity(.18),
-              ),
+              border: Border.all(color: cyan.withOpacity(.18)),
             ),
             child: const Icon(
               Icons.auto_awesome_rounded,
@@ -170,8 +270,7 @@ class _AiRecommendationsScreenState
           const SizedBox(width: 15),
           const Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   "AI Station Intelligence",
@@ -183,9 +282,7 @@ class _AiRecommendationsScreenState
                 ),
                 SizedBox(height: 6),
                 Text(
-                  "Recommendations are generated using "
-                  "demand, nearby supply and charger "
-                  "utilization.",
+                  "Recommendations are generated using demand, nearby supply and charger utilization.",
                   style: TextStyle(
                     color: Colors.white54,
                     fontSize: 11,
@@ -200,21 +297,8 @@ class _AiRecommendationsScreenState
     );
   }
 
-  // ------------------------------------------------------------
-  // RECOMMENDATION CARD
-  // ------------------------------------------------------------
-
-  Widget _buildRecommendationCard(
-    Map<String, dynamic> recommendation,
-  ) {
-    final double confidence =
-        recommendation["confidence"];
-
-    final double utilization =
-        recommendation["utilization"];
-
-    final String status =
-        recommendation["status"];
+  Widget _buildRecommendationCard(Recommendation rec) {
+    final isMutating = _updatingIds.contains(rec.id);
 
     return Container(
       width: double.infinity,
@@ -223,36 +307,26 @@ class _AiRecommendationsScreenState
         color: panel,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: status == "pending"
+          color: rec.status == "pending"
               ? cyan.withOpacity(.2)
               : Colors.white.withOpacity(.06),
         ),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                 decoration: BoxDecoration(
                   color: cyan.withOpacity(.08),
-                  borderRadius:
-                      BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.auto_awesome,
-                      color: cyan,
-                      size: 12,
-                    ),
+                    Icon(Icons.auto_awesome, color: cyan, size: 12),
                     SizedBox(width: 5),
                     Text(
                       "AI RECOMMENDATION",
@@ -267,12 +341,10 @@ class _AiRecommendationsScreenState
                 ),
               ),
               const Spacer(),
-              _statusBadge(status),
+              _statusBadge(rec.status),
             ],
           ),
-
           const SizedBox(height: 18),
-
           const Text(
             "Open Availability",
             style: TextStyle(
@@ -281,91 +353,63 @@ class _AiRecommendationsScreenState
               fontWeight: FontWeight.bold,
             ),
           ),
-
           const SizedBox(height: 6),
-
           Text(
-            recommendation["reason"],
+            rec.reason,
             style: const TextStyle(
               color: Colors.white54,
               fontSize: 12,
               height: 1.5,
             ),
           ),
-
           const SizedBox(height: 20),
-
-          // Date
           _infoRow(
             Icons.calendar_today_rounded,
             "Recommended Date",
-            recommendation["date"],
+            rec.date,
           ),
-
           const SizedBox(height: 13),
-
-          // Time
           _infoRow(
             Icons.schedule_rounded,
             "Availability",
-            "${recommendation["start"]} – "
-                "${recommendation["end"]}",
+            "${rec.start} – ${rec.end}",
           ),
-
           const SizedBox(height: 13),
-
-          // Price
           _infoRow(
             Icons.currency_rupee_rounded,
             "Suggested Price",
-            "₹${recommendation["price"]}/kWh",
+            "₹${rec.price.toStringAsFixed(0)}/kWh",
             valueColor: cyan,
           ),
-
           const SizedBox(height: 20),
-
-          // Metrics
           Row(
             children: [
-              _metric(
-                "FORECAST",
-                "${recommendation["forecast"]}",
-                "sessions",
-              ),
+              _metric("FORECAST", "${rec.forecast}", "sessions"),
               const SizedBox(width: 8),
-              _metric(
-                "NEARBY",
-                "${recommendation["nearby"]}",
-                "chargers",
-              ),
+              _metric("NEARBY", "${rec.nearby}", "chargers"),
               const SizedBox(width: 8),
-              _metric(
-                "UTILIZATION",
-                "${(utilization * 100).toInt()}%",
-                "predicted",
-              ),
+              _metric("UTILIZATION", "${(rec.utilization * 100).toInt()}%", "predicted"),
             ],
           ),
-
           const SizedBox(height: 18),
-
-          // Confidence
-          _buildConfidence(confidence),
-
+          _buildConfidence(rec.confidence),
           const SizedBox(height: 20),
-
-          if (status == "pending")
-            _buildActionButtons(recommendation)
+          if (isMutating)
+            const Center(
+              child: SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(strokeWidth: 2, color: cyan),
+              ),
+            )
+          else if (rec.status == "pending")
+            _buildActionButtons(rec)
           else
-            _buildCompletedState(status),
+            _buildCompletedState(rec.status),
         ],
       ),
     );
   }
-
-  // ------------------------------------------------------------
-  // INFO ROW
-  // ------------------------------------------------------------
 
   Widget _infoRow(
     IconData icon,
@@ -375,19 +419,12 @@ class _AiRecommendationsScreenState
   }) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: Colors.white38,
-          size: 18,
-        ),
+        Icon(icon, color: Colors.white38, size: 18),
         const SizedBox(width: 11),
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(
-              color: Colors.white54,
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: Colors.white54, fontSize: 11),
           ),
         ),
         Text(
@@ -402,28 +439,17 @@ class _AiRecommendationsScreenState
     );
   }
 
-  // ------------------------------------------------------------
-  // METRIC
-  // ------------------------------------------------------------
-
-  Widget _metric(
-    String label,
-    String value,
-    String subtitle,
-  ) {
+  Widget _metric(String label, String value, String subtitle) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(.035),
           borderRadius: BorderRadius.circular(11),
-          border: Border.all(
-            color: Colors.white.withOpacity(.04),
-          ),
+          border: Border.all(color: Colors.white.withOpacity(.04)),
         ),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
@@ -445,10 +471,7 @@ class _AiRecommendationsScreenState
             const SizedBox(height: 2),
             Text(
               subtitle,
-              style: const TextStyle(
-                color: Colors.white38,
-                fontSize: 8,
-              ),
+              style: const TextStyle(color: Colors.white38, fontSize: 8),
             ),
           ],
         ),
@@ -456,23 +479,15 @@ class _AiRecommendationsScreenState
     );
   }
 
-  // ------------------------------------------------------------
-  // CONFIDENCE
-  // ------------------------------------------------------------
-
   Widget _buildConfidence(double confidence) {
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             const Text(
               "AI Confidence",
-              style: TextStyle(
-                color: Colors.white60,
-                fontSize: 10,
-              ),
+              style: TextStyle(color: Colors.white60, fontSize: 10),
             ),
             const Spacer(),
             Text(
@@ -492,23 +507,14 @@ class _AiRecommendationsScreenState
             value: confidence,
             minHeight: 5,
             backgroundColor: Colors.white10,
-            valueColor:
-                const AlwaysStoppedAnimation<Color>(
-              green,
-            ),
+            valueColor: const AlwaysStoppedAnimation<Color>(green),
           ),
         ),
       ],
     );
   }
 
-  // ------------------------------------------------------------
-  // ACTION BUTTONS
-  // ------------------------------------------------------------
-
-  Widget _buildActionButtons(
-    Map<String, dynamic> recommendation,
-  ) {
+  Widget _buildActionButtons(Recommendation rec) {
     return Column(
       children: [
         SizedBox(
@@ -520,64 +526,34 @@ class _AiRecommendationsScreenState
               foregroundColor: Colors.black,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onPressed: () {
-              setState(() {
-                recommendation["status"] =
-                    "accepted";
-              });
-
-              _showMessage(
-                "Recommendation accepted",
-                green,
-              );
-            },
-            icon: const Icon(
-              Icons.check_rounded,
-              size: 18,
-            ),
+            onPressed: () => _handleStatusUpdate(rec, "accepted"),
+            icon: const Icon(Icons.check_rounded, size: 18),
             label: const Text(
               "ACCEPT RECOMMENDATION",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
             ),
           ),
         ),
-
         const SizedBox(height: 9),
-
         Row(
           children: [
             Expanded(
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white70,
-                  side: const BorderSide(
-                    color: Colors.white12,
-                  ),
-                  minimumSize:
-                      const Size.fromHeight(44),
+                  side: const BorderSide(color: Colors.white12),
+                  minimumSize: const Size.fromHeight(44),
                   shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(11),
+                    borderRadius: BorderRadius.circular(11),
                   ),
                 ),
-                onPressed: () {
-                  _showEditDialog(
-                    recommendation,
-                  );
-                },
+                onPressed: () => _showEditDialog(rec),
                 child: const Text(
                   "EDIT",
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -586,33 +562,16 @@ class _AiRecommendationsScreenState
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: red,
-                  side: BorderSide(
-                    color: red.withOpacity(.25),
-                  ),
-                  minimumSize:
-                      const Size.fromHeight(44),
+                  side: BorderSide(color: red.withOpacity(.25)),
+                  minimumSize: const Size.fromHeight(44),
                   shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(11),
+                    borderRadius: BorderRadius.circular(11),
                   ),
                 ),
-                onPressed: () {
-                  setState(() {
-                    recommendation["status"] =
-                        "rejected";
-                  });
-
-                  _showMessage(
-                    "Recommendation rejected",
-                    red,
-                  );
-                },
+                onPressed: () => _handleStatusUpdate(rec, "rejected"),
                 child: const Text(
                   "REJECT",
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -622,13 +581,8 @@ class _AiRecommendationsScreenState
     );
   }
 
-  // ------------------------------------------------------------
-  // STATUS
-  // ------------------------------------------------------------
-
   Widget _statusBadge(String status) {
     Color color;
-
     switch (status) {
       case "accepted":
         color = green;
@@ -644,10 +598,7 @@ class _AiRecommendationsScreenState
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(.08),
         borderRadius: BorderRadius.circular(8),
@@ -700,16 +651,9 @@ class _AiRecommendationsScreenState
     );
   }
 
-  // ------------------------------------------------------------
-  // EDIT DIALOG
-  // ------------------------------------------------------------
-
-  void _showEditDialog(
-    Map<String, dynamic> recommendation,
-  ) {
-    final TextEditingController priceController =
-        TextEditingController(
-      text: recommendation["price"].toString(),
+  void _showEditDialog(Recommendation rec) {
+    final TextEditingController priceController = TextEditingController(
+      text: rec.price.toStringAsFixed(0),
     );
 
     showDialog(
@@ -729,37 +673,26 @@ class _AiRecommendationsScreenState
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 "Suggested price",
-                style: TextStyle(
-                  color: Colors.white60,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.white60, fontSize: 12),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: priceController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(
-                  color: Colors.white,
-                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   prefixText: "₹ ",
-                  prefixStyle: const TextStyle(
-                    color: cyan,
-                  ),
+                  prefixStyle: const TextStyle(color: cyan),
                   suffixText: "/kWh",
-                  suffixStyle: const TextStyle(
-                    color: Colors.white38,
-                  ),
+                  suffixStyle: const TextStyle(color: Colors.white38),
                   filled: true,
                   fillColor: Colors.white10,
                   border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
                   ),
                 ),
@@ -768,14 +701,8 @@ class _AiRecommendationsScreenState
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(context),
-              child: const Text(
-                "CANCEL",
-                style: TextStyle(
-                  color: Colors.white54,
-                ),
-              ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text("CANCEL", style: TextStyle(color: Colors.white54)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -783,31 +710,15 @@ class _AiRecommendationsScreenState
                 foregroundColor: Colors.black,
               ),
               onPressed: () {
-                final newPrice = double.tryParse(
-                  priceController.text,
-                );
-
-                if (newPrice != null) {
-                  setState(() {
-                    recommendation["price"] =
-                        newPrice;
-                    recommendation["status"] =
-                        "edited";
-                  });
-                }
-
+                final newPrice = double.tryParse(priceController.text);
                 Navigator.pop(context);
-
-                _showMessage(
-                  "Recommendation updated",
-                  amber,
-                );
+                if (newPrice != null) {
+                  _handleStatusUpdate(rec, "edited", newPrice: newPrice);
+                }
               },
               child: const Text(
                 "SAVE",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -816,10 +727,6 @@ class _AiRecommendationsScreenState
     );
   }
 
-  // ------------------------------------------------------------
-  // HOW IT WORKS
-  // ------------------------------------------------------------
-
   Widget _buildHowItWorks() {
     return Container(
       width: double.infinity,
@@ -827,13 +734,10 @@ class _AiRecommendationsScreenState
       decoration: BoxDecoration(
         color: panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(.05),
-        ),
+        border: Border.all(color: Colors.white.withOpacity(.05)),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             "How AI decides",
@@ -866,23 +770,14 @@ class _AiRecommendationsScreenState
     );
   }
 
-  Widget _reasonRow(
-    IconData icon,
-    String title,
-    String subtitle,
-  ) {
+  Widget _reasonRow(IconData icon, String title, String subtitle) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: cyan,
-          size: 19,
-        ),
+        Icon(icon, color: cyan, size: 19),
         const SizedBox(width: 11),
         Expanded(
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
@@ -895,10 +790,7 @@ class _AiRecommendationsScreenState
               const SizedBox(height: 3),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  color: Colors.white38,
-                  fontSize: 10,
-                ),
+                style: const TextStyle(color: Colors.white38, fontSize: 10),
               ),
             ],
           ),
@@ -907,31 +799,15 @@ class _AiRecommendationsScreenState
     );
   }
 
-  // ------------------------------------------------------------
-  // HELPERS
-  // ------------------------------------------------------------
-
-  void _showMessage(
-    String message,
-    Color color,
-  ) {
+  void _showMessage(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: panel,
         content: Row(
           children: [
-            Icon(
-              Icons.check_circle,
-              color: color,
-              size: 19,
-            ),
+            Icon(Icons.check_circle, color: color, size: 19),
             const SizedBox(width: 10),
-            Text(
-              message,
-              style: const TextStyle(
-                color: Colors.white,
-              ),
-            ),
+            Text(message, style: const TextStyle(color: Colors.white)),
           ],
         ),
       ),
