@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../../widgets/holographic_ev.dart';
+import '../shell/main_screen_screen.dart';
 
 enum AccountRole { user, business }
 
@@ -187,11 +188,11 @@ class _AuthPanelState extends State<_AuthPanel> {
   if (!(_form.currentState?.validate() ?? false)) return;
 
   if (widget.role == AccountRole.business) {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => DashboardScreen(),
-      ),
-    );
+    Navigator.pushAndRemoveUntil(
+  context,
+  MaterialPageRoute(builder: (_) => const MainShellScreen()),
+  (route) => false,
+);
   } else {
     // TODO: Navigate to driver dashboard
     ScaffoldMessenger.of(context).showSnackBar(
