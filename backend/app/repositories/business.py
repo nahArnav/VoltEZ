@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.base import BaseRepository
-from app.models.business import Business
+from database.models.business import Business
 from app.schemas.business import BusinessCreate, BusinessUpdate
 
 

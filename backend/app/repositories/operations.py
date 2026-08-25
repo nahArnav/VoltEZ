@@ -1,13 +1,15 @@
+from app.schemas.enums import ChargerStatus
+from uuid import UUID
 from typing import List,Optional
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from app.repositories.base import BaseRepository
-from app.models.notification import Notification
-from app.models.charger_status_event import ChargerStatusEvent
-from app.models.demand_history import DemandHistory
-from app.models.ml_prediction import MLPrediction
+from database.models.notification import Notification
+from database.models.charger_status_event import ChargerStatusEvent
+from database.models.demand_history import DemandHistory
+from database.models.ml_prediction import MLPrediction
 
 from app.schemas.notification import NotificationCreate, NotificationUpdate
 from app.schemas.charger_status_event import ChargerStatusEventCreate
@@ -23,11 +25,11 @@ class RepositoryNotification(BaseRepository[Notification, NotificationCreate, No
         return list(result.scalars().all())
 
 class RepositoryChargerStatusEvent(BaseRepository[ChargerStatusEvent, ChargerStatusEventCreate, EmptyUpdate]):
-    async def get_latest_for_charger(self, db: AsyncSession, charger_id: int) -> Optional[ChargerStatusEvent]:
+    async def get_latest_for_charger(self, db: AsyncSession, charger_id: UUID) -> Optional[ChargerStatusEvent]:
         result = await db.execute(
             select(ChargerStatusEvent)
             .where(ChargerStatusEvent.charger_id == charger_id)
-            .order_by(desc(ChargerStatusEvent.observed_at))
+            .order_by(desc(ChargerStatusEvent.created_at))
             .limit(1)
         )
         return result.scalar_one_or_none()

@@ -1,15 +1,16 @@
+from app.schemas.enums import BookingStatus
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 import razorpay
 
 from app.db.session import get_db
-from app.models.user import User
+from database.models.user import User
 from app.api.v1.deps import get_current_user
 from app.schemas.payment import PaymentCreate, PaymentResponse
 from app.repositories.payment import payment_repo
 from app.repositories.booking import booking_repo
-from app.models.booking import BookingStatus
+
 from app.core.config import settings
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
@@ -101,9 +102,9 @@ async def razorpay_webhook(
             
             # 2. Transition the booking status to CONFIRMED so the driver can check-in
             # Cast payment.booking_id to int to satisfy Pylance
-            booking_id = int(str(payment.booking_id))
+            booking_id = payment.booking_id
             booking = await booking_repo.get(db, id=booking_id)
-            if booking and (booking.status == BookingStatus.PAYMENT_PENDING.value or booking.status == BookingStatus.HELD.value):  # type: ignore
+            if booking and (booking.status == BookingStatus.HELD.value):
                 setattr(booking, "status", BookingStatus.CONFIRMED.value)
                 db.add(booking)
                 await db.commit()

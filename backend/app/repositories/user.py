@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.base import BaseRepository
-from app.models.user import User
+from database.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
 
 

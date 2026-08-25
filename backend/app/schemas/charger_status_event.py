@@ -1,3 +1,5 @@
+from app.schemas.enums import ChargerStatus
+from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
@@ -12,7 +14,7 @@ class ChargerStatusEventBase(BaseModel):
 
 # Properties received from an API call (e.g., driver taps "Report Broken")
 class ChargerStatusEventCreate(ChargerStatusEventBase):
-    charger_id: int
+    charger_id: UUID
     port_id: Optional[int] = Field(default=None, description="Optional: specific port ID if known")
     observed_at: Optional[datetime] = Field(
         default=None, 
@@ -22,8 +24,8 @@ class ChargerStatusEventCreate(ChargerStatusEventBase):
 
 # Properties returned to the client/dashboard
 class ChargerStatusEventResponse(ChargerStatusEventBase):
-    id: int
-    charger_id: int
+    id: UUID
+    charger_id: UUID
     port_id: Optional[int] = None
     observed_at: datetime
     created_at: datetime

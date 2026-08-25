@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
 class CheckInRequest(BaseModel):
     """Driver has arrived at the charger and is checking in."""
-    booking_id: int
+    booking_id: UUID
 
 
 class CompleteSessionRequest(BaseModel):
@@ -27,7 +28,7 @@ class CompleteSessionRequest(BaseModel):
 @router.post("/check-in", response_model=ChargingSessionResponse, status_code=status.HTTP_201_CREATED)
 async def check_in(
     request: CheckInRequest,
-    user_id: int = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -42,8 +43,8 @@ async def check_in(
 
 @router.post("/{session_id}/start", response_model=ChargingSessionResponse)
 async def start_charging(
-    session_id: int,
-    user_id: int = Depends(get_current_user_id),
+    session_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -58,9 +59,9 @@ async def start_charging(
 
 @router.post("/{session_id}/complete", response_model=ChargingSessionResponse)
 async def complete_session(
-    session_id: int,
+    session_id: UUID,
     request: CompleteSessionRequest,
-    user_id: int = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """

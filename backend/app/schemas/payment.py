@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, Optional
 from datetime import datetime
@@ -21,7 +22,7 @@ class PaymentBase(BaseModel):
 
 # Properties for internal creation when a checkout session begins
 class PaymentCreate(PaymentBase):
-    booking_id: int
+    booking_id: UUID
 
 
 # Properties for webhook updates (when the gateway confirms payment)
@@ -33,8 +34,8 @@ class PaymentUpdate(BaseModel):
 
 # Properties returned to the client (e.g., for receipt rendering)
 class PaymentResponse(PaymentBase):
-    id: int
-    booking_id: int
+    id: UUID
+    booking_id: UUID
     verified_at: Optional[datetime] = None
     created_at: datetime
 

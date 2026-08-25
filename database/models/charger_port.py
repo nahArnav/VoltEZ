@@ -1,4 +1,5 @@
 from uuid import uuid4
+import sqlalchemy
 
 from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
@@ -57,3 +58,5 @@ class ChargerPort(Base):
         nullable=False,
         default=True,
     )
+
+    charger = sqlalchemy.orm.relationship("Charger", back_populates="ports", lazy="selectin")

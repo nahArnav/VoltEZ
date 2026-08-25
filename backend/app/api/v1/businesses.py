@@ -1,9 +1,11 @@
+from app.schemas.enums import UserRole
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.db.session import get_db
-from app.models.user import User, UserRole
+from database.models.user import User
 from app.schemas.business import BusinessCreate, BusinessUpdate, BusinessResponse
 from app.api.v1.deps import get_current_user, require_role
 from app.repositories.business import business_repo
@@ -12,7 +14,7 @@ router = APIRouter(prefix="/businesses", tags=["Businesses"])
 
 @router.get("/", response_model=List[BusinessResponse])
 async def list_businesses(
-    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     """List all businesses for the current owner."""
@@ -23,7 +25,7 @@ async def list_businesses(
 @router.post("/", response_model=BusinessResponse, status_code=status.HTTP_201_CREATED)
 async def create_business(
     business_in: BusinessCreate,
-    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     """Register a new business."""
@@ -48,7 +50,7 @@ async def create_business(
 
 @router.get("/{business_id}", response_model=BusinessResponse)
 async def get_business(
-    business_id: int,
+    business_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -60,9 +62,9 @@ async def get_business(
 
 @router.patch("/{business_id}", response_model=BusinessResponse)
 async def update_business(
-    business_id: int,
+    business_id: UUID,
     business_in: BusinessUpdate,
-    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     business = await business_repo.get(db, id=business_id)
@@ -74,8 +76,8 @@ async def update_business(
 
 @router.delete("/{business_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_business(
-    business_id: int,
-    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    business_id: UUID,
+    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     business = await business_repo.get(db, id=business_id)

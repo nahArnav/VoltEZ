@@ -1,13 +1,14 @@
+from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from app.repositories.base import BaseRepository
-from app.models.payment import Payment
+from database.models.payment import Payment
 from app.schemas.payment import PaymentCreate, PaymentUpdate
 
 class RepositoryPayment(BaseRepository[Payment, PaymentCreate, PaymentUpdate]):
-    async def get_by_booking(self, db: AsyncSession, booking_id: int) -> Optional[Payment]:
+    async def get_by_booking(self, db: AsyncSession, booking_id: UUID) -> Optional[Payment]:
         """Fetch payment by booking ID."""
         result = await db.execute(select(Payment).where(Payment.booking_id == booking_id))
         return result.scalars().first()

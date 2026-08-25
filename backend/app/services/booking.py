@@ -1,9 +1,11 @@
+from app.schemas.enums import BookingStatus
+from uuid import UUID
 from datetime import datetime, timezone, timedelta
 from typing import cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.booking import Booking, BookingStatus
-from app.models.booking_event import BookingEvent
+from database.models.booking import Booking
+from database.models.booking_event import BookingEvent
 from app.schemas.booking import BookingCreate
 from app.repositories.booking import booking_repo
 from app.repositories.charger import charger_port_repo
@@ -14,18 +16,15 @@ class BookingService:
 
     # Valid cancellation source statuses (BR-008)
     CANCELLABLE_STATUSES = {
-        BookingStatus.PENDING,
-        BookingStatus.HELD,
-        BookingStatus.PAYMENT_PENDING,
-        BookingStatus.CONFIRMED,
+        BookingStatus.PENDING.HELD.PAYMENT_PENDING.CONFIRMED,
     }
 
     @staticmethod
-    async def create_booking(db: AsyncSession, user_id: int, booking_in: BookingCreate) -> Booking:
+    async def create_booking(db: AsyncSession, user_id: UUID, booking_in: BookingCreate) -> Booking:
         """Business logic for reserving a charger port."""
 
         # 1. Verify the port actually exists
-        port = await charger_port_repo.get(db, id=booking_in.port_id)
+        port = await charger_port_repo.get(db, id=booking_in.charger_port_id)
         if not port:
             raise NotFoundError(resource="ChargerPort")
 
@@ -40,7 +39,7 @@ class BookingService:
         # 3. Prevent Double-Bookings (Time Conflict Check)
         current_time = datetime.now(timezone.utc)
         active_bookings = await booking_repo.get_active_by_port(
-            db, port_id=cast(int, port.id), current_time=current_time
+            db, charger_port_id=port.id, current_time=current_time
         )
 
         for existing_booking in active_bookings:
@@ -81,7 +80,7 @@ class BookingService:
         return db_booking
 
     @staticmethod
-    async def cancel_booking(db: AsyncSession, booking_id: int, user_id: int) -> Booking:
+    async def cancel_booking(db: AsyncSession, booking_id: UUID, user_id: UUID) -> Booking:
         """Business logic for canceling a booking."""
         booking = await booking_repo.get(db, id=booking_id)
 
@@ -89,11 +88,11 @@ class BookingService:
             raise NotFoundError(resource="Booking")
 
         # Ensure a user is only canceling THEIR OWN booking
-        booking_user_id = cast(int, booking.user_id)
+        booking_user_id = booking.user_id
         if booking_user_id != user_id:
             raise ForbiddenError(message="Not authorized to cancel this booking.")
 
-        booking_status = cast(BookingStatus, booking.status)
+        booking_status = cast(booking.status)
         if booking_status not in BookingService.CANCELLABLE_STATUSES:
             raise BadRequestError(
                 message=f"Cannot cancel a booking that is {booking_status.value}.",
@@ -101,7 +100,7 @@ class BookingService:
             )
 
         old_status = booking_status.value
-        setattr(booking, "status", BookingStatus.CANCELLED)
+        setattr(booking, "status".CANCELLED)
         db.add(booking)
 
         # Write audit event (BR-009)

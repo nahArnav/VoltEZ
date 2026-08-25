@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+import sqlalchemy
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, UUID, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -78,4 +79,11 @@ class Vehicle(Base):
 
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
+    )
+
+    connector_types = sqlalchemy.orm.relationship(
+        "ConnectorType",
+        secondary="app.vehicle_connectors",
+        backref="vehicles",
+        lazy="selectin"
     )

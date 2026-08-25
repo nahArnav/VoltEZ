@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/ws", tags=["WebSockets"])
 @router.websocket("/{user_id}")
 async def websocket_endpoint(
     websocket: WebSocket, 
-    user_id: int,
+    user_id: UUID,
     # In a real app we'd validate the WS token:
     # current_user = Depends(get_current_user_ws)
 ):

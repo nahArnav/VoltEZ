@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, status, Request
 from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
 async def create_booking(
     request: Request,
     booking_in: BookingCreate,
-    user_id: int = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -25,7 +26,7 @@ async def create_booking(
     
     # Step 2.2: Implement atomic Redis hold locking with a 10-minute TTL
     # The lock key is scoped to the exact port and time slot to prevent UI double-booking
-    lock_key = f"hold:port:{booking_in.port_id}:{int(booking_in.start_at.timestamp())}:{int(booking_in.end_at.timestamp())}"
+    lock_key = f"hold:port:{booking_in.charger_port_id}:{int(booking_in.start_at.timestamp())}:{int(booking_in.end_at.timestamp())}"
     
     # SET NX with 10 minutes (600 seconds) TTL
     acquired = await redis.set(lock_key, str(user_id), nx=True, ex=600)
@@ -57,8 +58,8 @@ async def create_booking(
 
 @router.post("/{booking_id}/cancel", response_model=BookingResponse)
 async def cancel_booking(
-    booking_id: int,
-    user_id: int = Depends(get_current_user_id),
+    booking_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """

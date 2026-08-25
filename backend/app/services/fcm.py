@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
@@ -11,7 +12,7 @@ class FCMService:
     @staticmethod
     async def send_push_notification(
         db: AsyncSession, 
-        user_id: int, 
+        user_id: UUID, 
         title: str, 
         body: str, 
         payload: dict | None = None

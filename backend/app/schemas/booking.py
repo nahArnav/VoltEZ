@@ -1,7 +1,9 @@
+from app.schemas.enums import BookingStatus
+from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 from typing import Literal, Optional, Dict, Any
 from datetime import datetime, timezone
-from app.models.booking import BookingStatus
+
 
 
 # Shared properties
@@ -24,7 +26,7 @@ class BookingBase(BaseModel):
 
 # Properties to receive via API on booking creation
 class BookingCreate(BookingBase):
-    port_id: int
+    charger_port_id: UUID
     vehicle_id: Optional[int] = None
     idempotency_key: Optional[str] = Field(
         default=None, 
@@ -40,10 +42,10 @@ class BookingStatusUpdate(BaseModel):
 
 # Properties to return to client
 class BookingResponse(BookingBase):
-    id: int
-    user_id: int
+    id: UUID
+    user_id: UUID
     vehicle_id: Optional[int] = None
-    port_id: int
+    charger_port_id: UUID
     status: BookingStatus
     hold_expires_at: Optional[datetime] = None
     quote_snapshot: Optional[Dict[str, Any]] = None

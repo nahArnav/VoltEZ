@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -11,7 +12,7 @@ class NotificationBase(BaseModel):
 
 
 class NotificationCreate(NotificationBase):
-    user_id: int
+    user_id: UUID
 
 
 class NotificationUpdate(BaseModel):
@@ -20,8 +21,8 @@ class NotificationUpdate(BaseModel):
 
 
 class NotificationResponse(NotificationBase):
-    id: int
-    user_id: int
+    id: UUID
+    user_id: UUID
     sent_at: Optional[datetime] = None
     created_at: datetime
 

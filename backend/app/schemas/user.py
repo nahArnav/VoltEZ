@@ -1,7 +1,9 @@
+from app.schemas.enums import UserRole
+from uuid import UUID
 from pydantic import BaseModel, EmailStr
 from typing import Literal, Optional
 from datetime import datetime
-from app.models.user import UserRole
+
 
 
 # Shared properties
@@ -43,7 +45,7 @@ class TokenRefresh(BaseModel):
 
 # Properties to return to client (hides password_hash)
 class UserResponse(UserBase):
-    id: int
+    id: UUID
     role: UserRole
     phone: Optional[str] = None
     verification_status: str

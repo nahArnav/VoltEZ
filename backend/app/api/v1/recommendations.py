@@ -1,9 +1,11 @@
+from app.schemas.enums import UserRole
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
 
 from app.db.session import get_db
-from app.models.user import User, UserRole
+from database.models.user import User
 from app.api.v1.deps import get_current_user, require_role
 from app.schemas.recommendation import RecommendationRequest, RecommendationResponse
 from app.services.recommendation import recommendation_service
@@ -23,8 +25,8 @@ async def get_recommendations(
 
 @router.get("/business/{business_id}")
 async def get_business_recommendations(
-    business_id: int,
-    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    business_id: UUID,
+    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     """

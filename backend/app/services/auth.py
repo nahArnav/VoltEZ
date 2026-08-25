@@ -2,7 +2,7 @@ from typing import Optional, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 
-from app.models.user import User
+from database.models.user import User
 from app.schemas.user import UserCreate
 from app.repositories.user import user_repo
 from app.core.security import hash_password, verify_password

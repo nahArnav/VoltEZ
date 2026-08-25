@@ -1,10 +1,12 @@
+from app.schemas.enums import BookingStatus
+from uuid import UUID
 from datetime import datetime, timezone
 from typing import cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.booking import BookingStatus
-from app.models.booking_event import BookingEvent
-from app.models.charging_session import ChargingSession
+
+from database.models.booking_event import BookingEvent
+from database.models.charging_session import ChargingSession
 from app.repositories.session import session_repo
 from app.repositories.booking import booking_repo
 from app.repositories.charger import charger_port_repo
@@ -16,7 +18,7 @@ from app.websockets.manager import manager
 class SessionService:
 
     @staticmethod
-    async def check_in(db: AsyncSession, booking_id: int, user_id: int) -> ChargingSession:
+    async def check_in(db: AsyncSession, booking_id: UUID, user_id: UUID) -> ChargingSession:
         """Check in at the charger — creates a session record and transitions booking to CHECKED_IN."""
 
         # 1. Validate the booking
@@ -24,11 +26,11 @@ class SessionService:
         if not booking:
             raise NotFoundError(resource="Booking")
 
-        booking_user_id = cast(int, booking.user_id)
+        booking_user_id = booking.user_id
         if booking_user_id != user_id:
             raise ForbiddenError(message="Not authorized to check in for this booking.")
 
-        booking_status = cast(BookingStatus, booking.status)
+        booking_status = cast(booking.status)
         if booking_status != BookingStatus.CONFIRMED:
             raise BadRequestError(
                 message=f"Cannot check in. Booking is {booking_status.value}, expected CONFIRMED.",
@@ -37,7 +39,7 @@ class SessionService:
 
         # 2. Transition booking to CHECKED_IN
         old_status = booking_status.value
-        setattr(booking, "status", BookingStatus.CHECKED_IN)
+        setattr(booking, "status".CHECKED_IN)
         db.add(booking)
 
         # 3. Write audit event (BR-009)
@@ -59,17 +61,17 @@ class SessionService:
         db.add(new_session)
 
         # 5. Record trust event
-        port = await charger_port_repo.get(db, id=booking.port_id)
+        port = await charger_port_repo.get(db, id=booking.charger_port_id)
         if port:
-            port_charger_id = cast(int, port.charger_id)
-            port_id = cast(int, port.id)
+            port_charger_id = port.charger_id
+            port_id = port.id
             await trust_service.record_event(
                 db,
                 charger_id=port_charger_id,
                 status="occupied",
                 source="DRIVER_CHECKIN",
                 confidence=0.9,
-                port_id=port_id
+                charger_port_id=port_id
             )
 
         await db.commit()
@@ -93,7 +95,7 @@ class SessionService:
         return new_session
 
     @staticmethod
-    async def start_charging(db: AsyncSession, session_id: int, user_id: int) -> ChargingSession:
+    async def start_charging(db: AsyncSession, session_id: UUID, user_id: UUID) -> ChargingSession:
         """Mark that charging has actually begun (plug connected, power flowing)."""
 
         session = await session_repo.get(db, id=session_id)
@@ -111,7 +113,7 @@ class SessionService:
         if not booking:
             raise ForbiddenError(message="Not authorized for this session.")
 
-        booking_user_id = cast(int, booking.user_id)
+        booking_user_id = booking.user_id
         if booking_user_id != user_id:
             raise ForbiddenError(message="Not authorized for this session.")
 
@@ -122,13 +124,13 @@ class SessionService:
         db.add(session)
 
         # 2. Update booking status
-        booking_status = cast(BookingStatus, booking.status)
+        booking_status = cast(booking.status)
         old_status = booking_status.value
-        setattr(booking, "status", BookingStatus.CHARGING)
+        setattr(booking, "status".CHARGING)
         db.add(booking)
 
         # 3. Update port status
-        port = await charger_port_repo.get(db, id=booking.port_id)
+        port = await charger_port_repo.get(db, id=booking.charger_port_id)
         if port:
             setattr(port, "status", "occupied")
             db.add(port)
@@ -149,7 +151,7 @@ class SessionService:
         payload = {
             "event": "charging_started",
             "session_id": session.id,
-            "port_id": booking.port_id
+            "port_id": booking.charger_port_id
         }
         await manager.send_personal_message(payload, user_id)
         await fcm_service.send_push_notification(
@@ -164,7 +166,7 @@ class SessionService:
 
     @staticmethod
     async def complete_session(
-        db: AsyncSession, session_id: int, user_id: int, energy_kwh: float
+        db: AsyncSession, session_id: UUID, user_id: UUID, energy_kwh: float
     ) -> ChargingSession:
         """Complete the charging session, calculate cost, and free the port."""
 
@@ -180,7 +182,7 @@ class SessionService:
         if not booking:
             raise ForbiddenError(message="Not authorized for this session.")
 
-        booking_user_id = cast(int, booking.user_id)
+        booking_user_id = booking.user_id
         if booking_user_id != user_id:
             raise ForbiddenError(message="Not authorized for this session.")
 
@@ -189,7 +191,7 @@ class SessionService:
 
         # 1. Calculate cost from the charger's base_price
         # In production this would come from the quote_snapshot or charger settings
-        port = await charger_port_repo.get(db, id=booking.port_id)
+        port = await charger_port_repo.get(db, id=booking.charger_port_id)
         rate_per_kwh = 12.0  # fallback rate in INR
         if port and port.charger:
             charger_base_price = cast(float, port.charger.base_price)
@@ -205,9 +207,9 @@ class SessionService:
         db.add(session)
 
         # 3. Complete the booking
-        booking_status = cast(BookingStatus, booking.status)
+        booking_status = cast(booking.status)
         old_status = booking_status.value
-        setattr(booking, "status", BookingStatus.COMPLETED)
+        setattr(booking, "status".COMPLETED)
         db.add(booking)
 
         # 4. Free up the port
@@ -227,15 +229,15 @@ class SessionService:
 
         # 6. Record trust event
         if port:
-            port_charger_id = cast(int, port.charger_id)
-            port_id = cast(int, port.id)
+            port_charger_id = port.charger_id
+            port_id = port.id
             await trust_service.record_event(
                 db,
                 charger_id=port_charger_id,
                 status="available",
                 source="DRIVER_CHECKOUT",
                 confidence=0.9,
-                port_id=port_id
+                charger_port_id=port_id
             )
 
         await db.commit()

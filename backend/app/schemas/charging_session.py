@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, Optional
 from datetime import datetime
@@ -12,7 +13,7 @@ class ChargingSessionBase(BaseModel):
 
 # Properties received to initiate a session upon arrival/check-in
 class ChargingSessionCreate(BaseModel):
-    booking_id: int
+    booking_id: UUID
     check_in_at: Optional[datetime] = None
 
 
@@ -27,8 +28,8 @@ class ChargingSessionUpdate(BaseModel):
 
 # Properties returned to client
 class ChargingSessionResponse(ChargingSessionBase):
-    id: int
-    booking_id: int
+    id: UUID
+    booking_id: UUID
     check_in_at: Optional[datetime] = None
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None

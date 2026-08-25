@@ -44,6 +44,12 @@ class ChargingSession(Base):
         nullable=False,
     )
 
+    booking_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("app.bookings.id"),
+        nullable=True,
+    )
+
     status: Mapped[str] = mapped_column(
         String(30),
         nullable=False,

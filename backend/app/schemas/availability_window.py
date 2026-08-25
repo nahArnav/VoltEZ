@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 from datetime import datetime
@@ -22,7 +23,7 @@ class AvailabilityWindowBase(BaseModel):
 
 # Properties to receive via API on creation
 class AvailabilityWindowCreate(AvailabilityWindowBase):
-    port_id: int
+    charger_port_id: UUID
 
 
 # Properties to receive via API on update
@@ -44,8 +45,8 @@ class AvailabilityWindowUpdate(BaseModel):
 
 # Properties to return to client
 class AvailabilityWindowResponse(AvailabilityWindowBase):
-    id: int
-    port_id: int
+    id: UUID
+    charger_port_id: UUID
     created_at: datetime
 
     class Config:

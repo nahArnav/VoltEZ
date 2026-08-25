@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 import logging
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models.ml_prediction import MLPrediction
-from app.models.booking import Booking, BookingStatus
-from app.models.charging_session import ChargingSession
+from database.models.ml_prediction import MLPrediction
+from app.schemas.enums import BookingStatus
+from database.models.booking import Booking
+from database.models.charging_session import ChargingSession
 from app.repositories.operations import ml_prediction_repo
 from app.schemas.ml_prediction import MLPredictionCreate
 
@@ -43,7 +45,7 @@ class MLAdapter:
         return prediction
 
     @staticmethod
-    async def predict_demand(db: AsyncSession, charger_id: int) -> dict:
+    async def predict_demand(db: AsyncSession, charger_id: UUID) -> dict:
         """
         Model A: Demand Forecasting
         Baseline heuristic: Peak hours (17-21) and weekends increase demand.
@@ -83,7 +85,7 @@ class MLAdapter:
         }
 
     @staticmethod
-    async def predict_wait_time(db: AsyncSession, charger_id: int, port_id: int) -> dict:
+    async def predict_wait_time(db: AsyncSession, charger_id: UUID, port_id: UUID) -> dict:
         """
         Model B: Wait-time / Occupancy Predictor
         Baseline heuristic: Queue from current active sessions and bookings.
@@ -93,7 +95,7 @@ class MLAdapter:
         # For prototype, if there's a live charging session, assume 30 mins remaining.
         # Heuristic 2: Count currently active or checked-in bookings for this port
         result = await db.execute(
-            select(Booking).where(Booking.port_id == port_id, Booking.status.in_([BookingStatus.CHECKED_IN.value, BookingStatus.CHARGING.value]))
+            select(Booking).where(Booking.charger_port_id == port_id, Booking.status.in_([BookingStatus.CHECKED_IN.value, BookingStatus.CHARGING.value]))
         )
         active_bookings = result.scalars().all()
         

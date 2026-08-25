@@ -15,6 +15,11 @@ from database.models.charging_session import ChargingSession
 from database.models.booking import Booking
 from database.models.charger_search_event import ChargerSearchEvent
 from database.models.charger_search_result import ChargerSearchResult
+from database.models.notification import Notification
+from database.models.review import Review
+from database.models.demand_history import DemandHistory
+from database.models.ml_prediction import MLPrediction
+from database.models.charger_status_event import ChargerStatusEvent
 
 __all__ = [
     "User",
@@ -33,4 +38,9 @@ __all__ = [
     "ChargingSession",
     "Booking",
     "ChargerSearchResult",
+    "Notification",
+    "Review",
+    "DemandHistory",
+    "MLPrediction",
+    "ChargerStatusEvent",
 ]

@@ -2,7 +2,10 @@ import asyncio
 from arq.connections import RedisSettings
 from sqlalchemy import update
 from app.db.session import AsyncSessionLocal
-from app.models.booking import Booking, BookingStatus
+from app.schemas.enums import BookingStatus
+from database.models.booking import Booking
+
+from uuid import UUID
 
 async def expire_unpaid_booking(ctx, booking_id: str):
     """
@@ -14,7 +17,7 @@ async def expire_unpaid_booking(ctx, booking_id: str):
     # 1. Open a quick connection to the database
     async with AsyncSessionLocal() as db:
         # 2. Get the current booking status
-        booking = await db.get(Booking, int(booking_id))
+        booking = await db.get(Booking, UUID(booking_id))
         
         if not booking:
             print(f"❌ [Worker] Booking {booking_id} not found.")

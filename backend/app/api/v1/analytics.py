@@ -1,9 +1,11 @@
+from app.schemas.enums import UserRole
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any
 
 from app.api.v1.deps import get_db, get_current_user
-from app.models.user import User, UserRole
+from database.models.user import User
 from app.repositories.charger import charger_repo
 from app.ml.adapters import ml_adapter
 from pydantic import BaseModel
@@ -11,7 +13,7 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/analytics", tags=["Analytics & Intelligence"])
 
 class RecommendationResponse(BaseModel):
-    charger_id: int
+    charger_id: UUID
     recommended_action: str
     reason_code: str
     expected_demand: float
@@ -20,7 +22,7 @@ class RecommendationResponse(BaseModel):
 
 @router.get("/businesses/{business_id}/recommendations", response_model=List[RecommendationResponse])
 async def get_business_recommendations(
-    business_id: int,
+    business_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -39,10 +41,8 @@ async def get_business_recommendations(
     recommendations = []
     
     for charger in chargers:
-        charger_id_int = int(charger.id)  # type: ignore
-        
         # Call Model A (Demand Forecast)
-        forecast = await ml_adapter.predict_demand(db, charger_id=charger_id_int)
+        forecast = await ml_adapter.predict_demand(db, charger_id=charger.id)
         expected = forecast["expected_demand"]
         confidence = forecast["confidence"]
         
@@ -51,7 +51,7 @@ async def get_business_recommendations(
             # Low demand -> suggest discount
             recommendations.append(
                 RecommendationResponse(
-                    charger_id=charger_id_int,
+                    charger_id=charger.id,
                     recommended_action="Create Availability Window",
                     reason_code="BUSINESS_OFF_PEAK",
                     expected_demand=expected,
@@ -63,7 +63,7 @@ async def get_business_recommendations(
             # High demand -> surge pricing or hold slots
             recommendations.append(
                 RecommendationResponse(
-                    charger_id=charger_id_int,
+                    charger_id=charger.id,
                     recommended_action="Enable Peak Pricing",
                     reason_code="HIGH_DEMAND_LOW_SUPPLY",
                     expected_demand=expected,

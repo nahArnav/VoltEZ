@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
@@ -15,15 +16,15 @@ class ReviewBase(BaseModel):
 
 # Properties received from the driver after a session
 class ReviewCreate(ReviewBase):
-    session_id: int
+    session_id: UUID
     # user_id will be injected by the AuthService token, not the request payload
 
 
 # Properties to return to the client (e.g., when viewing a charger's reviews)
 class ReviewResponse(ReviewBase):
-    id: int
-    session_id: int
-    user_id: int
+    id: UUID
+    session_id: UUID
+    user_id: UUID
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

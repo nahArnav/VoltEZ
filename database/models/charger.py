@@ -1,6 +1,8 @@
+import uuid
 from uuid import uuid4
 
 from geoalchemy2 import Geometry
+import sqlalchemy
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -34,13 +36,13 @@ class Charger(Base):
     {"schema": "app"},
     )
 
-    id: Mapped[UUID] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid4,
     )
 
-    business_id: Mapped[UUID] = mapped_column(
+    business_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("app.businesses.id"),
         nullable=False,
@@ -104,3 +106,11 @@ class Charger(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    
+    reliability_score: Mapped[float] = mapped_column(
+        Numeric(5, 2),
+        default=100.0,
+        nullable=False,
+    )
+
+    ports = sqlalchemy.orm.relationship("ChargerPort", back_populates="charger", lazy="selectin")

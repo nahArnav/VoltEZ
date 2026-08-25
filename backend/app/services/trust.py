@@ -1,7 +1,9 @@
+from app.schemas.enums import ChargerStatus
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, cast
 
-from app.models.charger_status_event import ChargerStatusEvent
+from database.models.charger_status_event import ChargerStatusEvent
 from app.repositories.charger import charger_repo
 
 
@@ -9,7 +11,7 @@ class TrustService:
     @staticmethod
     async def record_event(
         db: AsyncSession,
-        charger_id: int,
+        charger_id: UUID,
         status: str,
         source: str,
         confidence: float,

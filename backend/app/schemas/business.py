@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -29,8 +30,8 @@ class BusinessUpdate(BaseModel):
 
 # Properties to return to client
 class BusinessResponse(BusinessBase):
-    id: int
-    owner_id: int
+    id: UUID
+    owner_id: UUID
     verification_status: str
     created_at: datetime
     updated_at: datetime

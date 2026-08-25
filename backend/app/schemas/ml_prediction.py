@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
@@ -24,7 +25,7 @@ class MLPredictionCreate(MLPredictionBase):
 
 # Properties returned to the client or analytics dashboard
 class MLPredictionResponse(MLPredictionBase):
-    id: int
+    id: UUID
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

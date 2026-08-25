@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field
 from typing import Literal, Optional, List
 from datetime import datetime
@@ -15,7 +16,7 @@ class ChargerBase(BaseModel):
 
 # Properties to receive via API on creation
 class ChargerCreate(ChargerBase):
-    business_id: int
+    business_id: UUID
     latitude: float = Field(..., ge=-90.0, le=90.0)
     longitude: float = Field(..., ge=-180.0, le=180.0)
 
@@ -33,8 +34,8 @@ class ChargerUpdate(BaseModel):
 
 # Properties to return to client
 class ChargerResponse(ChargerBase):
-    id: int
-    business_id: int
+    id: UUID
+    business_id: UUID
     reliability_score: float = Field(..., ge=0.0, le=1.0)
     created_at: datetime
     updated_at: datetime

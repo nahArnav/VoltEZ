@@ -1,3 +1,5 @@
+from app.schemas.enums import UserRole
+from uuid import UUID
 from typing import List
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.schemas.charger import ChargerCreate, ChargerResponse
 from app.services.charger import charger_service
-from app.models.user import User, UserRole
+from database.models.user import User
 from app.api.v1.deps import require_role
 
 router = APIRouter(prefix="/chargers", tags=["Chargers"])
@@ -14,7 +16,7 @@ router = APIRouter(prefix="/chargers", tags=["Chargers"])
 @router.post("/", response_model=ChargerResponse, status_code=status.HTTP_201_CREATED)
 async def create_charger(
     charger_in: ChargerCreate,
-    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -46,8 +48,8 @@ async def get_nearby_chargers(
 
 @router.post("/{charger_id}/report-issue", status_code=status.HTTP_204_NO_CONTENT)
 async def report_charger_issue(
-    charger_id: int,
-    current_user: User = Depends(require_role(UserRole.DRIVER, UserRole.ADMIN, UserRole.OWNER)),
+    charger_id: UUID,
+    current_user: User = Depends(require_role(UserRole.DRIVER.ADMIN.OWNER)),
     db: AsyncSession = Depends(get_db),
 ):
     """

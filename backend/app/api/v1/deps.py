@@ -1,9 +1,11 @@
+from app.schemas.enums import UserRole
 """
 Shared FastAPI dependencies for authentication and authorization.
 
 Used across all route files — never duplicate these in individual routers.
 """
 
+from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,20 +14,20 @@ from jose import JWTError
 from app.db.session import get_db
 from app.core.security import decode_access_token
 from app.repositories.user import user_repo
-from app.models.user import User, UserRole
+from database.models.user import User
 
 # Looks for "Authorization: Bearer <token>" in the request header
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
+async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> UUID:
     """Extract and validate user ID from JWT access token."""
     try:
         payload = decode_access_token(token)
         user_id = payload.get("sub")
         if user_id is None:
             raise JWTError("Missing subject")
-        return int(user_id)
+        return UUID(user_id)
     except (JWTError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -35,7 +37,7 @@ async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
 
 
 async def get_current_user(
-    user_id: int = Depends(get_current_user_id),
+    user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Fetch the full User object for the authenticated user."""
@@ -53,7 +55,7 @@ def require_role(*roles: UserRole):
     Dependency factory: ensures the current user has one of the required roles.
 
     Usage:
-        current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN))
+        current_user: User = Depends(require_role(UserRole.OWNER.ADMIN))
     """
     async def _check_role(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in roles:

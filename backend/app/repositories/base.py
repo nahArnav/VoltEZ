@@ -1,8 +1,9 @@
+from uuid import UUID
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
-from app.models.base import Base
+from database.base_class import Base
 
 # Define Generic Type Variables
 ModelType = TypeVar("ModelType", bound=Base)
@@ -69,7 +70,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         await db.refresh(db_obj)
         return db_obj
 
-    async def remove(self, db: AsyncSession, *, id: int) -> Optional[ModelType]:
+    async def remove(self, db: AsyncSession, *, id: UUID) -> Optional[ModelType]:
         """Delete a record by its ID."""
         obj = await self.get(db=db, id=id)
         if obj:

@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -22,7 +23,7 @@ class DemandHistoryCreate(DemandHistoryBase):
 
 # Properties returned for ML extraction or admin dashboards
 class DemandHistoryResponse(DemandHistoryBase):
-    id: int
+    id: UUID
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

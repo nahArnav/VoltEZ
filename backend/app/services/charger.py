@@ -1,9 +1,10 @@
+from uuid import UUID
 from typing import List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from geoalchemy2 import Geometry as GeometryType
 
-from app.models.charger import Charger
+from database.models.charger import Charger
 from app.schemas.charger import ChargerCreate
 from app.repositories.business import business_repo
 from app.core.errors import NotFoundError
@@ -12,7 +13,7 @@ from app.core.errors import NotFoundError
 class ChargerService:
 
     @staticmethod
-    async def create_charger(db: AsyncSession, business_id: int, charger_in: ChargerCreate) -> Charger:
+    async def create_charger(db: AsyncSession, business_id: UUID, charger_in: ChargerCreate) -> Charger:
         """Business logic for creating a new charger with spatial data."""
 
         # 1. Ensure the business (location) actually exists first

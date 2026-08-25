@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 from datetime import datetime
@@ -19,8 +20,8 @@ class ChargerPortUpdate(BaseModel):
 
 # Properties to return to client
 class ChargerPortResponse(ChargerPortBase):
-    id: int
-    charger_id: int
+    id: UUID
+    charger_id: UUID
     status: str
     created_at: datetime
 
