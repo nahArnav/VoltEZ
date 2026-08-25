@@ -189,7 +189,7 @@ class _AuthPanelState extends State<_AuthPanel> {
   if (widget.role == AccountRole.business) {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => const DashboardScreen(),
+        builder: (_) => DashboardScreen(),
       ),
     );
   } else {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/ai_copilot_drawer.dart';
-import 'recommendation_model.dart';
-import 'recommendation_service.dart';
+import '../../models/recommendation.dart';
+import '../../services/recommendation_services.dart';
 
 class AiRecommendationsScreen extends StatefulWidget {
   const AiRecommendationsScreen({super.key});
