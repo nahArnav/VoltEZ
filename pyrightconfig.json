@@ -3,13 +3,13 @@
         {
             "root": "scripts",
             "extraPaths": [
-                "services/api"
+                "backend"
             ]
         },
         {
-            "root": "services/api",
+            "root": "backend",
             "extraPaths": [
-                "services/api"
+                "backend"
             ]
         }
     ]

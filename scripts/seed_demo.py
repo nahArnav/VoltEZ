@@ -2,10 +2,10 @@
 VoltEZ Demo Seed Script
 
 Creates deterministic demo data for hackathon presentations.
-Run from the services/api directory:
+Run from the backend directory:
     python -m scripts.seed_demo
 Or from project root:
-    cd services/api && python ../../scripts/seed_demo.py
+    cd backend && python ../../scripts/seed_demo.py
 
 Prerequisites:
     - PostgreSQL with PostGIS running (docker compose up -d)
@@ -18,7 +18,7 @@ import os
 import random
 from datetime import datetime, timedelta, timezone
 
-# Add the services/api directory to the path so we can import app modules
+# Add the backend directory to the path so we can import app modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "services", "api"))
 
 from sqlalchemy import text

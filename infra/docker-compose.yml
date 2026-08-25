@@ -2,13 +2,13 @@ version: "3.9"
 
 services:
   api:
-    build: ../services/api  # <--- Goes up one level, then into services/api
+    build: ../backend  # <--- Goes up one level, then into backend
     container_name: voltez-api
     restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
-      - ../services/api:/app  # <--- Goes up one level, then into services/api
+      - ../backend:/app  # <--- Goes up one level, then into backend
     environment:
       - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/voltez
       - REDIS_URL=redis://redis:6379/0

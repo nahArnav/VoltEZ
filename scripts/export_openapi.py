@@ -2,8 +2,8 @@ import json
 import sys
 import os
 
-# Add services/api to PYTHONPATH so we can import the app
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../services/api"))
+# Add backend to PYTHONPATH so we can import the app
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../backend"))
 
 from app.main import app
 from fastapi.openapi.utils import get_openapi
