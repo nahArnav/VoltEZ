@@ -1,4 +1,4 @@
-package io.voltlez.voltez_frontend
+package com.voltez.app
 
 import io.flutter.embedding.android.FlutterActivity
 

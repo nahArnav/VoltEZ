@@ -21,6 +21,10 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+ios/Flutter/Secrets.xcconfig
+android/key.properties
+*.jks
+*.keystore
 
 # Python caches
 __pycache__/

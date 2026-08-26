@@ -1,11 +1,11 @@
 {
-    "name": "voltez_frontend",
-    "short_name": "voltez_frontend",
+    "name": "VoltEZ",
+    "short_name": "VoltEZ",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Smart EV charging discovery, booking and intelligence.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

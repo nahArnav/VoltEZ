@@ -18,6 +18,13 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    # Quarantined pre-merge UI architecture. The production entrypoint uses
+    # lib/core + lib/features; these files remain only as design references.
+    - lib/screens/**
+    - lib/services/**
+    - lib/providers/**
+    - lib/widgets/**
+    - lib/models/**
 
 linter:
   # The lint rules applied to this project can be customized in the

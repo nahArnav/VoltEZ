@@ -62,7 +62,7 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --strict-config"
 pythonpath = ["src"]
-testpaths = ["tests"]
+testpaths = ["tests", "backend/tests"]
 
 [tool.mypy]
 python_version = "3.12"

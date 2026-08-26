@@ -1,0 +1,39 @@
+.git
+.github
+.dart_tool
+.pytest_cache
+.ruff_cache
+.venv
+
+# Flutter/client sources are built separately from the Python API image.
+android
+ios
+lib
+linux
+macos
+test
+web
+windows
+build
+pubspec.lock
+pubspec.yaml
+analysis_options.yaml
+
+# Training-only data, reports, tests, and local output are not runtime inputs.
+artifacts
+data
+docs
+output
+reports
+backend/tests
+tests
+**/__pycache__
+**/*.pyc
+*.log
+
+# Secrets never belong in an image. Keep templates available in source control.
+.env
+.env.*
+!.env.example
+!backend/.env.example
+
