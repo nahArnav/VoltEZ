@@ -25,6 +25,21 @@ class PaymentCreate(PaymentBase):
     booking_id: UUID
 
 
+class PaymentOrderCreate(BaseModel):
+    """Public create-order contract; amount is always calculated server-side."""
+
+    booking_id: UUID
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class PaymentVerifyRequest(BaseModel):
+    booking_id: UUID
+    provider_order_id: str = Field(..., min_length=1)
+    provider_payment_id: str = Field(..., min_length=1)
+    provider_signature: str = Field(..., min_length=1)
+
+
 # Properties for webhook updates (when the gateway confirms payment)
 class PaymentUpdate(BaseModel):
     status: Optional[str] = None

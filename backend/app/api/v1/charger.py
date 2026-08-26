@@ -44,6 +44,11 @@ async def create_charger(
     Create a new EV charger location.
     Requires OWNER or ADMIN role.
     """
+    business = await business_repo.get(db, id=charger_in.business_id)
+    if business is None or (
+        current_user.role != UserRole.ADMIN and business.owner_id != current_user.id
+    ):
+        raise HTTPException(status_code=404, detail="Business not found")
     charger = await charger_service.create_charger(
         db=db, business_id=charger_in.business_id, charger_in=charger_in
     )

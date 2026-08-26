@@ -24,6 +24,7 @@ async def get_recommendations(
     return await recommendation_service.get_recommendations(
         db,
         request_data,
+        user_id=current_user.id,
         availability_model=getattr(request.app.state, "availability_model", None),
     )
 

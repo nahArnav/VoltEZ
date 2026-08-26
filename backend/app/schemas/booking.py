@@ -1,7 +1,7 @@
 from app.schemas.enums import BookingStatus
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict, model_validator
-from typing import Literal, Optional, Dict, Any
+from typing import Optional
 from datetime import datetime, timezone
 
 # Shared properties for both incoming requests and API responses.
@@ -36,6 +36,9 @@ class BookingResponse(BookingBase):
     user_id: UUID
     charger_port_id: UUID
     status: BookingStatus
+    estimated_amount: float | None = None
+    hold_expires_at: datetime | None = None
+    cancelled_at: datetime | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

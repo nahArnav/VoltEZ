@@ -1,7 +1,6 @@
-from app.schemas.enums import ChargerStatus
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, cast
+from typing import Optional
 from datetime import datetime, timezone
 
 from database.models.charger_status_event import ChargerStatusEvent
@@ -39,9 +38,8 @@ class TrustService:
         # 2. Adjust the reliability score of the charger
         charger = await charger_repo.get(db, id=charger_id)
         if charger:
-            current_score = cast(float, getattr(charger, "reliability_score", 100.0))
-            if current_score is None:
-                current_score = 100.0
+            raw_score = getattr(charger, "reliability_score", 100.0)
+            current_score = float(raw_score) if raw_score is not None else 100.0
             
             # Simple heuristic for No-IoT trust model (Playbook Phase 3)
             if source == "DRIVER_CHECKIN":

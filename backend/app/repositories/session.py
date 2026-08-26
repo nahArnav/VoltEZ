@@ -1,5 +1,5 @@
 from uuid import UUID
-from typing import Optional, Any
+from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,14 @@ class RepositoryChargingSession(BaseRepository[ChargingSession, ChargingSessionC
     async def get_by_booking(self, db: AsyncSession, booking_id: UUID) -> Optional[ChargingSession]:
         result = await db.execute(select(ChargingSession).where(ChargingSession.booking_id == booking_id))
         return result.scalar_one_or_none()
+
+    async def get_by_user(self, db: AsyncSession, user_id: UUID) -> list[ChargingSession]:
+        result = await db.execute(
+            select(ChargingSession)
+            .where(ChargingSession.user_id == user_id)
+            .order_by(ChargingSession.reserved_at.desc())
+        )
+        return list(result.scalars().all())
 
 class RepositoryPayment(BaseRepository[Payment, PaymentCreate, PaymentUpdate]):
     async def get_by_provider_id(self, db: AsyncSession, provider_payment_id: str) -> Optional[Payment]:

@@ -14,6 +14,7 @@ from app.core.errors import NotFoundError, BadRequestError, ForbiddenError
 from app.services.trust import trust_service
 from app.services.fcm import fcm_service
 from app.websockets.manager import manager
+from app.core.config import settings
 
 class SessionService:
 
@@ -186,7 +187,7 @@ class SessionService:
             raise BadRequestError(message="Energy delivered cannot be negative.")
 
         # 1. Calculate cost (pricing should come from another domain)
-        rate_per_kwh = 12.0  # fallback rate in INR
+        rate_per_kwh = settings.DEFAULT_PRICE_PER_KWH_INR
         total_cost = round(energy_kwh * rate_per_kwh, 2)
 
         # 2. Finalize session

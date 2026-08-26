@@ -2,6 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
+import json
 
 from app.websockets.manager import manager
 from app.core.security import decode_access_token
@@ -38,6 +39,14 @@ async def websocket_endpoint(
     try:
         while True:
             data = await websocket.receive_text()
+            try:
+                message = json.loads(data)
+            except json.JSONDecodeError:
+                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
+                continue
+            if message.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
             logger.info(f"Received message from WS user {user_id}: {data}")
     except WebSocketDisconnect:
         manager.disconnect(websocket, user_id)

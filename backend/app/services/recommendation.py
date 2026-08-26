@@ -1,11 +1,13 @@
 import math
 from typing import List, Any
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.recommendation import RecommendationRequest, RecommendationResult, RecommendationResponse
 from app.services.charger import charger_service
 from app.repositories.vehicle import vehicle_repo
 from fastapi import HTTPException
 from app.ml.adapters import ml_adapter
+from app.core.config import settings
 
 
 def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -28,12 +30,13 @@ class RecommendationService:
     async def get_recommendations(
         db: AsyncSession,
         req: RecommendationRequest,
+        user_id: UUID,
         availability_model: Any = None
     ) -> RecommendationResponse:
         
         # 1. Fetch vehicle
         vehicle = await vehicle_repo.get(db, id=req.vehicle_id)
-        if not vehicle:
+        if not vehicle or vehicle.user_id != user_id:
             raise HTTPException(status_code=404, detail="Vehicle not found")
 
         # 2. Get Candidates (spatial search)
@@ -81,11 +84,17 @@ class RecommendationService:
             # Charge-time Math
             required_energy_kwh = veh_battery * max(0.0, req.target_soc - req.current_soc)
             
-            # Find best port power
+            # Find the best active connector that is actually compatible with
+            # the selected vehicle.
+            compatible_connector_ids = {
+                connector.id for connector in getattr(vehicle, "connector_types", [])
+            }
             best_port_kw = 0.0
             best_port_id = None
             for port in charger.ports:
                 if not port.is_active:
+                    continue
+                if compatible_connector_ids and port.connector_type_id not in compatible_connector_ids:
                     continue
                 kw = get_float(port, "max_power_kw")
                 if kw > best_port_kw:
@@ -105,12 +114,12 @@ class RecommendationService:
             ideal_time_hr = required_energy_kwh / effective_power_kw if effective_power_kw > 0 else 99.0
             estimated_charge_min = ideal_time_hr * 60.0 * 1.2  # 1.2 is a taper factor
 
-            # Cost Math (fixed $15/kWh rate instead of non-existent base_price)
-            charger_base_price = 15.0
+            # Cost remains a configured fallback until tariff tables are added.
+            charger_base_price = settings.DEFAULT_PRICE_PER_KWH_INR
             estimated_cost = required_energy_kwh * charger_base_price
             
             # Wait time (ML Model 2)
-            rel_score = get_float(charger, "reliability_score", 0.5)
+            rel_score = max(0.0, min(1.0, get_float(charger, "reliability_score", 50.0) / 100.0))
             wait_prediction = await ml_adapter.predict_wait_time(
                 db, 
                 charger_id=charger.id,

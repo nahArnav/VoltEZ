@@ -1,4 +1,5 @@
 from uuid import UUID
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
@@ -21,7 +22,10 @@ class FCMService:
         Sends a push notification via Firebase Cloud Messaging (FCM) and saves it to the DB.
         Currently mocked for development/hackathon purposes.
         """
-        payload = payload or {}
+        # Notification payloads are stored in PostgreSQL JSONB.  Domain events
+        # commonly contain UUID/datetime values, so normalise them at this
+        # boundary instead of allowing a late JSON serialization failure.
+        payload = jsonable_encoder(payload or {})
         
         # 1. Save to Database
         notification_in = NotificationCreate(
@@ -33,6 +37,7 @@ class FCMService:
             status="unread",
         )
         await notification_repo.create(db, obj_in=notification_in)
+        await db.commit()
         
         # 2. Mock FCM API Call
         logger.info(f"[MOCK FCM] Sending push to user {user_id}: {title} - {body} | payload={payload}")

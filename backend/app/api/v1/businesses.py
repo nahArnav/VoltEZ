@@ -2,6 +2,7 @@ from app.schemas.enums import UserRole
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List
 
 from app.db.session import get_db
@@ -9,6 +10,10 @@ from database.models.user import User
 from app.schemas.business import BusinessCreate, BusinessUpdate, BusinessResponse
 from app.api.v1.deps import get_current_user, require_role
 from app.repositories.business import business_repo
+from app.schemas.booking import BookingResponse
+from database.models.booking import Booking
+from database.models.charger import Charger
+from database.models.charger_port import ChargerPort
 
 router = APIRouter(prefix="/businesses", tags=["Businesses"])
 
@@ -73,6 +78,28 @@ async def get_business(
         raise HTTPException(status_code=404, detail="Business not found")
     # For now, let anyone view a business, or restrict to owner if needed.
     return business
+
+
+@router.get("/{business_id}/bookings", response_model=List[BookingResponse])
+async def list_business_bookings(
+    business_id: UUID,
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """List reservations made against ports owned by this business."""
+    business = await business_repo.get(db, id=business_id)
+    if business is None or (
+        current_user.role != UserRole.ADMIN and business.owner_id != current_user.id
+    ):
+        raise HTTPException(status_code=404, detail="Business not found")
+    result = await db.execute(
+        select(Booking)
+        .join(ChargerPort, Booking.charger_port_id == ChargerPort.id)
+        .join(Charger, ChargerPort.charger_id == Charger.id)
+        .where(Charger.business_id == business_id)
+        .order_by(Booking.start_at.desc())
+    )
+    return list(result.scalars().all())
 
 @router.patch("/{business_id}", response_model=BusinessResponse)
 async def update_business(

@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from app.api.v1.deps import get_db, get_current_user
 from database.models.user import User
 from app.repositories.charger import charger_repo
+from app.repositories.business import business_repo
 from app.ml.adapters import ml_adapter
 from pydantic import BaseModel
 
@@ -35,6 +36,11 @@ async def get_business_recommendations(
     """
     if current_user.role not in [UserRole.OWNER, UserRole.ADMIN]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    business = await business_repo.get(db, id=business_id)
+    if business is None or (
+        current_user.role != UserRole.ADMIN and business.owner_id != current_user.id
+    ):
+        raise HTTPException(status_code=404, detail="Business not found")
         
     # Get all chargers for this business
     chargers = await charger_repo.get_by_business(db, business_id=business_id)

@@ -1,7 +1,7 @@
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from typing import Optional
-from datetime import time
+from datetime import datetime, time
 
 # Shared properties
 class AvailabilityWindowBase(BaseModel):
@@ -39,3 +39,10 @@ class AvailabilityWindowResponse(AvailabilityWindowBase):
     charger_port_id: UUID
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AvailabilitySlotResponse(BaseModel):
+    charger_port_id: UUID
+    start_at: datetime
+    end_at: datetime
+    price_per_kwh: float = Field(..., gt=0)

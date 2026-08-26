@@ -10,6 +10,8 @@ from app.schemas.booking import BookingCreate
 from app.repositories.booking import booking_repo
 from app.repositories.charger import charger_port_repo
 from app.core.errors import NotFoundError, ConflictError, BadRequestError, ForbiddenError
+from app.core.config import settings
+from app.services.availability import availability_service
 
 
 class BookingService:
@@ -52,6 +54,17 @@ class BookingService:
                 code="PORT_NOT_AVAILABLE",
             )
 
+        if not await availability_service.is_slot_bookable(
+            db,
+            cast(UUID, port.id),
+            booking_in.start_at,
+            booking_in.end_at,
+        ):
+            raise ConflictError(
+                code="OUTSIDE_AVAILABILITY",
+                message="This slot is outside the owner's approved availability.",
+            )
+
         # 3. Prevent Double-Bookings (Time Conflict Check)
         current_time = datetime.now(timezone.utc)
         active_bookings = await booking_repo.get_active_by_port(
@@ -74,6 +87,7 @@ class BookingService:
         booking_data = booking_in.model_dump()
         booking_data["user_id"] = user_id
         booking_data["status"] = BookingStatus.HELD.value
+        booking_data["estimated_amount"] = settings.BOOKING_HOLD_FEE_INR
         
         # Set the 10-minute hold expiry
         booking_data["hold_expires_at"] = current_time + timedelta(minutes=10)
@@ -92,7 +106,8 @@ class BookingService:
         )
         db.add(event)
 
-        await db.commit()
+        await db.flush()
+        await db.refresh(db_booking)
         return db_booking
 
     @staticmethod

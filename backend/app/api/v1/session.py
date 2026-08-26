@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,6 +7,8 @@ from app.db.session import get_db
 from app.schemas.charging_session import ChargingSessionResponse
 from app.services.session import session_service
 from app.api.v1.deps import get_current_user_id
+from app.repositories.session import review_repo, session_repo
+from app.schemas.review import ReviewCreate, ReviewResponse
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
@@ -24,6 +26,25 @@ class CompleteSessionRequest(BaseModel):
 
 
 # --- Endpoints ---
+
+@router.get("/", response_model=list[ChargingSessionResponse])
+async def list_sessions(
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    return await session_repo.get_by_user(db, user_id=user_id)
+
+
+@router.get("/{session_id}", response_model=ChargingSessionResponse)
+async def get_session(
+    session_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    session = await session_repo.get(db, id=session_id)
+    if session is None or session.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Charging session not found")
+    return session
 
 @router.post("/check-in", response_model=ChargingSessionResponse, status_code=status.HTTP_201_CREATED)
 async def check_in(
@@ -72,3 +93,35 @@ async def complete_session(
         db=db, session_id=session_id, user_id=user_id, energy_kwh=request.energy_kwh
     )
     return session
+
+
+@router.post("/{session_id}/rating", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)
+async def submit_rating(
+    session_id: UUID,
+    review_in: ReviewCreate,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    if review_in.session_id != session_id:
+        raise HTTPException(status_code=422, detail="Session id does not match path")
+    session = await session_repo.get(db, id=session_id)
+    if session is None or session.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Charging session not found")
+    if session.status != "completed":
+        raise HTTPException(status_code=409, detail="Only completed sessions can be reviewed")
+    existing = await review_repo.get_by_session(db, session_id=session_id)
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Session already reviewed")
+    review = await review_repo.create(
+        db,
+        obj_in={
+            "session_id": session_id,
+            "user_id": user_id,
+            "rating": review_in.rating,
+            "comment": review_in.comment,
+            "issue_flags": review_in.issue_flags,
+        },
+    )
+    await db.commit()
+    await db.refresh(review)
+    return review

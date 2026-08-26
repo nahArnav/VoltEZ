@@ -1,7 +1,9 @@
 import time
 import uuid
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
 from app.core.errors import register_exception_handlers
@@ -15,6 +17,7 @@ setup_logging()
 logger = get_logger("main")
 from pathlib import Path
 from voltez_ml.serving import AvailabilityPredictor, DemandPredictor
+from app.db.session import engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,7 +52,7 @@ async def lifespan(app: FastAPI):
 
     yield
     logger.info("Disconnecting from Redis...")
-    await app.state.redis.close()
+    await app.state.redis.aclose()
 
 def create_app() -> FastAPI:
     # 1. Application Factory setup
@@ -108,10 +111,27 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready", tags=["System"])
     async def readiness(request: Request):
-        return {
-            "status": "ready",
-            "ml_ready": getattr(request.app.state, "ml_ready", False)
+        checks = {
+            "database": False,
+            "redis": False,
+            "ml": getattr(request.app.state, "ml_ready", False),
         }
+        try:
+            async with engine.connect() as connection:
+                await connection.execute(text("SELECT 1"))
+            checks["database"] = True
+        except Exception:
+            logger.exception("Database readiness check failed")
+        try:
+            checks["redis"] = bool(await request.app.state.redis.ping())
+        except Exception:
+            logger.exception("Redis readiness check failed")
+
+        ready = all(checks.values())
+        return JSONResponse(
+            status_code=200 if ready else 503,
+            content={"status": "ready" if ready else "not_ready", "checks": checks},
+        )
 
     @app.get("/version", tags=["System"])
     async def version():

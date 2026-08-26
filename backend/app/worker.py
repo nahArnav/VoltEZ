@@ -4,13 +4,14 @@ from sqlalchemy import update
 from app.db.session import AsyncSessionLocal
 from app.schemas.enums import BookingStatus
 from database.models.booking import Booking
+from database.models.booking_event import BookingEvent
 
 from uuid import UUID
 
 async def expire_unpaid_booking(ctx, booking_id: str):
     """
-    This task wakes up 15 minutes after a booking is created.
-    If the booking is still 'PENDING', it changes it to 'EXPIRED' to free the charger.
+    This task wakes up 10 minutes after a booking is created.
+    If the booking is still unpaid, it expires the hold and records the transition.
     """
     print(f"🚦 [Worker] Waking up to check booking: {booking_id}")
     
@@ -28,7 +29,16 @@ async def expire_unpaid_booking(ctx, booking_id: str):
         if booking.status in (BookingStatus.PENDING.value, BookingStatus.HELD.value):
             print(f"⚠️ [Worker] Booking {booking_id} is still {booking.status}. Expiring now!")
             
+            old_status = booking.status
             setattr(booking, "status", BookingStatus.EXPIRED.value)
+            db.add(
+                BookingEvent(
+                    booking_id=booking.id,
+                    old_status=old_status,
+                    new_status=BookingStatus.EXPIRED.value,
+                    actor="system:hold-expiry-worker",
+                )
+            )
             await db.commit()
             
             print(f"✅ [Worker] Booking {booking_id} successfully expired. Charger is free.")

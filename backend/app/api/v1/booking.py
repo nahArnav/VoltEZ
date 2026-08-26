@@ -70,11 +70,14 @@ async def create_booking(
             _defer_by=timedelta(minutes=10)
         )
         
+        await db.commit()
+        await db.refresh(booking)
         return booking
-    except Exception as e:
+    except Exception:
         # If DB creation fails (e.g. overlap check fails), release the lock
+        await db.rollback()
         await redis.delete(lock_key)
-        raise e
+        raise
 
 
 @router.post("/{booking_id}/cancel", response_model=BookingResponse)
