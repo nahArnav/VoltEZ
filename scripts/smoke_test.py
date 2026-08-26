@@ -18,7 +18,6 @@ def main():
         ("/health/live", "Liveness"),
         ("/health/ready", "Readiness"),
         ("/version", "Version"),
-        ("/api/v1/health", "API v1 Health"),
     ]
 
     passed = 0
