@@ -1,5 +1,6 @@
 import pytest
 import pytest_asyncio
+import os
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
@@ -7,7 +8,10 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from app.main import app
 from app.db.session import get_db  # Using the correct path we found earlier!
 
-TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/voltez"
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/voltez",
+)
 
 @pytest_asyncio.fixture(scope="function")
 async def db_session():
@@ -23,7 +27,11 @@ async def db_session():
         transaction = await connection.begin()
         
         # Bind the session to the transaction
-        async with AsyncSession(bind=connection, expire_on_commit=False) as session:
+        async with AsyncSession(
+            bind=connection,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        ) as session:
             yield session
             
         # The test is over. Rollback everything so the database stays clean!

@@ -1,4 +1,5 @@
 import pytest
+from uuid import uuid4
 
 @pytest.mark.asyncio
 async def test_recommendations_endpoint(client):
@@ -8,15 +9,15 @@ async def test_recommendations_endpoint(client):
     # 1. Setup Driver and Vehicle
     password = "SecurePassword123!"
     register_payload = {
-        "email": "driver_rec@voltez.com",
+        "email": f"recommendation-{uuid4()}@example.com",
         "password": password,
         "name": "Rec Driver",
-        "role": "DRIVER"
+        "role": "driver"
     }
     await client.post("/api/v1/auth/register", json=register_payload)
     login_response = await client.post(
         "/api/v1/auth/login",
-        data={"username": "driver_rec@voltez.com", "password": password}
+        data={"username": register_payload["email"], "password": password}
     )
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -24,8 +25,9 @@ async def test_recommendations_endpoint(client):
     vehicle_payload = {
         "make": "MG",
         "model": "ZS EV",
+        "vehicle_class": "compact_suv",
         "battery_kwh": 50.3,
-        "connector_types": ["CCS2"],
+        "connector_type_ids": [1],
         "max_ac_kw": 7.4,
         "max_dc_kw": 50.0,
         "estimated_range_km": 461.0

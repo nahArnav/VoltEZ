@@ -1,4 +1,5 @@
 import pytest
+from uuid import uuid4
 
 @pytest.mark.asyncio
 async def test_crud_vehicle(client):
@@ -8,16 +9,16 @@ async def test_crud_vehicle(client):
     # 1. Register and login to get token
     password = "SecurePassword123!"
     register_payload = {
-        "email": "driver_veh@voltez.com",
+        "email": f"vehicle-{uuid4()}@example.com",
         "password": password,
         "name": "Vehicle Driver",
-        "role": "DRIVER"
+        "role": "driver"
     }
     await client.post("/api/v1/auth/register", json=register_payload)
     
     login_response = await client.post(
         "/api/v1/auth/login",
-        data={"username": "driver_veh@voltez.com", "password": password}
+        data={"username": register_payload["email"], "password": password}
     )
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -26,8 +27,9 @@ async def test_crud_vehicle(client):
     vehicle_payload = {
         "make": "Tata",
         "model": "Nexon EV",
+        "vehicle_class": "compact_suv",
         "battery_kwh": 30.2,
-        "connector_types": ["CCS2"],
+        "connector_type_ids": [1],
         "max_ac_kw": 7.2,
         "max_dc_kw": 25.0,
         "estimated_range_km": 312.0
@@ -36,7 +38,7 @@ async def test_crud_vehicle(client):
     assert create_response.status_code == 201, create_response.text
     vehicle_data = create_response.json()
     assert vehicle_data["make"] == "Tata"
-    assert vehicle_data["connector_types"] == ["CCS2"]
+    assert vehicle_data["connector_type_ids"] == [1]
     vehicle_id = vehicle_data["id"]
 
     # 3. GET the vehicle
