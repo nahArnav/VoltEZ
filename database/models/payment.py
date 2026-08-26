@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -9,7 +9,12 @@ from database.base_class import Base
 
 class Payment(Base):
     __tablename__ = "payments"
-    __table_args__ = {"schema": "app"}
+    __table_args__ = (
+        UniqueConstraint("booking_id", name="uq_payments_booking_id"),
+        UniqueConstraint("provider_order_id", name="uq_payments_provider_order_id"),
+        UniqueConstraint("provider_payment_id", name="uq_payments_provider_payment_id"),
+        {"schema": "app"},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +24,7 @@ class ChargingSession(Base):
         name="ck_charging_sessions_amount_nonnegative",
     ),
     Index("ix_charging_sessions_booking_id", "booking_id"),
+    UniqueConstraint("booking_id", name="uq_charging_sessions_booking_id"),
     {"schema": "app"},
 )
 

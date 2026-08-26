@@ -11,7 +11,7 @@ from database.base_class import Base
 class FeatureSnapshot(Base):
     """Point-in-time ML feature snapshots for reproducibility and drift monitoring."""
 
-    __tablename__ = "ml_feature_snapshots"
+    __tablename__ = "feature_snapshots"
     __table_args__ = {"schema": "app"}
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -26,13 +26,11 @@ class FeatureSnapshot(Base):
         String(50), nullable=False
     )
 
-    model_version: Mapped[str] = mapped_column(
-        String(50), nullable=False
-    )
-
     features: Mapped[dict] = mapped_column(
         JSONB, nullable=False
     )
+
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
