@@ -25,10 +25,10 @@ async def expire_unpaid_booking(ctx, booking_id: str):
 
         # 3. Check if they actually paid
         # Since Step 2.2, new bookings are marked as HELD. We check for both for backward compatibility.
-        if booking.status in (BookingStatus.PENDING, BookingStatus.HELD):
+        if booking.status in (BookingStatus.PENDING.value, BookingStatus.HELD.value):
             print(f"⚠️ [Worker] Booking {booking_id} is still {booking.status}. Expiring now!")
             
-            setattr(booking, "status", BookingStatus.EXPIRED)
+            setattr(booking, "status", BookingStatus.EXPIRED.value)
             await db.commit()
             
             print(f"✅ [Worker] Booking {booking_id} successfully expired. Charger is free.")

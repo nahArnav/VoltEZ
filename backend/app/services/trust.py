@@ -2,6 +2,7 @@ from app.schemas.enums import ChargerStatus
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, cast
+from datetime import datetime, timezone
 
 from database.models.charger_status_event import ChargerStatusEvent
 from app.repositories.charger import charger_repo
@@ -23,13 +24,15 @@ class TrustService:
         # 1. Record the audit event
         event = ChargerStatusEvent(
             charger_id=charger_id,
+            port_id=charger_port_id,
             status=status,
+            source=source,
+            confidence=confidence,
             error_code=None,
             details={
-                "source": source,
-                "confidence": confidence,
                 "charger_port_id": str(charger_port_id) if charger_port_id else None
-            }
+            },
+            observed_at=datetime.now(timezone.utc),
         )
         db.add(event)
 

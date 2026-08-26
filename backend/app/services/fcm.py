@@ -26,7 +26,7 @@ class FCMService:
         # 1. Save to Database
         notification_in = NotificationCreate(
             user_id=user_id,
-            type=payload.get("type", "system"),
+            type=payload.get("type", payload.get("event", "system")),
             title=title,
             message=body,
             data=payload,

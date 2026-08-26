@@ -1,28 +1,23 @@
 from app.schemas.enums import BookingStatus
 from uuid import UUID
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from typing import Literal, Optional, Dict, Any
 from datetime import datetime, timezone
-
-
 
 # Shared properties for both incoming requests and API responses.
 class BookingBase(BaseModel):
     start_at: datetime
     end_at: datetime
 
-    @model_validator(mode="after")
-    def validate_time_rules(self):
-        if self.end_at <= self.start_at:
-            raise ValueError("end_at must be strictly after start_at")
-        return self
 
 # Properties to receive via API on booking creation
 class BookingCreate(BookingBase):
     charger_port_id: UUID
 
     @model_validator(mode="after")
-    def validate_new_booking_is_future(self):
+    def validate_time_rules(self):
+        if self.end_at <= self.start_at:
+            raise ValueError("end_at must be strictly after start_at")
         now = datetime.now(timezone.utc)
         if self.start_at < now:
             raise ValueError("Booking start_at cannot be in the past")
@@ -43,5 +38,4 @@ class BookingResponse(BookingBase):
     status: BookingStatus
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

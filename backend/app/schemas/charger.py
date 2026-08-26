@@ -1,5 +1,5 @@
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Literal, Optional, List
 from datetime import datetime
 from app.schemas.charger_port import ChargerPortResponse
@@ -41,5 +41,4 @@ class ChargerResponse(ChargerBase):
     # Automatically loads the nested ports because of lazy="selectin" in the SQLAlchemy model
     ports: List[ChargerPortResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

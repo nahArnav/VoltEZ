@@ -1,68 +1,35 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../services/api_client.dart';
 import '../models/user_profile_model.dart';
 
+/// Profile service using the centralized ApiClient with JWT auth.
 class ProfileService {
-  static const String baseUrl = 'https://api.yourdomain.com/v1';
-
-  // In production, fetch auth token from FlutterSecureStorage / SharedPreferences
-  Map<String, String> get _headers => {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    // 'Authorization': 'Bearer <YOUR_TOKEN>',
-  };
+  final _api = ApiClient.instance;
 
   Future<UserProfile> fetchProfile() async {
-    final uri = Uri.parse('$baseUrl/user/profile');
-    final response = await http.get(uri, headers: _headers);
+    final response = await _api.get('/users/me');
 
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> data = json.decode(response.body);
-      return UserProfile.fromJson(data);
+    if (response.statusCode == 200 && response.data != null) {
+      return UserProfile.fromJson(response.data as Map<String, dynamic>);
     } else {
       throw Exception('Failed to load profile (${response.statusCode})');
     }
   }
 
   Future<bool> updateProfile({
-    required String name,
-    required String email,
-    required String phone,
-    required String businessName,
+    String? name,
+    String? phone,
   }) async {
-    final uri = Uri.parse('$baseUrl/user/profile');
-    final response = await http.put(
-      uri,
-      headers: _headers,
-      body: json.encode({
-        'name': name,
-        'email': email,
-        'phone': phone,
-        'businessName': businessName,
-      }),
-    );
+    final payload = <String, dynamic>{};
+    if (name != null) payload['name'] = name;
+    if (phone != null) payload['phone'] = phone;
 
-    return response.statusCode == 200 || response.statusCode == 204;
+    final response = await _api.patch('/users/me', data: payload);
+    return response.statusCode == 200;
   }
 
-  Future<bool> updatePreferences(UserPreferences preferences) async {
-    final uri = Uri.parse('$baseUrl/user/preferences');
-    final response = await http.patch(
-      uri,
-      headers: _headers,
-      body: json.encode(preferences.toJson()),
-    );
-
-    return response.statusCode == 200 || response.statusCode == 204;
-  }
-
-  Future<bool> logout() async {
-    final uri = Uri.parse('$baseUrl/auth/logout');
-    try {
-      final response = await http.post(uri, headers: _headers);
-      return response.statusCode == 200 || response.statusCode == 204;
-    } catch (_) {
-      return true; // Allow client logout even if backend call fails
-    }
+  Future<void> logout() async {
+    // Clear stored tokens — no backend logout endpoint exists
+    await _api.clearTokens();
   }
 }
