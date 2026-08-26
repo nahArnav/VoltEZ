@@ -133,9 +133,20 @@ class SessionProvider extends ChangeNotifier {
   }
 
   /// Start the charging session (transition from checkedIn to charging).
-  void startCharging() {
+  Future<void> startCharging() async {
     if (_phase != SessionPhase.checkedIn) return;
-    _phase = SessionPhase.charging;
+    if (_sessionData == null) return;
+    _errorMessage = null;
+    try {
+      _sessionData = await _api.startSession(_sessionData!.sessionId);
+      _phase = SessionPhase.charging;
+    } on SessionApiException catch (error) {
+      _errorMessage = error.message;
+      _phase = SessionPhase.error;
+    } catch (_) {
+      _errorMessage = 'Unable to start charging. Please try again.';
+      _phase = SessionPhase.error;
+    }
     notifyListeners();
   }
 

@@ -1,5 +1,6 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from typing import List
 from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +10,26 @@ from app.services.booking import booking_service
 from app.api.v1.deps import get_current_user_id
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
+
+
+@router.get("/", response_model=List[BookingResponse])
+async def list_bookings(
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    return await booking_service.list_bookings(db=db, user_id=user_id)
+
+
+@router.get("/{booking_id}", response_model=BookingResponse)
+async def get_booking(
+    booking_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    booking = await booking_service.get_booking(db=db, booking_id=booking_id, user_id=user_id)
+    if booking is None:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    return booking
 
 
 @router.post("/", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
@@ -58,6 +79,7 @@ async def create_booking(
 
 @router.post("/{booking_id}/cancel", response_model=BookingResponse)
 async def cancel_booking(
+    request: Request,
     booking_id: UUID,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
@@ -67,4 +89,9 @@ async def cancel_booking(
     Users can only cancel their own bookings.
     """
     booking = await booking_service.cancel_booking(db=db, booking_id=booking_id, user_id=user_id)
+    lock_key = (
+        f"hold:port:{booking.charger_port_id}:"
+        f"{int(booking.start_at.timestamp())}:{int(booking.end_at.timestamp())}"
+    )
+    await request.app.state.redis.delete(lock_key)
     return booking

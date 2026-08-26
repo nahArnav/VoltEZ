@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'api_service.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // DTOs
@@ -156,15 +157,66 @@ abstract class BookingApi {
 // ═════════════════════════════════════════════════════════════════════════════
 
 class LiveBookingApi implements BookingApi {
-  LiveBookingApi();
+  LiveBookingApi(this._api);
+
+  final ApiService _api;
 
   @override
   Future<List<SlotInfo>> getAvailability(
     String chargerId,
     DateTime date,
   ) async {
-    // TODO: Wire to real backend
-    throw UnimplementedError('LiveBookingApi not connected yet.');
+    final chargerResponse = await _api.getChargerById(chargerId);
+    final charger = chargerResponse.data as Map<String, dynamic>;
+    final ports = charger['ports'] as List<dynamic>? ?? const [];
+    final slots = <SlotInfo>[];
+
+    for (final rawPort in ports) {
+      final port = rawPort as Map<String, dynamic>;
+      if (!(port['is_active'] as bool? ?? true)) continue;
+      final portId = port['id'].toString();
+      final windowResponse = await _api.getPortAvailability(portId);
+      final windows = windowResponse.data as List<dynamic>? ?? const [];
+
+      for (final rawWindow in windows) {
+        final window = rawWindow as Map<String, dynamic>;
+        if ((window['day_of_week'] as num).toInt() != date.weekday - 1 ||
+            (window['is_unavailable'] as bool? ?? false)) {
+          continue;
+        }
+        final start = _combineDateAndTime(
+          date,
+          window['start_local_time'].toString(),
+        );
+        final end = _combineDateAndTime(
+          date,
+          window['end_local_time'].toString(),
+        );
+        var cursor = start;
+        while (cursor.isBefore(end)) {
+          final slotEnd = cursor.add(const Duration(hours: 1));
+          if (slotEnd.isAfter(end)) break;
+          if (slotEnd.isAfter(DateTime.now())) {
+            slots.add(SlotInfo(
+              id: '$portId|${cursor.toUtc().toIso8601String()}|${slotEnd.toUtc().toIso8601String()}',
+              chargerId: chargerId,
+              portName: 'Port ${port['port_number']}',
+              connectorType: _connectorName(
+                (port['connector_type_id'] as num?)?.toInt() ?? 1,
+              ),
+              startTime: cursor,
+              endTime: slotEnd,
+              status: SlotStatus.available,
+              pricePerKwh: 15,
+              lastUpdated: DateTime.now(),
+            ));
+          }
+          cursor = slotEnd;
+        }
+      }
+    }
+    slots.sort((a, b) => a.startTime.compareTo(b.startTime));
+    return slots;
   }
 
   @override
@@ -173,7 +225,44 @@ class LiveBookingApi implements BookingApi {
     required String slotId,
     required String connectorType,
   }) async {
-    throw UnimplementedError('LiveBookingApi not connected yet.');
+    final parts = slotId.split('|');
+    if (parts.length != 3) {
+      throw const BookingApiException('Invalid availability slot.');
+    }
+    try {
+      final response = await _api.createBooking({
+        'charger_port_id': parts[0],
+        'start_at': parts[1],
+        'end_at': parts[2],
+      });
+      final json = response.data as Map<String, dynamic>;
+      final slot = SlotInfo(
+        id: slotId,
+        chargerId: chargerId,
+        portName: 'Port',
+        connectorType: connectorType,
+        startTime: DateTime.parse(parts[1]).toLocal(),
+        endTime: DateTime.parse(parts[2]).toLocal(),
+        status: SlotStatus.occupied,
+        pricePerKwh: 15,
+        lastUpdated: DateTime.now(),
+      );
+      return HoldResult(
+        bookingId: json['id'].toString(),
+        holdExpiresAt: json['hold_expires_at'] != null
+            ? DateTime.parse(json['hold_expires_at'] as String).toLocal()
+            : DateTime.now().add(const Duration(minutes: 10)),
+        slot: slot,
+        estimatedCost: 450,
+      );
+    } catch (error) {
+      if (error.toString().contains('SLOT_UNAVAILABLE')) {
+        throw const SlotTakenException(
+          'This slot was just taken by another driver.',
+        );
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -181,7 +270,18 @@ class LiveBookingApi implements BookingApi {
     required String bookingId,
     required double amount,
   }) async {
-    throw UnimplementedError('LiveBookingApi not connected yet.');
+    final response = await _api.createPaymentOrder({
+      'booking_id': bookingId,
+      'amount': amount,
+      'currency': 'INR',
+      'status': 'pending',
+    });
+    final json = response.data as Map<String, dynamic>;
+    return PaymentOrder(
+      orderId: json['provider_order_id']?.toString() ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? amount,
+      bookingId: json['booking_id']?.toString() ?? bookingId,
+    );
   }
 
   @override
@@ -189,13 +289,58 @@ class LiveBookingApi implements BookingApi {
     required String orderId,
     required String bookingId,
   }) async {
-    throw UnimplementedError('LiveBookingApi not connected yet.');
+    throw const PaymentFailedException(
+      'Payment confirmation is completed by the signed Razorpay webhook; '
+      'no client-side verification endpoint exists.',
+    );
   }
 
   @override
   Future<List<ConfirmedBooking>> getBookingHistory() async {
-    throw UnimplementedError('LiveBookingApi not connected yet.');
+    final response = await _api.getDriverBookings();
+    return (response.data as List<dynamic>).map((item) {
+      final json = item as Map<String, dynamic>;
+      final start = DateTime.parse(json['start_at'] as String).toLocal();
+      final end = DateTime.parse(json['end_at'] as String).toLocal();
+      return ConfirmedBooking(
+        bookingId: json['id'].toString(),
+        chargerName: 'Charger booking',
+        chargerAddress: 'Port ${json['charger_port_id']}',
+        date: '${start.day}/${start.month}/${start.year}',
+        startTime: _clock(start),
+        endTime: _clock(end),
+        connectorType: 'See charger details',
+        powerKw: 0,
+        estimatedCost: 0,
+        status: json['status']?.toString() ?? 'held',
+      );
+    }).toList();
   }
+
+  static DateTime _combineDateAndTime(DateTime date, String time) {
+    final parts = time.split(':');
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+    );
+  }
+
+  static String _connectorName(int id) {
+    return const <int, String>{
+          1: 'CCS2',
+          2: 'Type2',
+          3: 'CHAdeMO',
+          4: 'Bharat AC',
+          5: 'Bharat DC',
+        }[id] ??
+        'Unknown';
+  }
+
+  static String _clock(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -403,21 +548,28 @@ class MockBookingApi implements BookingApi {
 // ═════════════════════════════════════════════════════════════════════════════
 
 class SlotTakenException implements Exception {
-  SlotTakenException(this.message);
+  const SlotTakenException(this.message);
   final String message;
   @override
   String toString() => message;
 }
 
 class PaymentFailedException implements Exception {
-  PaymentFailedException(this.message);
+  const PaymentFailedException(this.message);
   final String message;
   @override
   String toString() => message;
 }
 
 class HoldExpiredException implements Exception {
-  HoldExpiredException(this.message);
+  const HoldExpiredException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+class BookingApiException implements Exception {
+  const BookingApiException(this.message);
   final String message;
   @override
   String toString() => message;

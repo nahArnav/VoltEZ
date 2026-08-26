@@ -22,6 +22,21 @@ class BookingService:
     }
 
     @staticmethod
+    async def list_bookings(db: AsyncSession, user_id: UUID) -> list[Booking]:
+        return await booking_repo.get_by_user(db, user_id=user_id)
+
+    @staticmethod
+    async def get_booking(
+        db: AsyncSession,
+        booking_id: UUID,
+        user_id: UUID,
+    ) -> Booking | None:
+        booking = await booking_repo.get(db, id=booking_id)
+        if booking is None or booking.user_id != user_id:
+            return None
+        return booking
+
+    @staticmethod
     async def create_booking(db: AsyncSession, user_id: UUID, booking_in: BookingCreate) -> Booking:
         """Business logic for reserving a charger port."""
 

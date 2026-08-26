@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../shared/models/models.dart';
+import '../network/api_service.dart';
 import '../network/route_recommendation_api.dart';
 
 /// Manages the full route-planner flow:
@@ -10,10 +11,15 @@ import '../network/route_recommendation_api.dart';
 /// Inject [MockRouteRecommendationApi] for dev/testing,
 /// swap to [LiveRouteRecommendationApi] when the backend is live.
 class RoutePlannerProvider extends ChangeNotifier {
-  RoutePlannerProvider({RouteRecommendationApi? recommendationApi})
-      : _api = recommendationApi ?? MockRouteRecommendationApi();
+  RoutePlannerProvider({
+    ApiService? api,
+    RouteRecommendationApi? recommendationApi,
+  })  : _apiService = api ?? ApiService(),
+        _api = recommendationApi ??
+            LiveRouteRecommendationApi(api ?? ApiService());
 
   final RouteRecommendationApi _api;
+  final ApiService _apiService;
 
   // ─── Route Inputs ───
   String _originName = '';
@@ -59,28 +65,35 @@ class RoutePlannerProvider extends ChangeNotifier {
 
   bool get isRouteValid =>
       _originName.isNotEmpty &&
+      _originLat != null &&
+      _originLng != null &&
       _destinationName.isNotEmpty &&
       _selectedVehicle != null;
 
-  // ─── Mock Vehicles (match backend Vehicle schema) ───
-  final List<Vehicle> availableVehicles = const [
-    Vehicle(
-      id: 1, userId: 1, make: 'Tata', model: 'Nexon EV',
-      batteryKwh: 40.5, connectorTypes: ['CCS2'],
-    ),
-    Vehicle(
-      id: 2, userId: 1, make: 'MG', model: 'ZS EV',
-      batteryKwh: 50.3, connectorTypes: ['CCS2'],
-    ),
-    Vehicle(
-      id: 3, userId: 1, make: 'Hyundai', model: 'Ioniq 5',
-      batteryKwh: 58.0, connectorTypes: ['CCS2'],
-    ),
-    Vehicle(
-      id: 4, userId: 1, make: 'BYD', model: 'Atto 3',
-      batteryKwh: 60.5, connectorTypes: ['CCS2'],
-    ),
-  ];
+  // ─── Vehicles ───
+  final List<Vehicle> availableVehicles = [];
+  String? _vehiclesError;
+  String? get vehiclesError => _vehiclesError;
+
+  Future<void> loadVehicles() async {
+    _vehiclesError = null;
+    try {
+      final response = await _apiService.getVehicles();
+      availableVehicles
+        ..clear()
+        ..addAll(
+          (response.data as List<dynamic>)
+              .map((item) => Vehicle.fromJson(item as Map<String, dynamic>)),
+        );
+      if (_selectedVehicle == null && availableVehicles.isNotEmpty) {
+        _selectedVehicle = availableVehicles.first;
+      }
+    } catch (error) {
+      availableVehicles.clear();
+      _vehiclesError = error.toString();
+    }
+    notifyListeners();
+  }
 
   // ─── Location ───
   Position? _currentPosition;
@@ -91,8 +104,10 @@ class RoutePlannerProvider extends ChangeNotifier {
 
   void setOrigin(String name, {double? lat, double? lng}) {
     _originName = name;
-    _originLat = lat;
-    _originLng = lng;
+    // Text geocoding is not yet backed by a configured Maps key. Keep manual
+    // text entry inside the Pune pilot zone instead of sending null coordinates.
+    _originLat = lat ?? 18.5204;
+    _originLng = lng ?? 73.8567;
     _usingCurrentLocation = false;
     notifyListeners();
   }
@@ -182,6 +197,7 @@ class RoutePlannerProvider extends ChangeNotifier {
         preference: _preference.name,
         originName: _originName,
         destinationName: _destinationName,
+        vehicleId: _selectedVehicle!.id,
       );
 
       final results = await _api.getRecommendations(request);

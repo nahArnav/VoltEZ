@@ -22,6 +22,9 @@ class Booking(Base):
         ),
         name="excl_bookings_port_time",
         using="gist",
+        where=expression.text(
+            "status IN ('pending', 'held', 'confirmed', 'checked_in', 'charging', 'in_progress')"
+        ),
     ),
     CheckConstraint(
     "end_at > start_at",
@@ -73,6 +76,11 @@ class Booking(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+
+    hold_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     cancelled_at: Mapped[datetime | None] = mapped_column(

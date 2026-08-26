@@ -1,13 +1,30 @@
+import math
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from uuid import UUID
+from zoneinfo import ZoneInfo
 import pandas as pd
 
-def build_demand_features(charger_id: UUID) -> pd.DataFrame:
+PUNE_TIMEZONE = ZoneInfo("Asia/Kolkata")
+
+
+def build_demand_features(
+    charger_id: UUID,
+    prediction_origin: datetime | None = None,
+) -> pd.DataFrame:
     """
     Point-in-time feature builder for Model 1 (Demand).
     Constructs the 52 features required by the demand prediction model.
     """
-    # For now, we supply median fallback values as seen in the feature contract
+    origin = prediction_origin or datetime.now(timezone.utc)
+    target = origin.astimezone(PUNE_TIMEZONE) + timedelta(minutes=15)
+    target_hour = target.hour + target.minute / 60
+    target_day = target.weekday()
+
+    # Historical values remain conservative cold-start defaults until the
+    # analytics aggregation job has accumulated live VoltEZ history. Calendar
+    # values are derived from the actual prediction timestamp because the
+    # serving contract validates them exactly.
     features: Dict[str, Any] = {
         "request_lag_1": 0.0,
         "search_lag_1": 0.0,
@@ -33,7 +50,7 @@ def build_demand_features(charger_id: UUID) -> pd.DataFrame:
         "history_bucket_count": 4315.5,
         "centroid_latitude": 18.53465,
         "centroid_longitude": 73.8636,
-        "zone_type_commercial": 0,
+        "zone_type_commercial": 1,
         "zone_type_industrial": 0,
         "zone_type_mixed": 0,
         "zone_type_office": 0,
@@ -44,11 +61,11 @@ def build_demand_features(charger_id: UUID) -> pd.DataFrame:
         "request_lag_target_time_last_week": 0.0,
         "missing_target_lag_yesterday": 0,
         "missing_target_lag_last_week": 0,
-        "target_hour_sin": 0.0,
-        "target_hour_cos": 0.0,
-        "target_day_sin": 0.0,
-        "target_day_cos": 0.0,
-        "target_is_weekend": 0,
+        "target_hour_sin": math.sin(2 * math.pi * target_hour / 24),
+        "target_hour_cos": math.cos(2 * math.pi * target_hour / 24),
+        "target_day_sin": math.sin(2 * math.pi * target_day / 7),
+        "target_day_cos": math.cos(2 * math.pi * target_day / 7),
+        "target_is_weekend": int(target_day >= 5),
         "context_event_count": 0.0,
         "context_expected_impact_sum": 0.0,
         "context_expected_impact_max": 0.0,
@@ -65,18 +82,29 @@ def build_demand_features(charger_id: UUID) -> pd.DataFrame:
     # Return as a DataFrame for scikit-learn/joblib
     return pd.DataFrame([features])
 
-def build_availability_features(charger_id: UUID, port_id: UUID) -> pd.DataFrame:
+def build_availability_features(
+    charger_id: UUID,
+    port_id: UUID,
+    prediction_origin: datetime | None = None,
+    target_time: datetime | None = None,
+) -> pd.DataFrame:
     """
     Point-in-time feature builder for Model 2 (Availability).
     Constructs the 35 features required by the availability prediction model.
     """
+    origin = prediction_origin or datetime.now(timezone.utc)
+    target = target_time or origin + timedelta(minutes=30)
+    local_target = target.astimezone(PUNE_TIMEZONE)
+    target_hour = local_target.hour + local_target.minute / 60
+    target_day = local_target.weekday()
+
     features: Dict[str, Any] = {
-        "eta_minutes": 30.0,
-        "target_hour_sin": -0.533,
-        "target_hour_cos": -0.337,
-        "target_day_sin": 0.0,
-        "target_day_cos": -0.222,
-        "target_is_weekend": 0,
+        "eta_minutes": (target - origin).total_seconds() / 60,
+        "target_hour_sin": math.sin(2 * math.pi * target_hour / 24),
+        "target_hour_cos": math.cos(2 * math.pi * target_hour / 24),
+        "target_day_sin": math.sin(2 * math.pi * target_day / 7),
+        "target_day_cos": math.cos(2 * math.pi * target_day / 7),
+        "target_is_weekend": int(target_day >= 5),
         "minutes_to_business_close": 409.0,
         "known_bookings_near_target": 0.0,
         "active_session_count": 0.0,

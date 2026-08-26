@@ -75,7 +75,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
     // Final fallback — use default charger
     setState(() {
       _charger = const Charger(
-        id: 1, businessId: 1,
+        id: '1', businessId: '1',
         name: 'Phoenix Mall Charger',
         address: 'Phoenix Mall, Lower Parel, Mumbai',
         latitude: 19.0760,
@@ -516,7 +516,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
 
   // ─── Host Info ───
   Widget _buildHostInfo(Charger charger) {
-    if (charger.businessId == 0) return const SizedBox.shrink();
+    if (charger.businessId.isEmpty) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(16),

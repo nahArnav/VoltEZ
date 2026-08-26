@@ -14,7 +14,7 @@ import '../../../shared/models/models.dart';
 /// Station discovery screen with Google Maps.
 ///
 /// Features:
-/// - GoogleMap centered on driver's GPS (fallback: Mumbai).
+/// - GoogleMap centered on driver's GPS (fallback: Pune pilot zone).
 /// - Custom colored markers: green = available, amber = busy, red = offline.
 /// - Marker tap → bottom sheet with station name, distance, ports, wait
 ///   time prediction, and "View Details" button.
@@ -36,8 +36,8 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
   bool _sheetExpanded = false;
 
-  // Default center: Mumbai
-  static const LatLng _defaultCenter = LatLng(19.0760, 72.8777);
+  // Default center: Pune pilot zone
+  static const LatLng _defaultCenter = LatLng(18.5204, 73.8567);
 
   // Connector type display labels (backend uses plain strings)
   static const Map<String, String> _connectorLabels = {
@@ -70,11 +70,12 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   // ─── Marker hue mapping (backend status strings) ───
   double _markerHue(String status) {
     switch (status) {
-      case 'active':
+      case 'available':
         return BitmapDescriptor.hueGreen;
-      case 'paused':
+      case 'unavailable':
         return BitmapDescriptor.hueOrange;
-      case 'inactive':
+      case 'offline':
+      case 'maintenance':
         return BitmapDescriptor.hueRed;
       default:
         return BitmapDescriptor.hueRed;
@@ -83,11 +84,12 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'active':
+      case 'available':
         return AppColors.success;
-      case 'paused':
+      case 'unavailable':
         return AppColors.warning;
-      case 'inactive':
+      case 'offline':
+      case 'maintenance':
         return AppColors.error;
       default:
         return AppColors.textMuted;
@@ -98,11 +100,12 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
   String _waitTimeEstimate(String status) {
     switch (status) {
-      case 'active':
+      case 'available':
         return '< 5 min';
-      case 'paused':
+      case 'unavailable':
         return '~15 min';
-      case 'inactive':
+      case 'offline':
+      case 'maintenance':
         return 'N/A';
       default:
         return 'N/A';
@@ -179,7 +182,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     final markers = <Marker>{};
 
     // Collect recommended charger IDs so we can visually distinguish them
-    final recIds = <int>{};
+    final recIds = <String>{};
     try {
       final planner = context.read<RoutePlannerProvider>();
       for (final r in planner.recommendations) {

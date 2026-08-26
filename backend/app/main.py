@@ -13,8 +13,8 @@ from contextlib import asynccontextmanager
 # Initialize structured logging
 setup_logging()
 logger = get_logger("main")
-import joblib
 from pathlib import Path
+from voltez_ml.serving import AvailabilityPredictor, DemandPredictor
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,12 +23,22 @@ async def lifespan(app: FastAPI):
     
     logger.info("Loading ML models...")
     try:
-        base_dir = Path(__file__).parent.parent.parent.parent
-        demand_path = base_dir / "models" / "demand" / "voltez-demand-60m-pune-v1" / "model.joblib"
-        avail_path = base_dir / "models" / "availability" / "voltez-availability-pune-v1" / "model.joblib"
-        
-        app.state.demand_model = joblib.load(demand_path)
-        app.state.availability_model = joblib.load(avail_path)
+        repo_root = Path(__file__).resolve().parents[2]
+        demand_bundle = repo_root / "models" / "demand" / "voltez-demand-60m-pune-v1"
+        availability_bundle = (
+            repo_root / "models" / "availability" / "voltez-availability-pune-v1"
+        )
+
+        # Use the published, hash-verifying serving wrappers. The joblib files
+        # contain dictionaries, not estimators that can be called directly.
+        app.state.demand_model = DemandPredictor.from_artifact(
+            demand_bundle,
+            demand_bundle / "feature_contract.json",
+        )
+        app.state.availability_model = AvailabilityPredictor.from_artifact(
+            availability_bundle,
+            availability_bundle / "feature_contract.json",
+        )
         app.state.ml_ready = True
         logger.info("ML models loaded successfully.")
     except Exception as e:

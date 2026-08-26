@@ -1,13 +1,12 @@
-from app.schemas.enums import UserRole
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, cast
+from typing import List
 
 from app.db.session import get_db
 from database.models.user import User
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate, VehicleResponse
-from app.api.v1.deps import get_current_user, require_role
+from app.api.v1.deps import get_current_user
 from app.repositories.vehicle import vehicle_repo
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
@@ -29,11 +28,14 @@ async def create_vehicle(
     db: AsyncSession = Depends(get_db)
 ):
     """Register a new vehicle."""
-    vehicle_data = vehicle_in.model_dump()
-    uid = current_user.id
-    vehicle_data["user_id"] = uid
-    vehicle = await vehicle_repo.create(db, obj_in=vehicle_data)
-    return vehicle
+    try:
+        return await vehicle_repo.create_for_owner(
+            db,
+            user_id=current_user.id,
+            obj_in=vehicle_in,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 @router.get("/{vehicle_id}", response_model=VehicleResponse)
 async def get_vehicle(
@@ -59,8 +61,14 @@ async def update_vehicle(
     if not vehicle or vehicle.user_id != uid:
         raise HTTPException(status_code=404, detail="Vehicle not found")
     
-    vehicle = await vehicle_repo.update(db, db_obj=vehicle, obj_in=vehicle_in)
-    return vehicle
+    try:
+        return await vehicle_repo.update_with_connectors(
+            db,
+            db_obj=vehicle,
+            obj_in=vehicle_in,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 @router.delete("/{vehicle_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_vehicle(
@@ -74,4 +82,5 @@ async def delete_vehicle(
         raise HTTPException(status_code=404, detail="Vehicle not found")
     
     await vehicle_repo.remove(db, id=vehicle_id)
+    await db.commit()
     return None

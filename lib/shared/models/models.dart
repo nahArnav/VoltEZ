@@ -15,7 +15,7 @@ import 'package:flutter/material.dart';
 enum AccountRole { driver, owner, admin }
 
 class User {
-  final int id;
+  final String id;
   final String name;
   final String email;
   final String? phone;
@@ -34,10 +34,10 @@ class User {
   });
 
   // ─── Backward-compat ───
-  String get idString => id.toString();
+  String get idString => id;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
-        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+        id: json['id']?.toString() ?? '',
         name: json['name'] as String,
         email: json['email'] as String,
         phone: json['phone'] as String?,
@@ -78,8 +78,8 @@ AccountRole _parseUserRole(String? role) {
 // Backend: { id: int, user_id, make, model, battery_kwh, connector_types: List[str], ... }
 
 class Vehicle {
-  final int id;
-  final int userId;
+  final String id;
+  final String userId;
   final String make;
   final String model;
   final double batteryKwh;
@@ -111,13 +111,16 @@ class Vehicle {
   int get year => createdAt?.year ?? 2024;
 
   factory Vehicle.fromJson(Map<String, dynamic> json) => Vehicle(
-        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
-        userId: json['user_id'] is int ? json['user_id'] as int : 0,
+        id: json['id']?.toString() ?? '',
+        userId: json['user_id']?.toString() ?? '',
         make: json['make'] as String,
         model: json['model'] as String,
         batteryKwh: (json['battery_kwh'] as num).toDouble(),
         connectorTypes: (json['connector_types'] as List<dynamic>?)
-                ?.map((e) => e as String)
+                ?.map((e) => e.toString())
+                .toList() ??
+            (json['connector_type_ids'] as List<dynamic>?)
+                ?.map((e) => _connectorNameFromId((e as num).toInt()))
                 .toList() ?? [],
         maxAcKw: (json['max_ac_kw'] as num?)?.toDouble(),
         maxDcKw: (json['max_dc_kw'] as num?)?.toDouble(),
@@ -131,7 +134,7 @@ class Vehicle {
         'make': make,
         'model': model,
         'battery_kwh': batteryKwh,
-        'connector_types': connectorTypes,
+        'connector_type_ids': connectorTypes.map(_connectorIdFromName).toList(),
         if (maxAcKw != null) 'max_ac_kw': maxAcKw,
         if (maxDcKw != null) 'max_dc_kw': maxDcKw,
         if (estimatedRangeKm != null) 'estimated_range_km': estimatedRangeKm,
@@ -168,8 +171,8 @@ String connectorTypeLabel(String type) {
 }
 
 class ChargerPort {
-  final int id;
-  final int chargerId;
+  final String id;
+  final String chargerId;
   final String connectorType;
   final double maxPowerKw;
   final String status;
@@ -187,11 +190,13 @@ class ChargerPort {
   bool get isAvailable => status == 'available';
 
   factory ChargerPort.fromJson(Map<String, dynamic> json) => ChargerPort(
-        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
-        chargerId: json['charger_id'] is int ? json['charger_id'] as int : 0,
-        connectorType: json['connector_type'] as String,
+        id: json['id']?.toString() ?? '',
+        chargerId: json['charger_id']?.toString() ?? '',
+        connectorType: json['connector_type'] as String? ??
+            _connectorNameFromId((json['connector_type_id'] as num?)?.toInt() ?? 1),
         maxPowerKw: (json['max_power_kw'] as num).toDouble(),
-        status: json['status'] as String? ?? 'available',
+        status: json['status'] as String? ??
+            ((json['is_active'] as bool? ?? true) ? 'available' : 'offline'),
         createdAt: json['created_at'] != null
             ? DateTime.tryParse(json['created_at'] as String)
             : null,
@@ -199,8 +204,8 @@ class ChargerPort {
 }
 
 class Charger {
-  final int id;
-  final int businessId;
+  final String id;
+  final String businessId;
   final String name;
   final String? address; // Not in backend — may be computed from lat/lng or omitted
   final double latitude;
@@ -222,7 +227,7 @@ class Charger {
 
   const Charger({
     required this.id,
-    this.businessId = 0,
+    this.businessId = '',
     required this.name,
     this.address,
     required this.latitude,
@@ -245,9 +250,13 @@ class Charger {
   /// Backward-compat: display status for UI.
   String get displayStatus {
     switch (status) {
+      case 'available':
       case 'active': return 'Available';
+      case 'unavailable':
       case 'paused': return 'Paused';
+      case 'offline':
       case 'inactive': return 'Offline';
+      case 'maintenance': return 'Maintenance';
       default: return status;
     }
   }
@@ -265,7 +274,9 @@ class Charger {
       amenities?.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() ?? [];
 
   /// Backward-compat: rating (use reliabilityScore * 5 as proxy).
-  double get rating => (reliabilityScore * 5).clamp(0.0, 5.0);
+  double get rating =>
+      ((reliabilityScore > 1 ? reliabilityScore / 100 : reliabilityScore) * 5)
+          .clamp(0.0, 5.0);
 
   /// Backward-compat: totalRatings (not in backend — return 0).
   int get totalRatings => 0;
@@ -313,6 +324,7 @@ class Charger {
     ChargerStatus legacyStatus;
     switch (statusStr) {
       case 'available': legacyStatus = ChargerStatus.available; break;
+      case 'unavailable': legacyStatus = ChargerStatus.busy; break;
       case 'busy': legacyStatus = ChargerStatus.busy; break;
       case 'offline': legacyStatus = ChargerStatus.offline; break;
       case 'maintenance': legacyStatus = ChargerStatus.maintenance; break;
@@ -331,14 +343,15 @@ class Charger {
     }
 
     return Charger(
-      id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
-      businessId: json['business_id'] is int ? json['business_id'] as int : 0,
+      id: json['id']?.toString() ?? '',
+      businessId: json['business_id']?.toString() ?? '',
       name: json['name'] as String,
       address: json['address'] as String?,
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
       powerKw: (json['power_kw'] as num?)?.toDouble() ?? (json['powerKw'] as num?)?.toDouble() ?? 0,
-      accessType: json['access_type'] as String? ?? 'public',
+      accessType: json['access_type'] as String? ??
+          json['charger_type'] as String? ?? 'public',
       basePrice: (json['base_price'] as num?)?.toDouble() ?? (json['pricePerKwh'] as num?)?.toDouble() ?? 0,
       status: statusStr,
       reliabilityScore: (json['reliability_score'] as num?)?.toDouble() ?? 0.5,
@@ -391,10 +404,10 @@ BookingStatus parseBookingStatus(String? status) {
 }
 
 class Booking {
-  final int id;
-  final int userId;
-  final int? vehicleId;
-  final int portId;
+  final String id;
+  final String userId;
+  final String? vehicleId;
+  final String portId;
   final DateTime startAt;
   final DateTime endAt;
   final BookingStatus status;
@@ -420,10 +433,10 @@ class Booking {
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
-        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
-        userId: json['user_id'] is int ? json['user_id'] as int : 0,
-        vehicleId: json['vehicle_id'] as int?,
-        portId: json['port_id'] is int ? json['port_id'] as int : 0,
+        id: json['id']?.toString() ?? '',
+        userId: json['user_id']?.toString() ?? '',
+        vehicleId: json['vehicle_id']?.toString(),
+        portId: (json['charger_port_id'] ?? json['port_id'])?.toString() ?? '',
         startAt: DateTime.parse(json['start_at'] as String),
         endAt: DateTime.parse(json['end_at'] as String),
         status: parseBookingStatus(json['status'] as String?),
@@ -451,8 +464,8 @@ SessionStatus parseSessionStatus(String? status) {
 }
 
 class ChargingSession {
-  final int id;
-  final int bookingId;
+  final String id;
+  final String bookingId;
   final DateTime? checkInAt;
   final DateTime? startAt;
   final DateTime? endAt;
@@ -480,16 +493,43 @@ class ChargingSession {
   }
 
   factory ChargingSession.fromJson(Map<String, dynamic> json) => ChargingSession(
-        id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
-        bookingId: json['booking_id'] is int ? json['booking_id'] as int : 0,
-        checkInAt: json['check_in_at'] != null ? DateTime.tryParse(json['check_in_at'] as String) : null,
-        startAt: json['start_at'] != null ? DateTime.tryParse(json['start_at'] as String) : null,
-        endAt: json['end_at'] != null ? DateTime.tryParse(json['end_at'] as String) : null,
+        id: json['id']?.toString() ?? '',
+        bookingId: json['booking_id']?.toString() ?? '',
+        checkInAt: json['reserved_at'] != null ? DateTime.tryParse(json['reserved_at'] as String) : null,
+        startAt: json['started_at'] != null ? DateTime.tryParse(json['started_at'] as String) : null,
+        endAt: json['ended_at'] != null ? DateTime.tryParse(json['ended_at'] as String) : null,
         energyKwh: (json['energy_kwh'] as num?)?.toDouble(),
-        finalAmount: (json['final_amount'] as num?)?.toDouble(),
+        finalAmount: (json['amount'] as num?)?.toDouble(),
         status: parseSessionStatus(json['status'] as String?),
         createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
       );
+}
+
+String _connectorNameFromId(int id) {
+  const names = <int, String>{
+    1: 'CCS2',
+    2: 'Type2',
+    3: 'CHAdeMO',
+    4: 'Bharat AC',
+    5: 'Bharat DC',
+  };
+  return names[id] ?? 'Unknown';
+}
+
+int _connectorIdFromName(String name) {
+  switch (name.toLowerCase().replaceAll(' ', '')) {
+    case 'type2':
+      return 2;
+    case 'chademo':
+      return 3;
+    case 'bharatac':
+      return 4;
+    case 'bharatdc':
+      return 5;
+    case 'ccs2':
+    default:
+      return 1;
+  }
 }
 
 // ─── Payment ───

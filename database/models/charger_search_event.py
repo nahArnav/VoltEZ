@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,6 +23,16 @@ class ChargerSearchEvent(Base):
     CheckConstraint(
         "chargers_found >= 0",
         name="ck_charger_search_event_chargers_found_nonnegative",
+    ),
+    Index(
+        "ix_charger_search_events_location",
+        "search_location",
+        postgresql_using="gist",
+    ),
+    Index(
+        "idx_charger_search_events_search_location",
+        "search_location",
+        postgresql_using="gist",
     ),
     {"schema": "app"},
 )

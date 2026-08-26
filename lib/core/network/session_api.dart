@@ -1,3 +1,5 @@
+import 'api_service.dart';
+
 // ═════════════════════════════════════════════════════════════════════════════
 // DTOs
 // ═════════════════════════════════════════════════════════════════════════════
@@ -150,6 +152,9 @@ abstract class SessionApi {
   /// Throws if: too early, too late, booking not found, charger unavailable.
   Future<SessionData> checkIn(String bookingId);
 
+  /// POST /sessions/:id/start — transition the backend session to charging.
+  Future<SessionData> startSession(String sessionId);
+
   /// GET /sessions/:id/status — fetch live session status.
   Future<SessionData> getSessionStatus(String sessionId);
 
@@ -168,30 +173,119 @@ abstract class SessionApi {
 // ═════════════════════════════════════════════════════════════════════════════
 
 class LiveSessionApi implements SessionApi {
+  LiveSessionApi(this._api);
+
+  final ApiService _api;
+  SessionData? _activeSession;
+
   @override
   Future<SessionData> checkIn(String bookingId) async {
-    throw UnimplementedError('LiveSessionApi not connected yet.');
+    final response = await _api.checkIn(bookingId);
+    _activeSession = _fromJson(response.data as Map<String, dynamic>);
+    return _activeSession!;
+  }
+
+  @override
+  Future<SessionData> startSession(String sessionId) async {
+    final response = await _api.startCharging(sessionId);
+    _activeSession = _fromJson(response.data as Map<String, dynamic>);
+    return _activeSession!;
   }
 
   @override
   Future<SessionData> getSessionStatus(String sessionId) async {
-    throw UnimplementedError('LiveSessionApi not connected yet.');
+    if (_activeSession?.sessionId != sessionId) {
+      throw SessionApiException('Session status endpoint is unavailable.');
+    }
+    return _activeSession!;
   }
 
   @override
   Future<SessionSummary> endSession(String sessionId) async {
-    throw UnimplementedError('LiveSessionApi not connected yet.');
+    final response = await _api.completeSession(
+      sessionId,
+      _activeSession?.energyKwh ?? 0,
+    );
+    final json = response.data as Map<String, dynamic>;
+    final completed = _fromJson(json);
+    _activeSession = completed;
+    final started = completed.sessionStartedAt;
+    final ended = json['ended_at'] != null
+        ? DateTime.parse(json['ended_at'] as String).toLocal()
+        : DateTime.now();
+    return SessionSummary(
+      sessionId: completed.sessionId,
+      chargerName: completed.chargerName,
+      connectorType: completed.connectorType,
+      durationMinutes: started == null ? 0 : ended.difference(started).inMinutes,
+      energyKwh: completed.energyKwh,
+      totalCost: completed.runningCost,
+      date: '${ended.day}/${ended.month}/${ended.year}',
+      startTime: completed.slotStart,
+      endTime: _clock(ended),
+    );
   }
 
   @override
   Future<void> submitRating(RatingPayload payload) async {
-    throw UnimplementedError('LiveSessionApi not connected yet.');
+    throw SessionApiException('The backend does not expose a review endpoint yet.');
   }
 
   @override
   Future<List<DriverHistoryItem>> getHistory() async {
-    throw UnimplementedError('LiveSessionApi not connected yet.');
+    final response = await _api.getDriverBookings();
+    return (response.data as List<dynamic>).map((item) {
+      final json = item as Map<String, dynamic>;
+      final start = DateTime.parse(json['start_at'] as String).toLocal();
+      final end = DateTime.parse(json['end_at'] as String).toLocal();
+      return DriverHistoryItem(
+        id: json['id'].toString(),
+        chargerName: 'Charger booking',
+        chargerAddress: 'Port ${json['charger_port_id']}',
+        date: '${start.day}/${start.month}/${start.year}',
+        startTime: _clock(start),
+        endTime: _clock(end),
+        connectorType: 'See charger details',
+        powerKw: 0,
+        durationMinutes: end.difference(start).inMinutes,
+        energyKwh: 0,
+        amountPaid: 0,
+        status: json['status']?.toString() ?? 'held',
+      );
+    }).toList();
   }
+
+  SessionData _fromJson(Map<String, dynamic> json) {
+    final status = json['status']?.toString();
+    final started = json['started_at'] != null
+        ? DateTime.parse(json['started_at'] as String).toLocal()
+        : null;
+    return SessionData(
+      sessionId: json['id'].toString(),
+      bookingId: json['booking_id']?.toString() ?? '',
+      chargerName: 'VoltEZ charger',
+      chargerAddress: 'Port ${json['charger_port_id']}',
+      connectorType: 'Connected port',
+      powerKw: 0,
+      slotStart: started == null ? '' : _clock(started),
+      slotEnd: '',
+      status: status == 'charging'
+          ? SessionStatus.charging
+          : status == 'completed'
+              ? SessionStatus.completed
+              : status == 'failed'
+                  ? SessionStatus.failed
+                  : SessionStatus.checkedIn,
+      energyKwh: (json['energy_kwh'] as num?)?.toDouble() ?? 0,
+      runningCost: (json['amount'] as num?)?.toDouble() ?? 0,
+      currentPowerKw: status == 'charging' ? 1 : 0,
+      sessionStartedAt: started,
+      lastUpdated: DateTime.now(),
+    );
+  }
+
+  static String _clock(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -236,6 +330,10 @@ class MockSessionApi implements SessionApi {
 
     return _activeSession!;
   }
+
+  @override
+  Future<SessionData> startSession(String sessionId) =>
+      getSessionStatus(sessionId);
 
   @override
   Future<SessionData> getSessionStatus(String sessionId) async {

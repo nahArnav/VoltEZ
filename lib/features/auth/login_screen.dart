@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -42,57 +43,65 @@ class _RoleSelect extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-        builder: (_, box) => SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: box.maxHeight),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
-                const Text(
-                  'VOLTEZ',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3,
+        builder: (_, box) {
+          final heroWidth = math.min(math.max(0.0, box.maxWidth - 48), 360.0);
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: box.maxHeight),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  const Text(
+                    'VOLTEZ',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 42,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 3,
+                    ),
                   ),
-                ),
-                const Text(
-                  'INTELLIGENT EV CHARGING NETWORK',
-                  style: _micro,
-                ),
-                const SizedBox(height: 12),
-                const HolographicEv(progress: .62, compact: true),
-                const SizedBox(height: 18),
-                Text('Choose your access', style: AppTypography.displaySmall),
-                const SizedBox(height: 8),
-                const Text(
-                  'A private, connected energy experience.',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 22),
-                _AccessCard(
-                  icon: Icons.person_outline_rounded,
-                  title: 'Driver access',
-                  detail: 'Find and use intelligent charging.',
-                  color: AppColors.primary,
-                  onTap: () => onSelect(AccountRole.driver),
-                ),
-                const SizedBox(height: 12),
-                _AccessCard(
-                  icon: Icons.business_center_outlined,
-                  title: 'Business owner',
-                  detail: 'Manage chargers, fleet and insights.',
-                  color: AppColors.success,
-                  onTap: () => onSelect(AccountRole.owner),
-                ),
-                const SizedBox(height: 20),
-              ],
+                  const Text(
+                    'INTELLIGENT EV CHARGING NETWORK',
+                    style: _micro,
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: SizedBox(
+                      width: heroWidth,
+                      child: const HolographicEv(progress: .62, compact: true),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text('Choose your access', style: AppTypography.displaySmall),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'A private, connected energy experience.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 22),
+                  _AccessCard(
+                    icon: Icons.person_outline_rounded,
+                    title: 'Driver access',
+                    detail: 'Find and use intelligent charging.',
+                    color: AppColors.primary,
+                    onTap: () => onSelect(AccountRole.driver),
+                  ),
+                  const SizedBox(height: 12),
+                  _AccessCard(
+                    icon: Icons.business_center_outlined,
+                    title: 'Business owner',
+                    detail: 'Manage chargers, fleet and insights.',
+                    color: AppColors.success,
+                    onTap: () => onSelect(AccountRole.owner),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       );
 }
 
@@ -177,11 +186,28 @@ class _AuthPanelState extends State<_AuthPanel> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!(_form.currentState?.validate() ?? false)) return;
 
-    // Quick demo login — skip backend for now
-    context.read<AuthProvider>().demoLogin(widget.role);
+    final auth = context.read<AuthProvider>();
+    final success = widget.signUp
+        ? await auth.signup(
+            _name.text.trim(),
+            _email.text.trim(),
+            _password.text,
+            role: widget.role,
+          )
+        : await auth.login(_email.text.trim(), _password.text);
+
+    if (!mounted || !success) return;
+
+    if (auth.currentRole != widget.role) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This account belongs to a different role.')),
+      );
+      await auth.logout();
+      return;
+    }
 
     if (widget.role == AccountRole.owner) {
       context.go('/business/dashboard');
@@ -192,6 +218,7 @@ class _AuthPanelState extends State<_AuthPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     final accent =
         widget.role == AccountRole.owner ? AppColors.success : AppColors.primary;
 
@@ -296,8 +323,17 @@ class _AuthPanelState extends State<_AuthPanel> {
                       PrimaryButton(
                         text: widget.signUp ? 'CREATE ACCOUNT' : 'CONTINUE',
                         onPressed: _submit,
+                        isLoading: auth.isLoading,
                         isExpanded: true,
                       ),
+                      if (auth.error != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          auth.error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: AppColors.error, fontSize: 12),
+                        ),
+                      ],
                       const SizedBox(height: 11),
                       SizedBox(
                         width: double.infinity,

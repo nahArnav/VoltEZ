@@ -44,19 +44,9 @@ class AuthProvider extends ChangeNotifier {
         }
       }
 
-      // After login, fetch user profile from /users/me
-      try {
-        final userResponse = await _api.getMe();
-        _user = User.fromJson(userResponse.data as Map<String, dynamic>);
-      } catch (_) {
-        // Fallback: create from email
-        _user = User(
-          id: 0,
-          name: email.split('@').first,
-          email: email,
-          role: AccountRole.driver,
-        );
-      }
+      // Fetch the authoritative profile; never fabricate an authenticated user.
+      final userResponse = await _api.getMe();
+      _user = User.fromJson(userResponse.data as Map<String, dynamic>);
 
       _isLoading = false;
       notifyListeners();
@@ -71,13 +61,23 @@ class AuthProvider extends ChangeNotifier {
 
   // ─── Signup ───
   // Backend: POST /auth/register → returns UserResponse
-  Future<bool> signup(String name, String email, String password) async {
+  Future<bool> signup(
+    String name,
+    String email,
+    String password, {
+    required AccountRole role,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _api.register(name: name, email: email, password: password);
+      final response = await _api.register(
+        name: name,
+        email: email,
+        password: password,
+        role: role.name,
+      );
       final userData = response.data as Map<String, dynamic>;
 
       // Backend returns user object, then we need to login separately
@@ -85,10 +85,15 @@ class AuthProvider extends ChangeNotifier {
       final loginData = loginResponse.data as Map<String, dynamic>;
 
       final accessToken = loginData['access_token'] as String?;
+      final refreshToken = loginData['refresh_token'] as String?;
       if (accessToken != null) {
         _api.setToken(accessToken);
+        _api.setRefreshToken(refreshToken);
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', accessToken);
+        if (refreshToken != null) {
+          await prefs.setString('refresh_token', refreshToken);
+        }
       }
 
       _user = User.fromJson(userData);
@@ -121,7 +126,7 @@ class AuthProvider extends ChangeNotifier {
   // ─── Quick login (for demo/testing — skips backend) ───
   void demoLogin(AccountRole role) {
     _user = User(
-      id: 9999,
+      id: 'demo',
       name: role == AccountRole.driver ? 'Demo Driver' : 'ABC Motors',
       email: role == AccountRole.driver ? 'driver@voltez.in' : 'business@voltez.in',
       role: role,
@@ -136,8 +141,10 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     _error = null;
     _api.setToken(null);
+    _api.setRefreshToken(null);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove('refresh_token');
     notifyListeners();
   }
 
@@ -145,8 +152,10 @@ class AuthProvider extends ChangeNotifier {
   Future<void> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
+    final refreshToken = prefs.getString('refresh_token');
     if (token != null) {
       _api.setToken(token);
+      _api.setRefreshToken(refreshToken);
       try {
         final response = await _api.getMe();
         _user = User.fromJson(response.data as Map<String, dynamic>);

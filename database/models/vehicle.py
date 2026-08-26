@@ -87,3 +87,8 @@ class Vehicle(Base):
         backref="vehicles",
         lazy="selectin"
     )
+
+    @property
+    def connector_type_ids(self) -> list[int]:
+        """Expose the join-table relationship through the public API contract."""
+        return [connector.id for connector in self.connector_types]

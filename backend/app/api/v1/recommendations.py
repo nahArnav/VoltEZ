@@ -1,8 +1,7 @@
 from app.schemas.enums import UserRole
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any
 
 from app.db.session import get_db
 from database.models.user import User
@@ -14,6 +13,7 @@ router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 
 @router.post("/", response_model=RecommendationResponse)
 async def get_recommendations(
+    request: Request,
     request_data: RecommendationRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -21,12 +21,16 @@ async def get_recommendations(
     """
     Get charging route recommendations based on battery SoC, vehicle, and route.
     """
-    return await recommendation_service.get_recommendations(db, request_data)
+    return await recommendation_service.get_recommendations(
+        db,
+        request_data,
+        availability_model=getattr(request.app.state, "availability_model", None),
+    )
 
 @router.get("/business/{business_id}")
 async def get_business_recommendations(
     business_id: UUID,
-    current_user: User = Depends(require_role(UserRole.OWNER.ADMIN)),
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db)
 ):
     """

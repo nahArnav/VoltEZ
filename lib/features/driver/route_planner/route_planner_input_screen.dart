@@ -31,6 +31,9 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<RoutePlannerProvider>().loadVehicles();
+    });
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),

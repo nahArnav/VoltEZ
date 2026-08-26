@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/colors.dart';
@@ -37,79 +38,94 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: AppColors.background,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            const CustomPaint(painter: _HudGrid()),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: AnimatedBuilder(
-                  animation: _c,
-                  builder: (_, _) {
-                    final p = _c.value;
-                    return Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        body: LayoutBuilder(
+          builder: (_, box) {
+            final availableWidth = math.max(0.0, box.maxWidth - 48);
+            final carWidth = math.min(
+              availableWidth,
+              math.min(560.0, box.maxHeight * .78),
+            );
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                const CustomPaint(painter: _HudGrid()),
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: AnimatedBuilder(
+                      animation: _c,
+                      builder: (_, _) {
+                        final p = _c.value;
+                        return Column(
                           children: [
-                            const Text(
-                              'VOLTEZ // VEHICLE OS',
-                              style: _micro,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'VOLTEZ // VEHICLE OS',
+                                  style: _micro,
+                                ),
+                                Text(
+                                  'BOOT ${(p * 100).round().toString().padLeft(3, '0')}%',
+                                  style: _micro.copyWith(
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              'BOOT ${(p * 100).round().toString().padLeft(3, '0')}%',
-                              style: _micro.copyWith(
-                                color: AppColors.primary,
+                            Expanded(
+                              child: Center(
+                                child: Transform.scale(
+                                  scale: 1 + .06 * p,
+                                  child: SizedBox(
+                                    width: carWidth,
+                                    child: HolographicEv(progress: p),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Opacity(
+                              opacity:
+                                  Curves.easeIn.transform((p / .55).clamp(0, 1)),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'VOLTEZ',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 36,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Powering the Future of EV Charging',
+                                    style: TextStyle(
+                                      color: AppColors.textMuted,
+                                      fontSize: 13,
+                                      letterSpacing: .5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 22),
+                                  LinearProgressIndicator(
+                                    value: p,
+                                    color: AppColors.primary,
+                                    backgroundColor: AppColors.surface,
+                                    minHeight: 3,
+                                  ),
+                                ],
                               ),
                             ),
                           ],
-                        ),
-                        const Spacer(),
-                        Transform.scale(
-                          scale: 1 + .06 * p,
-                          child: HolographicEv(progress: p),
-                        ),
-                        const Spacer(),
-                        Opacity(
-                          opacity: Curves.easeIn.transform((p / .55).clamp(0, 1)),
-                          child: Column(
-                            children: [
-                              const Text(
-                                'VOLTEZ',
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 4,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Powering the Future of EV Charging',
-                                style: TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontSize: 13,
-                                  letterSpacing: .5,
-                                ),
-                              ),
-                              const SizedBox(height: 22),
-                              LinearProgressIndicator(
-                                value: p,
-                                color: AppColors.primary,
-                                backgroundColor: AppColors.surface,
-                                minHeight: 3,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                        );
+                      },
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       );
 }

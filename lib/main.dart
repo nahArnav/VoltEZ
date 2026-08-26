@@ -6,17 +6,41 @@ import 'core/providers/charger_discovery_provider.dart';
 import 'core/providers/route_planner_provider.dart';
 import 'core/providers/booking_provider.dart';
 import 'core/providers/session_provider.dart';
+import 'core/network/api_service.dart';
+import 'core/network/booking_api.dart';
+import 'core/network/session_api.dart';
+import 'core/network/session_websocket.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  final api = ApiService();
+  final auth = AuthProvider(api: api)..restoreSession();
+  const wsBaseUrl = String.fromEnvironment(
+    'WS_BASE_URL',
+    defaultValue: 'ws://127.0.0.1:8001/api/v1',
+  );
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()..restoreSession()),
-        ChangeNotifierProvider(create: (_) => ChargerDiscoveryProvider()),
-        ChangeNotifierProvider(create: (_) => RoutePlannerProvider()),
-        ChangeNotifierProvider(create: (_) => BookingProvider()),
-        ChangeNotifierProvider(create: (_) => SessionProvider()),
+        Provider<ApiService>.value(value: api),
+        ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ChangeNotifierProvider(
+          create: (_) => ChargerDiscoveryProvider(api: api),
+        ),
+        ChangeNotifierProvider(create: (_) => RoutePlannerProvider(api: api)),
+        ChangeNotifierProvider(
+          create: (_) => BookingProvider(bookingApi: LiveBookingApi(api)),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SessionProvider(
+            sessionApi: LiveSessionApi(api),
+            webSocket: LiveSessionWebSocket(
+              baseUrl: wsBaseUrl,
+              userIdGetter: () => auth.user?.id,
+              tokenGetter: () => api.token,
+            ),
+          ),
+        ),
       ],
       child: const VoltezApp(),
     ),

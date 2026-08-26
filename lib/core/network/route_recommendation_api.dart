@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../shared/models/models.dart';
+import 'api_service.dart';
 
 /// ─── Request / Response DTOs ────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ class RouteRecommendationRequest {
     required this.currentSOC,
     required this.reserveSOC,
     required this.preference,
+    this.vehicleId = '',
     this.originName,
     this.destinationName,
   });
@@ -33,6 +35,7 @@ class RouteRecommendationRequest {
   final double currentSOC;
   final double reserveSOC;
   final String preference;
+  final String vehicleId;
   final String? originName;
   final String? destinationName;
 
@@ -127,18 +130,75 @@ abstract class RouteRecommendationApi {
 class LiveRouteRecommendationApi implements RouteRecommendationApi {
   LiveRouteRecommendationApi(this._api);
 
-  // ignore: unused_field
-  final dynamic _api;
+  final ApiService _api;
 
   @override
   Future<List<RouteRecommendationResult>> getRecommendations(
     RouteRecommendationRequest request,
   ) async {
-    // TODO: Wire to _api.getRouteRecommendations(...) once backend is live.
-    throw UnimplementedError(
-      'LiveRouteRecommendationApi is not connected yet. '
-      'Use MockRouteRecommendationApi for development.',
+    final response = await _api.getRouteRecommendations(
+      originLat: request.originLat,
+      originLng: request.originLng,
+      vehicleId: request.vehicleId,
+      currentSOC: request.currentSOC,
+      targetSOC: 80,
+      reserveSOC: request.reserveSOC,
+      preference: request.preference,
     );
+    final body = response.data as Map<String, dynamic>;
+    final rows = body['recommendations'] as List<dynamic>? ?? const [];
+
+    return rows.map((item) {
+      final json = item as Map<String, dynamic>;
+      final charger = Charger.fromJson(
+        json['charger'] as Map<String, dynamic>,
+      );
+      final reachable = json['reachable'] as bool? ?? false;
+      final distance =
+          (json['distance_to_charger_km'] as num?)?.toDouble() ?? 0;
+      final ranking = (json['ranking_score'] as num?)?.toDouble() ?? 0;
+      final normalizedReliability = charger.reliabilityScore > 1
+          ? charger.reliabilityScore / 100
+          : charger.reliabilityScore;
+
+      return RouteRecommendationResult(
+        charger: charger,
+        reason: reachable
+            ? '${distance.toStringAsFixed(1)} km away and reachable at your current charge.'
+            : 'Outside the safe range at your current state of charge.',
+        estimatedCost: (json['estimated_cost'] as num?)?.toDouble() ?? 0,
+        estimatedTimeMinutes:
+            ((json['estimated_charge_minutes'] as num?)?.toDouble() ?? 0)
+                .round(),
+        confidenceScore: (ranking / 1000).clamp(0.0, 1.0),
+        reliabilityScore: normalizedReliability.clamp(0.0, 1.0),
+        connectorCompatible: charger.ports.any(
+          (port) =>
+              port.connectorType.toLowerCase() ==
+              request.connectorType.toLowerCase(),
+        ),
+        factors: [
+          RecommendationReason(
+            icon: reachable
+                ? Icons.route_rounded
+                : Icons.warning_amber_rounded,
+            label: reachable ? 'Reachable' : 'Low battery range',
+            description:
+                '${distance.toStringAsFixed(1)} km from your starting point',
+            color: reachable
+                ? const Color(0xFF34D399)
+                : const Color(0xFFEF4444),
+          ),
+          RecommendationReason(
+            icon: Icons.verified_rounded,
+            label: 'Reliability',
+            description:
+                '${(normalizedReliability * 100).round()}% charger trust score',
+            color: const Color(0xFF00E5FF),
+          ),
+        ],
+      );
+    }).toList();
   }
 }
 
@@ -186,7 +246,7 @@ class MockRouteRecommendationApi implements RouteRecommendationApi {
 
     return RouteRecommendationResult(
       charger: const Charger(
-        id: 1, businessId: 1,
+        id: '1', businessId: '1',
         name: 'Phoenix Mall Charger',
         address: 'Phoenix Mall, Lower Parel, Mumbai',
         latitude: 19.0760,
@@ -260,7 +320,7 @@ class MockRouteRecommendationApi implements RouteRecommendationApi {
 
     return RouteRecommendationResult(
       charger: const Charger(
-        id: 5, businessId: 1,
+        id: '5', businessId: '1',
         name: 'Bandra Hub DC Fast',
         address: 'Bandra Kurla Complex, Bandra East',
         latitude: 19.0596,
@@ -327,7 +387,7 @@ class MockRouteRecommendationApi implements RouteRecommendationApi {
 
     return RouteRecommendationResult(
       charger: const Charger(
-        id: 4, businessId: 1,
+        id: '4', businessId: '1',
         name: 'Marine Drive AC Charger',
         address: 'Marine Drive, Churchgate',
         latitude: 18.9432,

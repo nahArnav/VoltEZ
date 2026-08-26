@@ -36,13 +36,32 @@ class ChargerService:
         db_charger = Charger(**charger_data)
         db.add(db_charger)
         await db.commit()
-        await db.refresh(db_charger)
+        await db.refresh(db_charger, attribute_names=["ports"])
 
         # 5. Attach lat/lng for Pydantic serialization (ChargerResponse expects these fields)
         setattr(db_charger, "latitude", lat)
         setattr(db_charger, "longitude", lon)
 
         return db_charger
+
+    @staticmethod
+    async def get_charger(db: AsyncSession, charger_id: UUID) -> Charger | None:
+        """Fetch one charger with ports and decoded map coordinates."""
+        query = (
+            select(
+                Charger,
+                func.ST_Y(Charger.location.cast(GeometryType)).label("latitude"),
+                func.ST_X(Charger.location.cast(GeometryType)).label("longitude"),
+            )
+            .where(Charger.id == charger_id)
+        )
+        row = (await db.execute(query)).one_or_none()
+        if row is None:
+            return None
+        charger, lat, lng = row
+        setattr(charger, "latitude", lat)
+        setattr(charger, "longitude", lng)
+        return charger
 
     @staticmethod
     async def get_nearby_chargers(

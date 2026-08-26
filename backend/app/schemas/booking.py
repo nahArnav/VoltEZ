@@ -6,27 +6,27 @@ from datetime import datetime, timezone
 
 
 
-# Shared properties
+# Shared properties for both incoming requests and API responses.
 class BookingBase(BaseModel):
     start_at: datetime
     end_at: datetime
 
     @model_validator(mode="after")
     def validate_time_rules(self):
-        # Rule 1: End must be after start
         if self.end_at <= self.start_at:
             raise ValueError("end_at must be strictly after start_at")
-        
-        # Rule 2: Booking must be in the future (adding a small buffer for server delay)
-        now = datetime.now(timezone.utc)
-        if self.start_at < now:
-            raise ValueError("Booking start_at cannot be in the past")
-            
         return self
 
 # Properties to receive via API on booking creation
 class BookingCreate(BookingBase):
     charger_port_id: UUID
+
+    @model_validator(mode="after")
+    def validate_new_booking_is_future(self):
+        now = datetime.now(timezone.utc)
+        if self.start_at < now:
+            raise ValueError("Booking start_at cannot be in the past")
+        return self
 
 
 # Properties to receive via API on state transitions

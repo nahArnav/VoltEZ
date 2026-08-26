@@ -12,6 +12,18 @@ from app.repositories.business import business_repo
 
 router = APIRouter(prefix="/businesses", tags=["Businesses"])
 
+
+@router.get("/me", response_model=BusinessResponse)
+async def get_my_business(
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the owner's primary business for the current single-business UI."""
+    businesses = await business_repo.get_by_owner_id(db, owner_id=current_user.id)
+    if not businesses:
+        raise HTTPException(status_code=404, detail="Business not found")
+    return businesses[0]
+
 @router.get("/", response_model=List[BusinessResponse])
 async def list_businesses(
     current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
@@ -41,6 +53,8 @@ async def create_business(
     business_data["verification_status"] = "pending"
     
     business = await business_repo.create(db, obj_in=business_data)
+    await db.commit()
+    await db.refresh(business)
     
     # Attach lat/lng for Pydantic serialization
     setattr(business, "latitude", lat)
@@ -71,7 +85,23 @@ async def update_business(
     if not business or business.owner_id != current_user.id:  # type: ignore
         raise HTTPException(status_code=404, detail="Business not found or unauthorized")
     
-    business = await business_repo.update(db, db_obj=business, obj_in=business_in)
+    update_data = business_in.model_dump(exclude_unset=True)
+    lat = update_data.pop("latitude", None)
+    lon = update_data.pop("longitude", None)
+    if (lat is None) != (lon is None):
+        raise HTTPException(
+            status_code=422,
+            detail="latitude and longitude must be updated together",
+        )
+    if lat is not None and lon is not None:
+        update_data["location"] = f"SRID=4326;POINT({lon} {lat})"
+
+    business = await business_repo.update(db, db_obj=business, obj_in=update_data)
+    await db.commit()
+    await db.refresh(business)
+    if lat is not None:
+        setattr(business, "latitude", lat)
+        setattr(business, "longitude", lon)
     return business
 
 @router.delete("/{business_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -85,4 +115,5 @@ async def delete_business(
         raise HTTPException(status_code=404, detail="Business not found or unauthorized")
     
     await business_repo.remove(db, id=business_id)
+    await db.commit()
     return None

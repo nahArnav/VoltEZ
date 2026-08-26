@@ -23,15 +23,14 @@ class FCMService:
         """
         payload = payload or {}
         
-        # Merge title and body into payload since Notification schema expects it
-        db_payload = {**payload, "title": title, "body": body}
-        
         # 1. Save to Database
         notification_in = NotificationCreate(
             user_id=user_id,
             type=payload.get("type", "system"),
-            payload=db_payload,
-            status="sent" # Since it's a mock, we assume it sent instantly
+            title=title,
+            message=body,
+            data=payload,
+            status="unread",
         )
         await notification_repo.create(db, obj_in=notification_in)
         

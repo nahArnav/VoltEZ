@@ -100,16 +100,22 @@ abstract class SessionWebSocket {
 /// Connects to the real backend WebSocket endpoint.
 ///
 /// Expected server protocol:
-/// - URL: `wss://{host}/sessions/{sessionId}/stream`
+/// - URL: `wss://{host}/api/v1/ws/{userId}?token={jwt}`
 /// - Client → Server: `{"type": "ping"}`
 /// - Server → Client: `{"type": "status_update", "data": {...SessionData...}}`
 /// - Server → Client: `{"type": "session_completed", "data": {...SessionSummary...}}`
 /// - Server → Client: `{"type": "pong"}`
 /// - Server → Client: `{"type": "error", "message": "..."}`
 class LiveSessionWebSocket implements SessionWebSocket {
-  LiveSessionWebSocket({required this.baseUrl});
+  LiveSessionWebSocket({
+    required this.baseUrl,
+    required this.userIdGetter,
+    required this.tokenGetter,
+  });
 
   final String baseUrl;
+  final String? Function() userIdGetter;
+  final String? Function() tokenGetter;
 
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
@@ -148,7 +154,14 @@ class LiveSessionWebSocket implements SessionWebSocket {
     _setState(WebSocketConnectionState.connecting);
 
     try {
-      final uri = Uri.parse('$baseUrl/sessions/$_sessionId/stream');
+      final userId = userIdGetter();
+      final token = tokenGetter();
+      if (userId == null || userId.isEmpty || token == null || token.isEmpty) {
+        throw StateError('Authenticated WebSocket identity is unavailable.');
+      }
+      final uri = Uri.parse('$baseUrl/ws/$userId').replace(
+        queryParameters: {'token': token},
+      );
       _channel = WebSocketChannel.connect(uri);
 
       // Wait for the connection to be ready
