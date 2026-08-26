@@ -1,869 +1,540 @@
 import 'package:flutter/material.dart';
-import '../chargers/charger_management_screen.dart';
+import 'package:provider/provider.dart';
 
-// Shared Voltez AI-mobility command-centre palette.
-const _ivory = Color(0xFF05090E);
-const _ink = Color(0xFFF1F8FF);
-const _forest = Color(0xFF50F5FF);
-const _rust = Color(0xFFC9FF58);
-const _fadeInk = Color(0xFF7990A1);
-const _panel = Color(0xFF0D1821);
+import '../../../core/auth/auth_provider.dart';
+import '../../../core/providers/business_provider.dart';
+import '../../../core/theme/colors.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.initialTab = 0});
+
+  final int initialTab;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _selectedIndex = 0;
+  late int _tab = widget.initialTab;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BusinessProvider>().load();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<BusinessProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.business == null) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (provider.needsOnboarding) {
+          return _BusinessOnboarding(provider: provider);
+        }
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(provider.business?['name']?.toString() ?? 'VoltEZ Business'),
+            actions: [
+              IconButton(
+                tooltip: 'Refresh',
+                onPressed: provider.isLoading ? null : provider.load,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                if (provider.errorMessage != null)
+                  MaterialBanner(
+                    content: Text(provider.errorMessage!),
+                    actions: [
+                      TextButton(onPressed: provider.load, child: const Text('RETRY')),
+                    ],
+                  ),
+                if (provider.isLoading) const LinearProgressIndicator(minHeight: 2),
+                Expanded(
+                  child: IndexedStack(
+                    index: _tab,
+                    children: [
+                      _Overview(provider: provider),
+                      _Chargers(provider: provider),
+                      _Bookings(provider: provider),
+                      _Analytics(provider: provider),
+                      _Profile(provider: provider),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _tab,
+            onDestinationSelected: (value) => setState(() => _tab = value),
+            destinations: const [
+              NavigationDestination(icon: Icon(Icons.dashboard_rounded), label: 'Home'),
+              NavigationDestination(icon: Icon(Icons.ev_station_rounded), label: 'Chargers'),
+              NavigationDestination(icon: Icon(Icons.event_note_rounded), label: 'Bookings'),
+              NavigationDestination(icon: Icon(Icons.insights_rounded), label: 'AI'),
+              NavigationDestination(icon: Icon(Icons.person_rounded), label: 'Profile'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BusinessOnboarding extends StatefulWidget {
+  const _BusinessOnboarding({required this.provider});
+  final BusinessProvider provider;
+
+  @override
+  State<_BusinessOnboarding> createState() => _BusinessOnboardingState();
+}
+
+class _BusinessOnboardingState extends State<_BusinessOnboarding> {
+  final _form = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _category = TextEditingController(text: 'mall');
+  final _address = TextEditingController(text: 'Pune, Maharashtra');
+  final _latitude = TextEditingController(text: '18.5204');
+  final _longitude = TextEditingController(text: '73.8567');
+
+  @override
+  void dispose() {
+    for (final controller in [_name, _category, _address, _latitude, _longitude]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _ivory,
-      body: SafeArea(
-        child: IndexedStack(
-          index: _selectedIndex,
-          children: const [
-            _DashboardHome(),
-            _ChargersPage(),
-            _BookingsPage(),
-            _AnalyticsPage(),
-            _ProfilePage(),
-          ],
+      appBar: AppBar(title: const Text('Set up your charging business')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Form(
+            key: _form,
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                const Icon(Icons.storefront_rounded, size: 72, color: AppColors.primary),
+                const SizedBox(height: 20),
+                _field(_name, 'Business name'),
+                _field(_category, 'Category'),
+                _field(_address, 'Address'),
+                Row(children: [
+                  Expanded(child: _field(_latitude, 'Latitude', numeric: true)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _field(_longitude, 'Longitude', numeric: true)),
+                ]),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: widget.provider.isLoading ? null : _submit,
+                  child: const Text('CREATE BUSINESS PROFILE'),
+                ),
+                if (widget.provider.errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(widget.provider.errorMessage!, style: const TextStyle(color: Colors.redAccent)),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
-      bottomNavigationBar: _BottomNav(
-        selectedIndex: _selectedIndex,
-        onChanged: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
+    );
+  }
+
+  Widget _field(TextEditingController controller, String label, {bool numeric = false}) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextFormField(
+          controller: controller,
+          decoration: InputDecoration(labelText: label),
+          keyboardType: numeric ? const TextInputType.numberWithOptions(decimal: true) : null,
+          validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+        ),
+      );
+
+  Future<void> _submit() async {
+    if (!(_form.currentState?.validate() ?? false)) return;
+    final latitude = double.tryParse(_latitude.text);
+    final longitude = double.tryParse(_longitude.text);
+    if (latitude == null || longitude == null) return;
+    await widget.provider.createBusiness(
+      name: _name.text.trim(),
+      category: _category.text.trim(),
+      address: _address.text.trim(),
+      latitude: latitude,
+      longitude: longitude,
+    );
+  }
+}
+
+class _Overview extends StatelessWidget {
+  const _Overview({required this.provider});
+  final BusinessProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = provider.chargers.where((c) => c['status'] == 'available').length;
+    final confirmed = provider.bookings.where((b) => b['status'] == 'confirmed').length;
+    return RefreshIndicator(
+      onRefresh: provider.load,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text('Live operations', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _Metric(label: 'Chargers', value: '${provider.chargers.length}', icon: Icons.ev_station),
+              _Metric(label: 'Available', value: '$active', icon: Icons.bolt),
+              _Metric(label: 'Bookings', value: '${provider.bookings.length}', icon: Icons.event),
+              _Metric(label: 'Confirmed', value: '$confirmed', icon: Icons.verified),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text('Recent bookings', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          if (provider.bookings.isEmpty)
+            const _Empty(text: 'No bookings yet. New driver bookings will appear here.')
+          else
+            ...provider.bookings.take(5).map(_bookingTile),
+        ],
       ),
     );
   }
 }
 
-// ============================================================
-// DASHBOARD HOME
-// ============================================================
-
-class _DashboardHome extends StatelessWidget {
-  const _DashboardHome();
+class _Chargers extends StatelessWidget {
+  const _Chargers({required this.provider});
+  final BusinessProvider provider;
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 22, 24, 30),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              _buildHeader(),
-              const SizedBox(height: 34),
-
-              const _SectionLabel(
-                number: '01',
-                title: 'TODAY AT A GLANCE',
-              ),
-
-              const SizedBox(height: 16),
-
-              _buildStats(),
-
-              const SizedBox(height: 34),
-
-              const _SectionLabel(
-                number: '02',
-                title: 'YOUR CHARGERS',
-              ),
-
-              const SizedBox(height: 16),
-
-              _buildChargers(),
-
-              const SizedBox(height: 34),
-
-              const _SectionLabel(
-                number: '03',
-                title: "TODAY'S BOOKINGS",
-              ),
-
-              const SizedBox(height: 16),
-
-              _buildBookings(),
-
-              const SizedBox(height: 34),
-
-              const _SectionLabel(
-                number: '04',
-                title: 'NETWORK UTILIZATION',
-              ),
-
-              const SizedBox(height: 16),
-
-              _buildUtilization(),
-
-              const SizedBox(height: 34),
-
-              _buildInsight(),
-
-              const SizedBox(height: 30),
-            ]),
-          ),
-        ),
-      ],
+    return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddCharger(context, provider),
+        icon: const Icon(Icons.add),
+        label: const Text('Add charger'),
+      ),
+      body: provider.chargers.isEmpty
+          ? const _Empty(text: 'Add your first physical charger to start accepting bookings.')
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              itemCount: provider.chargers.length,
+              itemBuilder: (context, index) {
+                final charger = provider.chargers[index];
+                final ports = charger['ports'] as List<dynamic>? ?? const [];
+                final available = charger['status'] == 'available';
+                return Card(
+                  child: ExpansionTile(
+                    leading: const Icon(Icons.ev_station_rounded, color: AppColors.primary),
+                    title: Text(charger['name']?.toString() ?? 'Charger'),
+                    subtitle: Text('${charger['power_kw']} kW • ${charger['status']} • ${ports.length} ports'),
+                    trailing: Switch(
+                      value: available,
+                      onChanged: (value) => provider.setChargerStatus(
+                        charger['id'].toString(),
+                        value ? 'available' : 'unavailable',
+                      ),
+                    ),
+                    children: [
+                      for (final raw in ports)
+                        ListTile(
+                          leading: const Icon(Icons.power_rounded),
+                          title: Text('Port ${(raw as Map)['port_number']} • ${raw['max_power_kw']} kW'),
+                          subtitle: Text(raw['is_active'] == true ? 'Active' : 'Inactive'),
+                          trailing: TextButton(
+                            onPressed: () => _showAvailability(context, provider, raw['id'].toString()),
+                            child: const Text('SCHEDULE'),
+                          ),
+                        ),
+                      OverflowBar(children: [
+                        TextButton.icon(
+                          onPressed: () => _showAddPort(context, provider, charger),
+                          icon: const Icon(Icons.add),
+                          label: const Text('ADD PORT'),
+                        ),
+                      ]),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
+}
 
-  Widget _buildHeader() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+class _Bookings extends StatelessWidget {
+  const _Bookings({required this.provider});
+  final BusinessProvider provider;
+
+  @override
+  Widget build(BuildContext context) => provider.bookings.isEmpty
+      ? const _Empty(text: 'No customer bookings have been recorded yet.')
+      : RefreshIndicator(
+          onRefresh: provider.load,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: provider.bookings.map(_bookingTile).toList(),
+          ),
+        );
+}
+
+class _Analytics extends StatelessWidget {
+  const _Analytics({required this.provider});
+  final BusinessProvider provider;
+
+  @override
+  Widget build(BuildContext context) => provider.recommendations.isEmpty
+      ? const _Empty(text: 'No off-peak opportunity is currently strong enough to recommend.')
+      : RefreshIndicator(
+          onRefresh: provider.load,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: provider.recommendations.map((item) => Card(
+              child: ListTile(
+                leading: const Icon(Icons.auto_awesome, color: AppColors.primary),
+                title: Text(item['recommended_action']?.toString() ?? 'Recommendation'),
+                subtitle: Text('Expected demand: ${item['expected_demand']} • Confidence: ${item['confidence']}'),
+                trailing: Text('${item['suggested_discount_pct'] ?? 0}%'),
+              ),
+            )).toList(),
+          ),
+        );
+}
+
+class _Profile extends StatelessWidget {
+  const _Profile({required this.provider});
+  final BusinessProvider provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final business = provider.business!;
+    return ListView(
+      padding: const EdgeInsets.all(20),
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'VOLTEZ / BUSINESS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2.5,
-                  color: _forest,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Good evening,',
-                style: TextStyle(
-                  fontSize: 17,
-                  color: _fadeInk,
-                ),
-              ),
-              const SizedBox(height: 2),
-              const Text(
-                'ABC Motors.',
-                style: TextStyle(
-                  fontSize: 31,
-                  fontWeight: FontWeight.w800,
-                  color: _ink,
-                  height: 1,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: _forest,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.notifications_none_rounded,
-            color: Colors.white,
-            size: 23,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStats() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _StatBlock(
-                value: '08',
-                label: 'ACTIVE\nCHARGERS',
-                accent: _forest,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatBlock(
-                value: '24',
-                label: 'BOOKINGS\nTODAY',
-                accent: _rust,
-              ),
-            ),
-          ],
+        const CircleAvatar(radius: 38, child: Icon(Icons.storefront, size: 38)),
+        const SizedBox(height: 16),
+        Center(child: Text(business['name'].toString(), style: Theme.of(context).textTheme.headlineSmall)),
+        Center(child: Text('${business['category']} • ${business['verification_status']}')),
+        const SizedBox(height: 24),
+        ListTile(leading: const Icon(Icons.location_on), title: Text(business['address_text']?.toString() ?? 'No address')),
+        ListTile(leading: const Icon(Icons.email), title: Text(context.read<AuthProvider>().user?.email ?? '')),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: () => _showEditBusiness(context, provider),
+          icon: const Icon(Icons.edit),
+          label: const Text('EDIT BUSINESS'),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _StatBlock(
-                value: '₹18.4K',
-                label: 'REVENUE\nTODAY',
-                accent: _ink,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatBlock(
-                value: '76%',
-                label: 'NETWORK\nUTILIZATION',
-                accent: _forest,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildChargers() {
-    return Column(
-      children: [
-        const _ChargerRow(
-          name: 'Charger 01',
-          type: 'DC FAST / 60 kW',
-          status: 'AVAILABLE',
-          statusColor: _forest,
-        ),
-        const Divider(height: 1),
-        const _ChargerRow(
-          name: 'Charger 02',
-          type: 'AC / 22 kW',
-          status: 'IN USE',
-          statusColor: _rust,
-        ),
-        const Divider(height: 1),
-        const _ChargerRow(
-          name: 'Charger 03',
-          type: 'DC FAST / 120 kW',
-          status: 'OFFLINE',
-          statusColor: _fadeInk,
-        ),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.add_rounded, size: 19),
-            label: const Text('ADD CHARGER'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _forest,
-              side: const BorderSide(
-                color: _forest,
-                width: 1.3,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBookings() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: const [
-          _BookingRow(
-            time: '10:00',
-            customer: 'Tata Nexon EV',
-            charger: 'Charger 01',
-            status: 'CONFIRMED',
-          ),
-          Divider(height: 1),
-          _BookingRow(
-            time: '12:30',
-            customer: 'MG ZS EV',
-            charger: 'Charger 02',
-            status: 'UPCOMING',
-          ),
-          Divider(height: 1),
-          _BookingRow(
-            time: '15:00',
-            customer: 'Hyundai Ioniq 5',
-            charger: 'Charger 01',
-            status: 'UPCOMING',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUtilization() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-      decoration: BoxDecoration(
-        color: _forest,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '76%',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                'LAST 7 DAYS',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          SizedBox(
-            height: 120,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                _Bar(value: 0.52, label: 'M'),
-                _Bar(value: 0.67, label: 'T'),
-                _Bar(value: 0.61, label: 'W'),
-                _Bar(value: 0.82, label: 'T'),
-                _Bar(value: 0.76, label: 'F'),
-                _Bar(value: 0.91, label: 'S'),
-                _Bar(value: 0.76, label: 'S'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInsight() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: _forest.withValues(alpha: 0.15),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: _rust,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.bolt_rounded,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'VOLTEZ INSIGHT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
-                    color: _rust,
-                  ),
-                ),
-                SizedBox(height: 7),
-                Text(
-                  'Charger 03 is underutilized between 11 AM – 3 PM.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                    color: _ink,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'View recommendation →',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: _forest,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// COMPONENTS
-// ============================================================
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({
-    required this.number,
-    required this.title,
-  });
-
-  final String number;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          number,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: _rust,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Container(
-            height: 1,
-            color: _ink.withValues(alpha: 0.15),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.4,
-            color: _fadeInk,
-          ),
+        FilledButton.tonalIcon(
+          onPressed: () => context.read<AuthProvider>().logout(),
+          icon: const Icon(Icons.logout),
+          label: const Text('LOG OUT'),
         ),
       ],
     );
   }
 }
 
-class _StatBlock extends StatelessWidget {
-  const _StatBlock({
-    required this.value,
-    required this.label,
-    required this.accent,
-  });
-
+class _Metric extends StatelessWidget {
+  const _Metric({required this.label, required this.value, required this.icon});
+  final String label;
   final String value;
-  final String label;
-  final Color accent;
+  final IconData icon;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 112,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(16),
+  Widget build(BuildContext context) => SizedBox(
+    width: 155,
+    child: Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, color: AppColors.primary),
+          const SizedBox(height: 10),
+          Text(value, style: Theme.of(context).textTheme.headlineMedium),
+          Text(label),
+        ]),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 28,
-            height: 4,
-            decoration: BoxDecoration(
-              color: accent,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 25,
-              fontWeight: FontWeight.w800,
-              color: _ink,
-            ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 9,
-              height: 1.25,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1,
-              color: _fadeInk,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    ),
+  );
 }
 
-class _ChargerRow extends StatelessWidget {
-  const _ChargerRow({
-    required this.name,
-    required this.type,
-    required this.status,
-    required this.statusColor,
-  });
-
-  final String name;
-  final String type;
-  final String status;
-  final Color statusColor;
-
-  
+class _Empty extends StatelessWidget {
+  const _Empty({required this.text});
+  final String text;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: _forest.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.ev_station_rounded,
-              color: _forest,
-              size: 21,
-            ),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: _ink,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  type,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: _fadeInk,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Row(
-            children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: statusColor,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                status,
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: statusColor,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.inbox_rounded, size: 56, color: Colors.white38),
+        const SizedBox(height: 12),
+        Text(text, textAlign: TextAlign.center),
+      ]),
+    ),
+  );
 }
 
-class _BookingRow extends StatelessWidget {
-  const _BookingRow({
-    required this.time,
-    required this.customer,
-    required this.charger,
-    required this.status,
-  });
-
-  final String time;
-  final String customer;
-  final String charger;
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 50,
-            child: Text(
-              time,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: _ink,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  customer,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: _ink,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  charger,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: _fadeInk,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            status,
-            style: const TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.7,
-              color: _forest,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+Widget _bookingTile(Map<String, dynamic> booking) {
+  final start = DateTime.tryParse(booking['start_at']?.toString() ?? '')?.toLocal();
+  final startText = start == null
+      ? 'Booking'
+      : '${start.day}/${start.month}/${start.year} ${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
+  return Card(
+    child: ListTile(
+      leading: const Icon(Icons.event_available_rounded),
+      title: Text(startText),
+      subtitle: Text('Port ${booking['charger_port_id']}'),
+      trailing: Chip(label: Text(booking['status']?.toString() ?? 'unknown')),
+    ),
+  );
 }
 
-class _Bar extends StatelessWidget {
-  const _Bar({
-    required this.value,
-    required this.label,
-  });
-
-  final double value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: FractionallySizedBox(
-              heightFactor: value,
-              child: Container(
-                width: 20,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(5),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.6),
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+Future<void> _showAddCharger(BuildContext context, BusinessProvider provider) async {
+  final name = TextEditingController();
+  final power = TextEditingController(text: '60');
+  final lat = TextEditingController(text: '18.5204');
+  final lng = TextEditingController(text: '73.8567');
+  final accepted = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Add charger'),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+        TextField(controller: power, decoration: const InputDecoration(labelText: 'Power (kW)'), keyboardType: TextInputType.number),
+        TextField(controller: lat, decoration: const InputDecoration(labelText: 'Latitude'), keyboardType: TextInputType.number),
+        TextField(controller: lng, decoration: const InputDecoration(labelText: 'Longitude'), keyboardType: TextInputType.number),
+      ])),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('SAVE')),
       ],
+    ),
+  );
+  if (accepted == true && context.mounted) {
+    await provider.createCharger(
+      name: name.text.trim(),
+      chargerType: 'public',
+      powerKw: double.tryParse(power.text) ?? 60,
+      latitude: double.tryParse(lat.text) ?? 18.5204,
+      longitude: double.tryParse(lng.text) ?? 73.8567,
     );
   }
 }
 
-// ============================================================
-// BOTTOM NAVIGATION
-// ============================================================
-
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({
-    required this.selectedIndex,
-    required this.onChanged,
-  });
-
-  final int selectedIndex;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [
-      (Icons.grid_view_rounded, 'Home'),
-      (Icons.ev_station_rounded, 'Chargers'),
-      (Icons.calendar_today_rounded, 'Bookings'),
-      (Icons.bar_chart_rounded, 'Analytics'),
-      (Icons.person_outline_rounded, 'Profile'),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _panel,
-        border: Border(
-          top: BorderSide(
-            color: _ink.withValues(alpha: 0.08),
-          ),
+Future<void> _showAddPort(BuildContext context, BusinessProvider provider, Map<String, dynamic> charger) async {
+  final number = TextEditingController(text: '${((charger['ports'] as List?)?.length ?? 0) + 1}');
+  final power = TextEditingController(text: '60');
+  int connector = 1;
+  final accepted = await showDialog<bool>(
+    context: context,
+    builder: (context) => StatefulBuilder(builder: (context, setState) => AlertDialog(
+      title: const Text('Add port'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        DropdownButtonFormField<int>(
+          initialValue: connector,
+          decoration: const InputDecoration(labelText: 'Connector'),
+          items: const [
+            DropdownMenuItem(value: 1, child: Text('CCS2')),
+            DropdownMenuItem(value: 2, child: Text('Type 2')),
+            DropdownMenuItem(value: 3, child: Text('CHAdeMO')),
+            DropdownMenuItem(value: 4, child: Text('Bharat AC')),
+            DropdownMenuItem(value: 5, child: Text('Bharat DC')),
+          ],
+          onChanged: (value) => setState(() => connector = value ?? 1),
         ),
-      ),
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(items.length, (index) {
-          final selected = index == selectedIndex;
-
-          return GestureDetector(
-            onTap: () => onChanged(index),
-            behavior: HitTestBehavior.opaque,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: selected
-                    ? _forest.withValues(alpha: 0.1)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    items[index].$1,
-                    size: 20,
-                    color: selected ? _forest : _fadeInk,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    items[index].$2,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight:
-                          selected ? FontWeight.w800 : FontWeight.w500,
-                      color: selected ? _forest : _fadeInk,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
+        TextField(controller: number, decoration: const InputDecoration(labelText: 'Port number'), keyboardType: TextInputType.number),
+        TextField(controller: power, decoration: const InputDecoration(labelText: 'Max power (kW)'), keyboardType: TextInputType.number),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('SAVE')),
+      ],
+    )),
+  );
+  if (accepted == true) {
+    await provider.createPort(
+      chargerId: charger['id'].toString(),
+      connectorTypeId: connector,
+      portNumber: int.tryParse(number.text) ?? 1,
+      maxPowerKw: double.tryParse(power.text) ?? 60,
     );
   }
 }
 
-// ============================================================
-// PLACEHOLDER PAGES
-// ============================================================
-class _ChargersPage extends StatelessWidget {
-  const _ChargersPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const ChargerManagementScreen();
-  }
-}
-
-class _BookingsPage extends StatelessWidget {
-  const _BookingsPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Bookings',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
-      ),
+Future<void> _showAvailability(BuildContext context, BusinessProvider provider, String portId) async {
+  final start = TextEditingController(text: '09:00');
+  final end = TextEditingController(text: '18:00');
+  int day = DateTime.now().weekday - 1;
+  final accepted = await showDialog<bool>(
+    context: context,
+    builder: (context) => StatefulBuilder(builder: (context, setState) => AlertDialog(
+      title: const Text('Create availability window'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        DropdownButtonFormField<int>(
+          initialValue: day,
+          decoration: const InputDecoration(labelText: 'Day'),
+          items: List.generate(7, (index) => DropdownMenuItem(value: index, child: Text(const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][index]))),
+          onChanged: (value) => setState(() => day = value ?? day),
+        ),
+        TextField(controller: start, decoration: const InputDecoration(labelText: 'Start (HH:MM)')),
+        TextField(controller: end, decoration: const InputDecoration(labelText: 'End (HH:MM)')),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('SAVE')),
+      ],
+    )),
+  );
+  if (accepted == true) {
+    await provider.createAvailability(
+      portId: portId,
+      dayOfWeek: day,
+      startTime: start.text,
+      endTime: end.text,
     );
   }
 }
 
-class _AnalyticsPage extends StatelessWidget {
-  const _AnalyticsPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Analytics',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-}
-
-class _ProfilePage extends StatelessWidget {
-  const _ProfilePage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Profile',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
-      ),
+Future<void> _showEditBusiness(BuildContext context, BusinessProvider provider) async {
+  final current = provider.business!;
+  final name = TextEditingController(text: current['name']?.toString());
+  final category = TextEditingController(text: current['category']?.toString());
+  final address = TextEditingController(text: current['address_text']?.toString());
+  final accepted = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Edit business'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+        TextField(controller: category, decoration: const InputDecoration(labelText: 'Category')),
+        TextField(controller: address, decoration: const InputDecoration(labelText: 'Address')),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('SAVE')),
+      ],
+    ),
+  );
+  if (accepted == true) {
+    await provider.updateBusiness(
+      name: name.text.trim(),
+      category: category.text.trim(),
+      address: address.text.trim(),
     );
   }
 }

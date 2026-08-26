@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../shared/models/models.dart';
 import '../network/api_service.dart';
 
@@ -9,6 +9,9 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider({ApiService? api}) : _api = api ?? ApiService();
 
   final ApiService _api;
+  static const _storage = FlutterSecureStorage();
+  static const _accessKey = 'voltez_access_token';
+  static const _refreshKey = 'voltez_refresh_token';
 
   // ─── State ───
   User? _user;
@@ -37,10 +40,9 @@ class AuthProvider extends ChangeNotifier {
       if (accessToken != null) {
         _api.setToken(accessToken);
         _api.setRefreshToken(refreshToken);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', accessToken);
+        await _storage.write(key: _accessKey, value: accessToken);
         if (refreshToken != null) {
-          await prefs.setString('refresh_token', refreshToken);
+          await _storage.write(key: _refreshKey, value: refreshToken);
         }
       }
 
@@ -89,10 +91,9 @@ class AuthProvider extends ChangeNotifier {
       if (accessToken != null) {
         _api.setToken(accessToken);
         _api.setRefreshToken(refreshToken);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', accessToken);
+        await _storage.write(key: _accessKey, value: accessToken);
         if (refreshToken != null) {
-          await prefs.setString('refresh_token', refreshToken);
+          await _storage.write(key: _refreshKey, value: refreshToken);
         }
       }
 
@@ -123,36 +124,21 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ─── Quick login (for demo/testing — skips backend) ───
-  void demoLogin(AccountRole role) {
-    _user = User(
-      id: 'demo',
-      name: role == AccountRole.driver ? 'Demo Driver' : 'ABC Motors',
-      email: role == AccountRole.driver ? 'driver@voltez.in' : 'business@voltez.in',
-      role: role,
-    );
-    _isLoading = false;
-    _error = null;
-    notifyListeners();
-  }
-
   // ─── Logout ───
   Future<void> logout() async {
     _user = null;
     _error = null;
     _api.setToken(null);
     _api.setRefreshToken(null);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-    await prefs.remove('refresh_token');
+    await _storage.delete(key: _accessKey);
+    await _storage.delete(key: _refreshKey);
     notifyListeners();
   }
 
   // ─── Restore session from storage ───
   Future<void> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    final refreshToken = prefs.getString('refresh_token');
+    final token = await _storage.read(key: _accessKey);
+    final refreshToken = await _storage.read(key: _refreshKey);
     if (token != null) {
       _api.setToken(token);
       _api.setRefreshToken(refreshToken);
@@ -161,8 +147,10 @@ class AuthProvider extends ChangeNotifier {
         _user = User.fromJson(response.data as Map<String, dynamic>);
       } catch (_) {
         // Token expired or invalid
-        await prefs.remove('auth_token');
+        await _storage.delete(key: _accessKey);
+        await _storage.delete(key: _refreshKey);
         _api.setToken(null);
+        _api.setRefreshToken(null);
       }
       notifyListeners();
     }

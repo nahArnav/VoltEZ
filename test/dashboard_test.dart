@@ -126,7 +126,7 @@ class DashboardScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: panel,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: cyan.withOpacity(0.2)),
+                border: Border.all(color: cyan.withValues(alpha: 0.2)),
               ),
               child: Text(rec, style: const TextStyle(color: Colors.white)),
             ),

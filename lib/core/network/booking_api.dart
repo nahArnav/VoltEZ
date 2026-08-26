@@ -146,7 +146,12 @@ abstract class BookingApi {
   Future<ConfirmedBooking> verifyPayment({
     required String orderId,
     required String bookingId,
+    required String paymentId,
+    required String signature,
   });
+
+  /// POST /bookings/{id}/cancel — release a held/confirmed booking.
+  Future<void> cancelBooking(String bookingId);
 
   /// GET /bookings — fetch driver's booking history.
   Future<List<ConfirmedBooking>> getBookingHistory();
@@ -175,44 +180,27 @@ class LiveBookingApi implements BookingApi {
       final port = rawPort as Map<String, dynamic>;
       if (!(port['is_active'] as bool? ?? true)) continue;
       final portId = port['id'].toString();
-      final windowResponse = await _api.getPortAvailability(portId);
-      final windows = windowResponse.data as List<dynamic>? ?? const [];
+      final slotResponse = await _api.getPortSlots(portId, date);
+      final openSlots = slotResponse.data as List<dynamic>? ?? const [];
 
-      for (final rawWindow in windows) {
-        final window = rawWindow as Map<String, dynamic>;
-        if ((window['day_of_week'] as num).toInt() != date.weekday - 1 ||
-            (window['is_unavailable'] as bool? ?? false)) {
-          continue;
-        }
-        final start = _combineDateAndTime(
-          date,
-          window['start_local_time'].toString(),
-        );
-        final end = _combineDateAndTime(
-          date,
-          window['end_local_time'].toString(),
-        );
-        var cursor = start;
-        while (cursor.isBefore(end)) {
-          final slotEnd = cursor.add(const Duration(hours: 1));
-          if (slotEnd.isAfter(end)) break;
-          if (slotEnd.isAfter(DateTime.now())) {
-            slots.add(SlotInfo(
-              id: '$portId|${cursor.toUtc().toIso8601String()}|${slotEnd.toUtc().toIso8601String()}',
-              chargerId: chargerId,
-              portName: 'Port ${port['port_number']}',
-              connectorType: _connectorName(
-                (port['connector_type_id'] as num?)?.toInt() ?? 1,
-              ),
-              startTime: cursor,
-              endTime: slotEnd,
-              status: SlotStatus.available,
-              pricePerKwh: 15,
-              lastUpdated: DateTime.now(),
-            ));
-          }
-          cursor = slotEnd;
-        }
+      for (final rawSlot in openSlots) {
+        final openSlot = rawSlot as Map<String, dynamic>;
+        final start = DateTime.parse(openSlot['start_at'] as String).toLocal();
+        final end = DateTime.parse(openSlot['end_at'] as String).toLocal();
+        slots.add(SlotInfo(
+          id: '$portId|${start.toUtc().toIso8601String()}|${end.toUtc().toIso8601String()}',
+          chargerId: chargerId,
+          portName: 'Port ${port['port_number']}',
+          connectorType: _connectorName(
+            (port['connector_type_id'] as num?)?.toInt() ?? 1,
+          ),
+          startTime: start,
+          endTime: end,
+          status: SlotStatus.available,
+          pricePerKwh:
+              (openSlot['price_per_kwh'] as num?)?.toDouble() ?? 15,
+          lastUpdated: DateTime.now(),
+        ));
       }
     }
     slots.sort((a, b) => a.startTime.compareTo(b.startTime));
@@ -253,7 +241,7 @@ class LiveBookingApi implements BookingApi {
             ? DateTime.parse(json['hold_expires_at'] as String).toLocal()
             : DateTime.now().add(const Duration(minutes: 10)),
         slot: slot,
-        estimatedCost: 450,
+        estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0,
       );
     } catch (error) {
       if (error.toString().contains('SLOT_UNAVAILABLE')) {
@@ -272,9 +260,6 @@ class LiveBookingApi implements BookingApi {
   }) async {
     final response = await _api.createPaymentOrder({
       'booking_id': bookingId,
-      'amount': amount,
-      'currency': 'INR',
-      'status': 'pending',
     });
     final json = response.data as Map<String, dynamic>;
     return PaymentOrder(
@@ -288,11 +273,36 @@ class LiveBookingApi implements BookingApi {
   Future<ConfirmedBooking> verifyPayment({
     required String orderId,
     required String bookingId,
+    required String paymentId,
+    required String signature,
   }) async {
-    throw const PaymentFailedException(
-      'Payment confirmation is completed by the signed Razorpay webhook; '
-      'no client-side verification endpoint exists.',
+    await _api.verifyPayment({
+      'booking_id': bookingId,
+      'provider_order_id': orderId,
+      'provider_payment_id': paymentId,
+      'provider_signature': signature,
+    });
+    final response = await _api.getBooking(bookingId);
+    final json = response.data as Map<String, dynamic>;
+    final start = DateTime.parse(json['start_at'] as String).toLocal();
+    final end = DateTime.parse(json['end_at'] as String).toLocal();
+    return ConfirmedBooking(
+      bookingId: json['id'].toString(),
+      chargerName: 'VoltEZ charger',
+      chargerAddress: 'Port ${json['charger_port_id']}',
+      date: '${start.day}/${start.month}/${start.year}',
+      startTime: _clock(start),
+      endTime: _clock(end),
+      connectorType: 'Connected port',
+      powerKw: 0,
+      estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0,
+      status: json['status']?.toString() ?? 'confirmed',
     );
+  }
+
+  @override
+  Future<void> cancelBooking(String bookingId) async {
+    await _api.cancelBooking(bookingId);
   }
 
   @override
@@ -311,21 +321,10 @@ class LiveBookingApi implements BookingApi {
         endTime: _clock(end),
         connectorType: 'See charger details',
         powerKw: 0,
-        estimatedCost: 0,
+        estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0,
         status: json['status']?.toString() ?? 'held',
       );
     }).toList();
-  }
-
-  static DateTime _combineDateAndTime(DateTime date, String time) {
-    final parts = time.split(':');
-    return DateTime(
-      date.year,
-      date.month,
-      date.day,
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-    );
   }
 
   static String _connectorName(int id) {
@@ -420,7 +419,7 @@ class MockBookingApi implements BookingApi {
     }
 
     final now = DateTime.now();
-    final holdExpiry = now.add(const Duration(minutes: 5));
+    final holdExpiry = now.add(const Duration(minutes: 10));
     final parts = slotId.split('_');
     final hour = parts.length >= 3 ? int.tryParse(parts.last) ?? 14 : 14;
 
@@ -464,6 +463,8 @@ class MockBookingApi implements BookingApi {
   Future<ConfirmedBooking> verifyPayment({
     required String orderId,
     required String bookingId,
+    required String paymentId,
+    required String signature,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 1200));
 
@@ -487,6 +488,11 @@ class MockBookingApi implements BookingApi {
       estimatedCost: 210,
       status: 'confirmed',
     );
+  }
+
+  @override
+  Future<void> cancelBooking(String bookingId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 200));
   }
 
   @override

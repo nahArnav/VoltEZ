@@ -89,11 +89,12 @@ class RazorpayService {
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
-    // External wallet selected — treat as success flow (wallet handles payment)
+    // Selecting a wallet is not proof of payment and provides no signature.
     if (_completer.isCompleted) return;
     _completer.complete(RazorpayPaymentResult(
-      status: RazorpayPaymentStatus.success,
-      paymentId: 'wallet_${response.walletName}',
+      status: RazorpayPaymentStatus.failure,
+      errorMessage:
+          'Complete the payment in ${response.walletName ?? 'the wallet'} and retry.',
     ));
   }
 
@@ -114,16 +115,13 @@ class RazorpayService {
     RazorpayPrefill? prefill,
     List<String>? methods,
   }) async {
-    // On web, Razorpay Flutter SDK doesn't work — return a mock success
-    // so the flow can continue in dev mode.
+    // razorpay_flutter has no web checkout. Never fabricate a successful
+    // payment; production web must use Razorpay Checkout.js.
     if (kIsWeb) {
-      debugPrint(
-        '[RazorpayService] Web detected — returning mock success. '
-        'Razorpay SDK only works on Android/iOS.',
-      );
-      return RazorpayPaymentResult(
-        status: RazorpayPaymentStatus.success,
-        paymentId: 'web_mock_payment_${DateTime.now().millisecondsSinceEpoch}',
+      return const RazorpayPaymentResult(
+        status: RazorpayPaymentStatus.failure,
+        errorMessage:
+            'Payments are currently available in the VoltEZ Android/iOS app.',
       );
     }
 

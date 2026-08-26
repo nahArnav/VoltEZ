@@ -7,7 +7,6 @@ import 'package:voltez_frontend/core/providers/charger_discovery_provider.dart';
 import 'package:voltez_frontend/core/providers/route_planner_provider.dart';
 import 'package:voltez_frontend/core/providers/booking_provider.dart';
 import 'package:voltez_frontend/core/providers/session_provider.dart';
-import 'package:voltez_frontend/shared/models/models.dart';
 
 void main() {
   testWidgets('App renders without crashing', (WidgetTester tester) async {
@@ -15,7 +14,7 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider(
-            create: (_) => AuthProvider()..demoLogin(AccountRole.driver),
+            create: (_) => AuthProvider(),
           ),
           ChangeNotifierProvider(
             create: (_) => ChargerDiscoveryProvider(),

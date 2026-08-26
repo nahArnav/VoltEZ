@@ -194,9 +194,8 @@ class LiveSessionApi implements SessionApi {
 
   @override
   Future<SessionData> getSessionStatus(String sessionId) async {
-    if (_activeSession?.sessionId != sessionId) {
-      throw SessionApiException('Session status endpoint is unavailable.');
-    }
+    final response = await _api.getSession(sessionId);
+    _activeSession = _fromJson(response.data as Map<String, dynamic>);
     return _activeSession!;
   }
 
@@ -228,29 +227,37 @@ class LiveSessionApi implements SessionApi {
 
   @override
   Future<void> submitRating(RatingPayload payload) async {
-    throw SessionApiException('The backend does not expose a review endpoint yet.');
+    await _api.submitSessionRating(payload.sessionId, {
+      'session_id': payload.sessionId,
+      'rating': payload.rating,
+      if (payload.feedback != null) 'comment': payload.feedback,
+      if (payload.issueCategory != null)
+        'issue_flags': [payload.issueCategory],
+    });
   }
 
   @override
   Future<List<DriverHistoryItem>> getHistory() async {
-    final response = await _api.getDriverBookings();
+    final response = await _api.getSessions();
     return (response.data as List<dynamic>).map((item) {
       final json = item as Map<String, dynamic>;
-      final start = DateTime.parse(json['start_at'] as String).toLocal();
-      final end = DateTime.parse(json['end_at'] as String).toLocal();
+      final start = DateTime.parse(json['reserved_at'] as String).toLocal();
+      final end = json['ended_at'] != null
+          ? DateTime.parse(json['ended_at'] as String).toLocal()
+          : start;
       return DriverHistoryItem(
         id: json['id'].toString(),
-        chargerName: 'Charger booking',
+        chargerName: 'VoltEZ charger',
         chargerAddress: 'Port ${json['charger_port_id']}',
         date: '${start.day}/${start.month}/${start.year}',
         startTime: _clock(start),
         endTime: _clock(end),
-        connectorType: 'See charger details',
+        connectorType: 'Connected port',
         powerKw: 0,
         durationMinutes: end.difference(start).inMinutes,
-        energyKwh: 0,
-        amountPaid: 0,
-        status: json['status']?.toString() ?? 'held',
+        energyKwh: (json['energy_kwh'] as num?)?.toDouble() ?? 0,
+        amountPaid: (json['amount'] as num?)?.toDouble() ?? 0,
+        status: json['status']?.toString() ?? 'reserved',
       );
     }).toList();
   }

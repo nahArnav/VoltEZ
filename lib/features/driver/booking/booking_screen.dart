@@ -258,13 +258,16 @@ class _BookingScreenState extends State<BookingScreen> {
         children: [
           // ─── Charger Info ───
           _buildChargerInfoBar(charger),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          Text('Available Slots — Today',
+          _buildDatePicker(booking),
+          const SizedBox(height: 14),
+
+          Text('Available Slots — ${_dateHeading(booking.selectedDate)}',
               style: AppTypography.headlineMedium),
           const SizedBox(height: 4),
           Text(
-            'Select a slot to hold it for 5 minutes',
+            'Select a slot to hold it for 10 minutes',
             style: AppTypography.bodySmall
                 .copyWith(color: AppColors.textMuted, fontSize: 11),
           ),
@@ -302,6 +305,96 @@ class _BookingScreenState extends State<BookingScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildDatePicker(BookingProvider booking) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final days = List.generate(
+      7,
+      (index) => today.add(Duration(days: index)),
+    );
+
+    return SizedBox(
+      height: 66,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: days.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final day = days[index];
+          final selected = _sameDate(day, booking.selectedDate);
+          return Semantics(
+            button: true,
+            selected: selected,
+            label: 'Book for ${_dateHeading(day)}',
+            child: InkWell(
+              onTap: booking.phase == BookingPhase.idle
+                  ? () => booking.selectDate(day)
+                  : null,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 58,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppColors.primary.withValues(alpha: 0.14)
+                      : AppColors.card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: selected ? AppColors.primary : AppColors.border,
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _weekday(day),
+                      style: TextStyle(
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${day.day}',
+                      style: TextStyle(
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  bool _sameDate(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  String _weekday(DateTime date) => const [
+        'MON',
+        'TUE',
+        'WED',
+        'THU',
+        'FRI',
+        'SAT',
+        'SUN',
+      ][date.weekday - 1];
+
+  String _dateHeading(DateTime date) {
+    if (_sameDate(date, DateTime.now())) return 'Today';
+    return '${_weekday(date)} ${date.day}/${date.month}';
   }
 
   Widget _buildChargerInfoBar(Charger charger) {

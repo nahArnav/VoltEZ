@@ -55,6 +55,8 @@ class BookingProvider extends ChangeNotifier {
   // ─── Slots ───
   List<SlotInfo> _slots = [];
   List<SlotInfo> get slots => _slots;
+  DateTime _selectedDate = DateTime.now();
+  DateTime get selectedDate => _selectedDate;
   bool _slotsLoading = false;
   bool get slotsLoading => _slotsLoading;
   String? _slotsError;
@@ -95,7 +97,17 @@ class BookingProvider extends ChangeNotifier {
   /// Set the charger context for this booking flow.
   void setCharger(Charger charger) {
     _selectedCharger = charger;
+    final now = DateTime.now();
+    _selectedDate = DateTime(now.year, now.month, now.day);
     notifyListeners();
+  }
+
+  /// Change the booking day and load server-computed slots for that date.
+  Future<void> selectDate(DateTime date) async {
+    _selectedDate = DateTime(date.year, date.month, date.day);
+    _selectedSlot = null;
+    _errorMessage = null;
+    await loadSlots();
   }
 
   /// Load available slots for the current charger.
@@ -110,7 +122,7 @@ class BookingProvider extends ChangeNotifier {
     try {
       _slots = await _api.getAvailability(
         _selectedCharger!.id.toString(),
-        DateTime.now(),
+        _selectedDate,
       );
     } catch (e) {
       _slotsError = e.toString();
@@ -198,6 +210,8 @@ class BookingProvider extends ChangeNotifier {
       _confirmedBooking = await _api.verifyPayment(
         orderId: razorpayOrderId ?? _paymentOrder!.orderId,
         bookingId: _holdResult!.bookingId,
+        paymentId: razorpayPaymentId ?? '',
+        signature: razorpaySignature ?? '',
       );
 
       _stopCountdown();
@@ -222,7 +236,18 @@ class BookingProvider extends ChangeNotifier {
   }
 
   /// Cancel payment and release the hold.
-  void cancelPayment() {
+  Future<void> cancelPayment() async {
+    final bookingId = _holdResult?.bookingId;
+    if (bookingId != null) {
+      try {
+        await _api.cancelBooking(bookingId);
+      } catch (_) {
+        _errorMessage = 'Could not cancel this booking. Please retry.';
+        _phase = BookingPhase.paymentFailed;
+        notifyListeners();
+        return;
+      }
+    }
     _stopCountdown();
     _errorMessage = null;
     _paymentOrder = null;

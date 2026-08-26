@@ -1,5 +1,6 @@
 // ignore_for_file: use_null_aware_elements, unintended_html_in_doc_comment
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// VoltEZ API Service
 /// Single Dio instance used by both Driver and Business sides.
@@ -21,6 +22,43 @@ class ApiService {
     );
 
     _dio.interceptors.add(_AuthInterceptor(() => _token));
+    _dio.interceptors.add(
+      QueuedInterceptorsWrapper(
+        onError: (error, handler) async {
+          if (error.response?.statusCode != 401 ||
+              error.requestOptions.extra['voltez_retried'] == true ||
+              _refreshToken == null) {
+            handler.next(error);
+            return;
+          }
+          try {
+            final refreshClient = Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
+            final response = await refreshClient.post('/auth/refresh', data: {
+              'refresh_token': _refreshToken,
+            });
+            final data = response.data as Map<String, dynamic>;
+            final access = data['access_token'] as String;
+            final refresh = data['refresh_token'] as String? ?? _refreshToken!;
+            setToken(access);
+            setRefreshToken(refresh);
+            const storage = FlutterSecureStorage();
+            await storage.write(key: 'voltez_access_token', value: access);
+            await storage.write(key: 'voltez_refresh_token', value: refresh);
+            final request = error.requestOptions;
+            request.extra['voltez_retried'] = true;
+            request.headers['Authorization'] = 'Bearer $access';
+            handler.resolve(await _dio.fetch(request));
+          } catch (_) {
+            setToken(null);
+            setRefreshToken(null);
+            const storage = FlutterSecureStorage();
+            await storage.delete(key: 'voltez_access_token');
+            await storage.delete(key: 'voltez_refresh_token');
+            handler.next(error);
+          }
+        },
+      ),
+    );
     _dio.interceptors.add(_ErrorInterceptor());
   }
 
@@ -28,7 +66,7 @@ class ApiService {
   // Backend serves under /api/v1
   static const String _defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8001/api/v1',
+    defaultValue: 'http://127.0.0.1:8000/api/v1',
   );
 
   late final Dio _dio;
@@ -240,6 +278,17 @@ class ApiService {
         'energy_kwh': energyKwh,
       });
 
+  Future<Response> getSession(String sessionId) =>
+      _dio.get('/sessions/$sessionId');
+
+  Future<Response> getSessions() => _dio.get('/sessions/');
+
+  Future<Response> submitSessionRating(
+    String sessionId,
+    Map<String, dynamic> data,
+  ) =>
+      _dio.post('/sessions/$sessionId/rating', data: data);
+
   /// POST /sessions/{id}/report-issue
   Future<Response> reportSessionIssue(String sessionId, Map<String, dynamic> data) =>
       _dio.post('/sessions/$sessionId/report-issue', data: data);
@@ -250,6 +299,9 @@ class ApiService {
 
   Future<Response> getBusinessProfile() => _dio.get('/businesses/me');
 
+  Future<Response> createBusiness(Map<String, dynamic> data) =>
+      _dio.post('/businesses/', data: data);
+
   Future<Response> updateBusinessProfile(String id, Map<String, dynamic> data) =>
       _dio.patch('/businesses/$id', data: data);
 
@@ -259,6 +311,12 @@ class ApiService {
   Future<Response> createCharger(Map<String, dynamic> data) =>
       _dio.post('/chargers/', data: data);
 
+  Future<Response> createChargerPort(String chargerId, Map<String, dynamic> data) =>
+      _dio.post('/chargers/$chargerId/ports', data: data);
+
+  Future<Response> updateChargerPort(String portId, Map<String, dynamic> data) =>
+      _dio.patch('/chargers/ports/$portId', data: data);
+
   Future<Response> updateCharger(String id, Map<String, dynamic> data) =>
       _dio.patch('/chargers/$id', data: data);
 
@@ -267,6 +325,13 @@ class ApiService {
   /// GET /ports/{id}/availability
   Future<Response> getPortAvailability(String portId) =>
       _dio.get('/availability/port/$portId');
+
+  Future<Response> getPortSlots(String portId, DateTime day) =>
+      _dio.get('/availability/port/$portId/slots', queryParameters: {
+        'day': '${day.year.toString().padLeft(4, '0')}-'
+            '${day.month.toString().padLeft(2, '0')}-'
+            '${day.day.toString().padLeft(2, '0')}',
+      });
 
   /// POST /ports/{id}/availability
   Future<Response> createAvailabilityWindow(String portId, Map<String, dynamic> data) =>
@@ -278,6 +343,9 @@ class ApiService {
   /// GET /businesses/{id}/analytics
   Future<Response> getAnalytics(String businessId) =>
       _dio.get('/analytics/businesses/$businessId/recommendations');
+
+  Future<Response> getBusinessBookings(String businessId) =>
+      _dio.get('/businesses/$businessId/bookings');
 }
 
 /// Adds Bearer token to every request.

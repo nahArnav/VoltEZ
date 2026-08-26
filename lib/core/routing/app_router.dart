@@ -45,8 +45,8 @@ class AppRouter {
         return '/login';
       }
 
-      // If logged in and on splash, redirect to appropriate dashboard
-      if (isLoggedIn && state.matchedLocation == '/splash') {
+      // Authenticated users cannot revisit auth/role screens and mutate local role state.
+      if (isLoggedIn && isAuthRoute) {
         return _auth.currentRole == AccountRole.owner
             ? '/business/dashboard'
             : '/driver/home';
@@ -124,38 +124,23 @@ class AppRouter {
       ),
       GoRoute(
         path: '/business/chargers',
-        builder: (context, state) => const _PlaceholderScreen(
-          title: 'Charger Management',
-          icon: Icons.ev_station_rounded,
-        ),
+        builder: (context, state) => const DashboardScreen(initialTab: 1),
       ),
       GoRoute(
         path: '/business/availability',
-        builder: (context, state) => const _PlaceholderScreen(
-          title: 'Availability',
-          icon: Icons.schedule_rounded,
-        ),
+        builder: (context, state) => const DashboardScreen(initialTab: 1),
       ),
       GoRoute(
         path: '/business/bookings',
-        builder: (context, state) => const _PlaceholderScreen(
-          title: 'Business Bookings',
-          icon: Icons.calendar_today_rounded,
-        ),
+        builder: (context, state) => const DashboardScreen(initialTab: 2),
       ),
       GoRoute(
         path: '/business/analytics',
-        builder: (context, state) => const _PlaceholderScreen(
-          title: 'Analytics',
-          icon: Icons.bar_chart_rounded,
-        ),
+        builder: (context, state) => const DashboardScreen(initialTab: 3),
       ),
       GoRoute(
         path: '/business/profile',
-        builder: (context, state) => const _PlaceholderScreen(
-          title: 'Business Profile',
-          icon: Icons.person_rounded,
-        ),
+        builder: (context, state) => const DashboardScreen(initialTab: 4),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
@@ -167,34 +152,4 @@ class AppRouter {
       ),
     ),
   );
-}
-
-/// Temporary placeholder screen until real screens are built.
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.title, required this.icon});
-
-  final String title;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 64, color: Colors.white24),
-            const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 20)),
-            const SizedBox(height: 8),
-            const Text(
-              'Coming soon',
-              style: TextStyle(color: Colors.white38),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

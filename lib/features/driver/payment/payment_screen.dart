@@ -11,7 +11,7 @@ import '../../../shared/widgets/widgets.dart';
 
 /// Razorpay API key — replace with your actual key from https://dashboard.razorpay.com/app/keys
 /// In production, store this in a backend endpoint, not in client code.
-const String kRazorpayKeyId = 'YOUR_RAZORPAY_KEY_ID';
+const String kRazorpayKeyId = String.fromEnvironment('RAZORPAY_KEY_ID');
 
 /// Payment screen — launches Razorpay checkout sheet, then verifies with backend.
 ///
@@ -57,6 +57,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final hold = booking.holdResult;
     final order = booking.paymentOrder;
     if (hold == null || order == null) return;
+    if (kRazorpayKeyId.isEmpty) {
+      booking.setPaymentError(
+        'Razorpay is not configured for this build. Add the RAZORPAY_KEY_ID build setting.',
+      );
+      return;
+    }
 
     _razorpay?.dispose();
     _razorpay = RazorpayService();
@@ -80,6 +86,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       await booking.processPayment(
         razorpayPaymentId: result.paymentId,
         razorpayOrderId: result.orderId,
+        razorpaySignature: result.signature,
       );
     } else if (result.status == RazorpayPaymentStatus.failure) {
       // Payment failed on Razorpay side
@@ -88,7 +95,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } else {
       // Dismissed or cancelled
       setState(() {});
-      booking.cancelPayment();
+      await booking.cancelPayment();
     }
   }
 
@@ -221,8 +228,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               const SizedBox(height: 8),
               GestureDetector(
-                onTap: () {
-                  booking.cancelPayment();
+                onTap: () async {
+                  await booking.cancelPayment();
+                  if (!mounted ||
+                      booking.phase != BookingPhase.paymentCancelled) {
+                    return;
+                  }
                   context.go('/driver/booking');
                 },
                 child: Text(
@@ -403,8 +414,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
             const SizedBox(height: 12),
             GestureDetector(
-              onTap: () {
-                booking.cancelPayment();
+              onTap: () async {
+                await booking.cancelPayment();
+                if (!mounted ||
+                    booking.phase != BookingPhase.paymentCancelled) {
+                  return;
+                }
                 context.go('/driver/booking');
               },
               child: Text(
