@@ -7,20 +7,56 @@
 .pub/
 build/
 .freebuff/
+.widget_preview/
+
+# Android machine-specific & build files
+android/local.properties
+android/.gradle/
+android/app/build/
+android/captures/
+.gradle/
+
+# iOS / macOS build & ephemeral files
+ios/Pods/
+macos/Pods/
+ios/.symlinks/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Package binary artifacts & archives (bulky)
+*.apk
+*.aab
+*.ipa
+*.app
+*.dmg
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Large data & parquet files
+*.parquet
+data/
+tmp/
+temp/
 
 # IDE files
 .idea/
 .vscode/
 *.swp
+*.swo
 
-# macOS
+# OS files
 .DS_Store
+._*
 Thumbs.db
 
 # Environment / secrets
 .env
 .env.*
 !.env.example
+!backend/.env.example
 ios/Flutter/Secrets.xcconfig
 android/key.properties
 *.jks
@@ -38,9 +74,11 @@ __pycache__/
 
 # Coverage
 .coverage
+.coverage.*
+coverage/
 htmlcov/
 
-# Python and Backend
+# Python virtual environments & distributions
 venv/
 .venv/
 ENV/
@@ -49,15 +87,12 @@ venv.bak/
 dist/
 *.egg-info/
 
-# Generated data and model artifacts
-data/raw/
-data/interim/
-data/processed/
-data/synthetic/
-data/rehearsals/
-data/final/
-artifacts/
-/models/
+# Model scratch & generated checkpoints (preserves committed model bundles)
+artifacts/scratch/
+*.h5
+*.ckpt
+
+# Reports & intermediate outputs
 reports/figures/
 reports/metrics/
 reports/demand/
@@ -68,10 +103,6 @@ reports/demand/
 # Node
 node_modules/
 
-# Build and distribution
-build/
-dist/
-
 # Local databases and runtime files
 *.db
 *.sqlite
@@ -79,6 +110,3 @@ dist/
 
 # Logs
 *.log
-
-# Widget Preview
-.widget_preview/
