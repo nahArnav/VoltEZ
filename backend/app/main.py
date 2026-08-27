@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     
     logger.info("Loading ML models...")
     try:
-        repo_root = Path(__file__).resolve().parents[2]
+        repo_root = Path(__file__).resolve().parents[1]
         demand_bundle = repo_root / "models" / "demand" / "voltez-demand-60m-pune-v1"
         availability_bundle = (
             repo_root / "models" / "availability" / "voltez-availability-pune-v1"

@@ -36,8 +36,8 @@ services:
 
   migrate:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     restart: "no"
     environment: &backend-environment
       PROJECT_NAME: ${PROJECT_NAME:-VoltEZ API}
@@ -61,8 +61,8 @@ services:
 
   api:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment: *backend-environment
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -86,8 +86,8 @@ services:
 
   worker:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment: *backend-environment
     command: arq app.worker.WorkerSettings
