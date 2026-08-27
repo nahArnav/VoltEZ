@@ -44,7 +44,7 @@ get_host_ip() {
 }
 
 HOST_IP=$(get_host_ip)
-PORT="${PORT:-8001}"
+PORT="${PORT:-8000}"
 
 # Check for flags
 USE_LAN=false
@@ -76,7 +76,7 @@ if command -v adb >/dev/null 2>&1; then
   DEVICES=$(adb devices | grep -v "List" | grep "device$" | awk '{print $1}' || true)
   if [ -n "$DEVICES" ]; then
     for dev in $DEVICES; do
-      echo "  📲 Setting up reverse port forward (8001 -> 8001) on device: $dev"
+      echo "  📲 Setting up reverse port forward (${PORT} -> ${PORT}) on device: $dev"
       adb -s "$dev" reverse "tcp:${PORT}" "tcp:${PORT}" 2>/dev/null || true
     done
   fi

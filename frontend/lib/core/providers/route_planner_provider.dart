@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../shared/models/models.dart';
 import '../network/api_service.dart';
 import '../network/route_recommendation_api.dart';
@@ -8,15 +9,15 @@ import '../network/route_recommendation_api.dart';
 /// origin → destination → vehicle/SOC → find → top-3 recommendations.
 ///
 /// Uses [RouteRecommendationApi] for all backend calls.
-/// Inject [MockRouteRecommendationApi] for dev/testing,
-/// swap to [LiveRouteRecommendationApi] when the backend is live.
+/// The production default is the live route-recommendation adapter. Tests can
+/// inject an explicit [RouteRecommendationApi] implementation.
 class RoutePlannerProvider extends ChangeNotifier {
   RoutePlannerProvider({
     ApiService? api,
     RouteRecommendationApi? recommendationApi,
-  })  : _apiService = api ?? ApiService(),
-        _api = recommendationApi ??
-            LiveRouteRecommendationApi(api ?? ApiService());
+  }) : _apiService = api ?? ApiService(),
+       _api =
+           recommendationApi ?? LiveRouteRecommendationApi(api ?? ApiService());
 
   final RouteRecommendationApi _api;
   final ApiService _apiService;
@@ -68,6 +69,15 @@ class RoutePlannerProvider extends ChangeNotifier {
       _originLat != null &&
       _originLng != null &&
       _destinationName.isNotEmpty &&
+      _destinationLat != null &&
+      _destinationLng != null &&
+      _selectedVehicle != null;
+
+  /// Whether the form has enough human-entered data to try on-device
+  /// geocoding before making the recommendation request.
+  bool get canAttemptSearch =>
+      _originName.trim().isNotEmpty &&
+      _destinationName.trim().isNotEmpty &&
       _selectedVehicle != null;
 
   // ─── Vehicles ───
@@ -82,8 +92,9 @@ class RoutePlannerProvider extends ChangeNotifier {
       availableVehicles
         ..clear()
         ..addAll(
-          (response.data as List<dynamic>)
-              .map((item) => Vehicle.fromJson(item as Map<String, dynamic>)),
+          (response.data as List<dynamic>).map(
+            (item) => Vehicle.fromJson(item as Map<String, dynamic>),
+          ),
         );
       if (_selectedVehicle == null && availableVehicles.isNotEmpty) {
         _selectedVehicle = availableVehicles.first;
@@ -104,10 +115,8 @@ class RoutePlannerProvider extends ChangeNotifier {
 
   void setOrigin(String name, {double? lat, double? lng}) {
     _originName = name;
-    // Text geocoding is not yet backed by a configured Maps key. Keep manual
-    // text entry inside the Pune pilot zone instead of sending null coordinates.
-    _originLat = lat ?? 18.5204;
-    _originLng = lng ?? 73.8567;
+    _originLat = lat;
+    _originLng = lng;
     _usingCurrentLocation = false;
     notifyListeners();
   }
@@ -145,6 +154,48 @@ class RoutePlannerProvider extends ChangeNotifier {
     _destinationName = name;
     _destinationLat = lat;
     _destinationLng = lng;
+    notifyListeners();
+  }
+
+  /// Resolve typed origin/destination names with the platform geocoder.
+  /// Failure is surfaced to the UI; no synthetic coordinates are sent.
+  Future<void> resolveTypedLocations() async {
+    final failures = <String>[];
+
+    if (!_usingCurrentLocation &&
+        (_originLat == null || _originLng == null) &&
+        _originName.trim().isNotEmpty) {
+      try {
+        final matches = await locationFromAddress(_originName.trim());
+        if (matches.isNotEmpty) {
+          _originLat = matches.first.latitude;
+          _originLng = matches.first.longitude;
+        } else {
+          failures.add('origin');
+        }
+      } catch (_) {
+        failures.add('origin');
+      }
+    }
+
+    if ((_destinationLat == null || _destinationLng == null) &&
+        _destinationName.trim().isNotEmpty) {
+      try {
+        final matches = await locationFromAddress(_destinationName.trim());
+        if (matches.isNotEmpty) {
+          _destinationLat = matches.first.latitude;
+          _destinationLng = matches.first.longitude;
+        } else {
+          failures.add('destination');
+        }
+      } catch (_) {
+        failures.add('destination');
+      }
+    }
+
+    _analysisError = failures.isEmpty
+        ? null
+        : 'Could not locate your ${failures.join(' and ')}. Use a more specific place name or enable location services.';
     notifyListeners();
   }
 
@@ -186,8 +237,8 @@ class RoutePlannerProvider extends ChangeNotifier {
       final request = RouteRecommendationRequest(
         originLat: _originLat!,
         originLng: _originLng!,
-        destLat: _destinationLat ?? 0,
-        destLng: _destinationLng ?? 0,
+        destLat: _destinationLat!,
+        destLng: _destinationLng!,
         vehicleMake: _selectedVehicle!.make,
         vehicleModel: _selectedVehicle!.model,
         batteryCapacityKwh: _selectedVehicle!.batteryCapacityKwh,
@@ -203,18 +254,21 @@ class RoutePlannerProvider extends ChangeNotifier {
       final results = await _api.getRecommendations(request);
 
       _recommendations = results
-          .map((r) => ChargerRecommendation(
-                charger: r.charger,
-                reason: r.reason,
-                estimatedCost: r.estimatedCost,
-                estimatedTimeMinutes: r.estimatedTimeMinutes,
-                confidenceScore: r.confidenceScore,
-                detourMinutes: r.detourMinutes,
-                predictedWaitMinutes: r.predictedWaitMinutes,
-                reliabilityScore: r.reliabilityScore,
-                connectorCompatible: r.connectorCompatible,
-                factors: r.factors,
-              ))
+          .map(
+            (r) => ChargerRecommendation(
+              charger: r.charger,
+              reason: r.reason,
+              estimatedCost: r.estimatedCost,
+              estimatedTimeMinutes: r.estimatedTimeMinutes,
+              confidenceScore: r.confidenceScore,
+              detourMinutes: r.detourMinutes,
+              detourDistanceKm: r.detourDistanceKm,
+              predictedWaitMinutes: r.predictedWaitMinutes,
+              reliabilityScore: r.reliabilityScore,
+              connectorCompatible: r.connectorCompatible,
+              factors: r.factors,
+            ),
+          )
           .toList();
     } catch (e) {
       _analysisError = e.toString();

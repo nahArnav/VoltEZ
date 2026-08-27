@@ -36,7 +36,7 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
   @override
   void initState() {
     super.initState();
-    final initialUrl = widget.config?.activeUrl ?? 'http://127.0.0.1:8001/api/v1';
+    final initialUrl = widget.config?.activeUrl ?? 'http://127.0.0.1:8000/api/v1';
     _controller = TextEditingController(text: initialUrl);
   }
 
@@ -210,20 +210,20 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                 runSpacing: 8,
                 children: [
                   _PresetCard(
-                    title: 'USB Cable (127.0.0.1:8001)',
+                    title: 'USB Cable (127.0.0.1:8000)',
                     subtitle: '⚡ Recommended (Instant & 100% Reliable)',
                     isHighlighted: true,
-                    onTap: () => _applyPreset('http://127.0.0.1:8001/api/v1'),
+                    onTap: () => _applyPreset('http://127.0.0.1:8000/api/v1'),
                   ),
                   _PresetCard(
-                    title: 'Host Mac Wi-Fi (10.98.69.20:8001)',
+                    title: 'Host Mac Wi-Fi (10.98.69.20:8000)',
                     subtitle: 'Requires same Wi-Fi & no router isolation',
-                    onTap: () => _applyPreset('http://10.98.69.20:8001/api/v1'),
+                    onTap: () => _applyPreset('http://10.98.69.20:8000/api/v1'),
                   ),
                   _PresetCard(
-                    title: 'Android Emulator (10.0.2.2:8001)',
+                    title: 'Android Emulator (10.0.2.2:8000)',
                     subtitle: 'For Android Studio Emulator',
-                    onTap: () => _applyPreset('http://10.0.2.2:8001/api/v1'),
+                    onTap: () => _applyPreset('http://10.0.2.2:8000/api/v1'),
                   ),
                   _PresetCard(
                     title: 'Cloud Staging',
@@ -255,7 +255,7 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: AppColors.surface,
-                  hintText: 'e.g. 192.168.1.5:8001 or http://...',
+                    hintText: 'e.g. 192.168.1.5:8000 or http://...',
                   hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                   prefixIcon: const Icon(Icons.link_rounded, color: AppColors.primary, size: 18),
                   suffixIcon: IconButton(

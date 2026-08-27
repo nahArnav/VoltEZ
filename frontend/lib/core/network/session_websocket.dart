@@ -69,7 +69,8 @@ class SessionStreamEvent {
 /// Abstraction for a session-scoped WebSocket connection.
 ///
 /// The real implementation connects to `wss://backend/sessions/{id}/stream`.
-/// The mock implementation simulates the same event stream with timers.
+/// The app uses the live stream implementation in production; connection
+/// failures are surfaced as state changes rather than simulated locally.
 abstract class SessionWebSocket {
   /// Stream of events from the server.
   Stream<SessionStreamEvent> get events;
@@ -108,7 +109,7 @@ abstract class SessionWebSocket {
 /// - Server → Client: `{"type": "error", "message": "..."}`
 class LiveSessionWebSocket implements SessionWebSocket {
   LiveSessionWebSocket({
-    this.baseUrl = 'ws://127.0.0.1:8001/api/v1',
+    this.baseUrl = 'ws://127.0.0.1:8000/api/v1',
     this.baseUrlGetter,
     required this.userIdGetter,
     required this.tokenGetter,
@@ -266,154 +267,6 @@ class LiveSessionWebSocket implements SessionWebSocket {
     _stateController.close();
   }
 }
-
-// ═════════════════════════════════════════════════════════════════════════════
-// Mock WebSocket implementation
-// ═════════════════════════════════════════════════════════════════════════════
-
-/// Simulates a WebSocket stream for development/testing.
-/// Produces the same charging-progress simulation as MockSessionApi
-/// but delivers data via a stream (no polling).
-class MockSessionWebSocket implements SessionWebSocket {
-  Timer? _tickTimer;
-  String? _sessionId;
-  int _elapsedSeconds = 0;
-  double _soc = 68;
-  double _energy = 0;
-  bool _connected = false;
-
-  final _eventController = StreamController<SessionStreamEvent>.broadcast();
-  final _stateController =
-      StreamController<WebSocketConnectionState>.broadcast();
-
-  WebSocketConnectionState _state = WebSocketConnectionState.disconnected;
-
-  @override
-  Stream<SessionStreamEvent> get events => _eventController.stream;
-
-  @override
-  WebSocketConnectionState get connectionState => _state;
-
-  @override
-  Stream<WebSocketConnectionState> get connectionStateChanges =>
-      _stateController.stream;
-
-  @override
-  Future<void> connect(String sessionId) async {
-    _sessionId = sessionId;
-    _setState(WebSocketConnectionState.connecting);
-
-    // Simulate connection delay
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-
-    _connected = true;
-    _setState(WebSocketConnectionState.connected);
-
-    // Start emitting updates every 3 seconds (same cadence as old polling)
-    _tickTimer?.cancel();
-    _tickTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      _emitUpdate();
-    });
-  }
-
-  void _emitUpdate() {
-    if (!_connected || _sessionId == null) return;
-
-    _elapsedSeconds += 3;
-    _energy = _elapsedSeconds * 0.025; // ~60kW → ~0.025 kWh/s
-    _soc = (68 + _energy * 2.5).clamp(0.0, 100.0);
-    final power = 45.0 + (_elapsedSeconds % 15);
-    final cost = _energy * 14;
-
-    // After ~30 minutes, emit completion
-    if (_elapsedSeconds > 1800) {
-      _tickTimer?.cancel();
-      final summary = SessionSummary(
-        sessionId: _sessionId!,
-        chargerName: 'Phoenix Mall Charger',
-        connectorType: 'CCS2',
-        durationMinutes: (_elapsedSeconds / 60).ceil(),
-        energyKwh: _energy,
-        totalCost: cost,
-        date: _formatDate(DateTime.now()),
-        startTime: '14:00',
-        endTime:
-            '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-      );
-      _eventController.add(SessionStreamEvent(
-        type: 'session_completed',
-        summary: summary,
-      ));
-      return;
-    }
-
-    final data = SessionData(
-      sessionId: _sessionId!,
-      bookingId: 'BK-mock',
-      chargerName: 'Phoenix Mall Charger',
-      chargerAddress: 'Phoenix Mall, Lower Parel, Mumbai',
-      connectorType: 'CCS2',
-      powerKw: 60,
-      slotStart: '14:00',
-      slotEnd: '15:00',
-      status: _elapsedSeconds > 0 ? SessionStatus.charging : SessionStatus.checkedIn,
-      batteryPercent: _soc,
-      energyKwh: _energy,
-      currentPowerKw: power,
-      runningCost: cost,
-      costPerKwh: 14,
-      elapsedSeconds: _elapsedSeconds,
-      estimatedRemainingMinutes: ((1800 - _elapsedSeconds) / 60).ceil(),
-      sessionStartedAt: DateTime.now().subtract(Duration(seconds: _elapsedSeconds)),
-      lastUpdated: DateTime.now(),
-    );
-
-    _eventController.add(SessionStreamEvent(
-      type: 'status_update',
-      sessionData: data,
-    ));
-  }
-
-  @override
-  Future<void> disconnect() async {
-    _connected = false;
-    _tickTimer?.cancel();
-    _tickTimer = null;
-    _sessionId = null;
-    _elapsedSeconds = 0;
-    _soc = 68;
-    _energy = 0;
-    _setState(WebSocketConnectionState.disconnected);
-  }
-
-  @override
-  void sendPing() {
-    if (!_connected) return;
-    // Mock pong — no-op
-  }
-
-  @override
-  void dispose() {
-    disconnect();
-    _eventController.close();
-    _stateController.close();
-  }
-
-  void _setState(WebSocketConnectionState newState) {
-    if (_state == newState) return;
-    _state = newState;
-    _stateController.add(newState);
-  }
-
-  String _formatDate(DateTime dt) {
-    const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-}
-
 // ═════════════════════════════════════════════════════════════════════════════
 // JSON Parsing Helpers
 // ═════════════════════════════════════════════════════════════════════════════

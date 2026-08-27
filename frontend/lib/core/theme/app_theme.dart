@@ -14,6 +14,11 @@ class AppTheme {
       secondary: AppColors.secondary,
       surface: AppColors.surface,
       error: AppColors.error,
+      onPrimary: AppColors.textOnPrimary,
+      onSecondary: AppColors.textPrimary,
+      onSurface: AppColors.textPrimary,
+      onError: AppColors.textOnPrimary,
+      outline: AppColors.borderLight,
     ),
 
     appBarTheme: const AppBarTheme(
@@ -37,6 +42,20 @@ class AppTheme {
         borderRadius: BorderRadius.all(Radius.circular(12)),
         borderSide: BorderSide.none,
       ),
+    ),
+
+    navigationBarTheme: const NavigationBarThemeData(
+      backgroundColor: AppColors.card,
+      indicatorColor: AppColors.primary,
+      surfaceTintColor: Colors.transparent,
+      labelTextStyle: WidgetStatePropertyAll(
+        TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+      ),
+    ),
+
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.textOnPrimary,
     ),
 
     useMaterial3: true,

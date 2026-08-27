@@ -3,6 +3,8 @@
     <!-- Location permissions for geolocator -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Required by Dio, Google Maps tiles, and live charger/session APIs. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
         android:label="VoltEZ"

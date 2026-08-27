@@ -32,10 +32,13 @@ class ApiService {
             return;
           }
           try {
-            final refreshClient = Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
-            final response = await refreshClient.post('/auth/refresh', data: {
-              'refresh_token': _refreshToken,
-            });
+            final refreshClient = Dio(
+              BaseOptions(baseUrl: _dio.options.baseUrl),
+            );
+            final response = await refreshClient.post(
+              '/auth/refresh',
+              data: {'refresh_token': _refreshToken},
+            );
             final data = response.data as Map<String, dynamic>;
             final access = data['access_token'] as String;
             final refresh = data['refresh_token'] as String? ?? _refreshToken!;
@@ -108,32 +111,31 @@ class ApiService {
     required String password,
     String role = 'driver',
     String? phone,
-  }) =>
-      _dio.post('/auth/register', data: {
-        'name': name,
-        'email': email,
-        'password': password,
-        'role': role.toLowerCase(),
-        if (phone != null) 'phone': phone,
-      });
+  }) => _dio.post(
+    '/auth/register',
+    data: {
+      'name': name,
+      'email': email,
+      'password': password,
+      'role': role.toLowerCase(),
+      if (phone != null) 'phone': phone,
+    },
+  );
 
   /// POST /auth/login
   /// OAuth2 form body: { username: email, password }
   /// Returns: { access_token, refresh_token, token_type: "bearer" }
-  Future<Response> login(String email, String password) =>
-      _dio.post(
-        '/auth/login',
-        data: {'username': email, 'password': password},
-        options: Options(contentType: Headers.formUrlEncodedContentType),
-      );
+  Future<Response> login(String email, String password) => _dio.post(
+    '/auth/login',
+    data: {'username': email, 'password': password},
+    options: Options(contentType: Headers.formUrlEncodedContentType),
+  );
 
   /// POST /auth/refresh
   /// Body: { refresh_token }
   /// Returns: { access_token, refresh_token, token_type: "bearer" }
   Future<Response> refreshTokens(String refreshToken) =>
-      _dio.post('/auth/refresh', data: {
-        'refresh_token': refreshToken,
-      });
+      _dio.post('/auth/refresh', data: {'refresh_token': refreshToken});
 
   /// POST /auth/logout
   Future<Response> logout() => _dio.post('/auth/logout');
@@ -183,12 +185,14 @@ class ApiService {
     required double latitude,
     required double longitude,
     int radiusMeters = 5000,
-  }) =>
-      _dio.get('/chargers/nearby', queryParameters: {
-        'latitude': latitude,
-        'longitude': longitude,
-        'radius_meters': radiusMeters,
-      });
+  }) => _dio.get(
+    '/chargers/nearby',
+    queryParameters: {
+      'latitude': latitude,
+      'longitude': longitude,
+      'radius_meters': radiusMeters,
+    },
+  );
 
   /// GET /chargers/{id}
   /// Returns: ChargerResponse with nested ports
@@ -202,23 +206,31 @@ class ApiService {
   Future<Response> getRouteRecommendations({
     required double originLat,
     required double originLng,
+    double? destinationLat,
+    double? destinationLng,
     required String vehicleId,
     required double currentSOC,
     required double targetSOC,
     required double reserveSOC,
     required String preference,
     double radiusMeters = 25000,
-  }) =>
-      _dio.post('/recommendations/', data: {
-        'latitude': originLat,
-        'longitude': originLng,
-        'radius_meters': radiusMeters,
-        'vehicle_id': vehicleId,
-        'current_soc': currentSOC / 100,
-        'target_soc': targetSOC / 100,
-        'reserve_soc': reserveSOC / 100,
-        'preferences': {'mode': preference},
-      });
+  }) => _dio.post(
+    '/recommendations/',
+    data: {
+      'latitude': originLat,
+      'longitude': originLng,
+      if (destinationLat != null && destinationLng != null) ...{
+        'destination_latitude': destinationLat,
+        'destination_longitude': destinationLng,
+      },
+      'radius_meters': radiusMeters,
+      'vehicle_id': vehicleId,
+      'current_soc': currentSOC / 100,
+      'target_soc': targetSOC / 100,
+      'reserve_soc': reserveSOC / 100,
+      'preferences': {'mode': preference},
+    },
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Bookings — POST /bookings/, POST /bookings/{id}/cancel, GET /bookings
@@ -245,7 +257,8 @@ class ApiService {
   Future<Response> getDriverBookings() => _dio.get('/bookings/');
 
   /// GET /bookings/{id}
-  Future<Response> getBooking(String bookingId) => _dio.get('/bookings/$bookingId');
+  Future<Response> getBooking(String bookingId) =>
+      _dio.get('/bookings/$bookingId');
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Payments — POST /payments/create-order, POST /payments/verify
@@ -279,10 +292,8 @@ class ApiService {
   /// POST /sessions/{id}/complete
   /// Body: { energy_kwh: float }
   /// Returns: ChargingSessionResponse
-  Future<Response> completeSession(String sessionId, double energyKwh) =>
-      _dio.post('/sessions/$sessionId/complete', data: {
-        'energy_kwh': energyKwh,
-      });
+  Future<Response> completeSession(String sessionId, double energyKwh) => _dio
+      .post('/sessions/$sessionId/complete', data: {'energy_kwh': energyKwh});
 
   Future<Response> getSession(String sessionId) =>
       _dio.get('/sessions/$sessionId');
@@ -292,12 +303,13 @@ class ApiService {
   Future<Response> submitSessionRating(
     String sessionId,
     Map<String, dynamic> data,
-  ) =>
-      _dio.post('/sessions/$sessionId/rating', data: data);
+  ) => _dio.post('/sessions/$sessionId/rating', data: data);
 
   /// POST /sessions/{id}/report-issue
-  Future<Response> reportSessionIssue(String sessionId, Map<String, dynamic> data) =>
-      _dio.post('/sessions/$sessionId/report-issue', data: data);
+  Future<Response> reportSessionIssue(
+    String sessionId,
+    Map<String, dynamic> data,
+  ) => _dio.post('/sessions/$sessionId/report-issue', data: data);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Business APIs
@@ -308,8 +320,10 @@ class ApiService {
   Future<Response> createBusiness(Map<String, dynamic> data) =>
       _dio.post('/businesses/', data: data);
 
-  Future<Response> updateBusinessProfile(String id, Map<String, dynamic> data) =>
-      _dio.patch('/businesses/$id', data: data);
+  Future<Response> updateBusinessProfile(
+    String id,
+    Map<String, dynamic> data,
+  ) => _dio.patch('/businesses/$id', data: data);
 
   Future<Response> getBusinessChargers(String businessId) =>
       _dio.get('/chargers/', queryParameters: {'business_id': businessId});
@@ -317,11 +331,15 @@ class ApiService {
   Future<Response> createCharger(Map<String, dynamic> data) =>
       _dio.post('/chargers/', data: data);
 
-  Future<Response> createChargerPort(String chargerId, Map<String, dynamic> data) =>
-      _dio.post('/chargers/$chargerId/ports', data: data);
+  Future<Response> createChargerPort(
+    String chargerId,
+    Map<String, dynamic> data,
+  ) => _dio.post('/chargers/$chargerId/ports', data: data);
 
-  Future<Response> updateChargerPort(String portId, Map<String, dynamic> data) =>
-      _dio.patch('/chargers/ports/$portId', data: data);
+  Future<Response> updateChargerPort(
+    String portId,
+    Map<String, dynamic> data,
+  ) => _dio.patch('/chargers/ports/$portId', data: data);
 
   Future<Response> updateCharger(String id, Map<String, dynamic> data) =>
       _dio.patch('/chargers/$id', data: data);
@@ -332,19 +350,21 @@ class ApiService {
   Future<Response> getPortAvailability(String portId) =>
       _dio.get('/availability/port/$portId');
 
-  Future<Response> getPortSlots(String portId, DateTime day) =>
-      _dio.get('/availability/port/$portId/slots', queryParameters: {
-        'day': '${day.year.toString().padLeft(4, '0')}-'
-            '${day.month.toString().padLeft(2, '0')}-'
-            '${day.day.toString().padLeft(2, '0')}',
-      });
+  Future<Response> getPortSlots(String portId, DateTime day) => _dio.get(
+    '/availability/port/$portId/slots',
+    queryParameters: {
+      'day':
+          '${day.year.toString().padLeft(4, '0')}-'
+          '${day.month.toString().padLeft(2, '0')}-'
+          '${day.day.toString().padLeft(2, '0')}',
+    },
+  );
 
   /// POST /ports/{id}/availability
-  Future<Response> createAvailabilityWindow(String portId, Map<String, dynamic> data) =>
-      _dio.post('/availability/', data: {
-        'charger_port_id': portId,
-        ...data,
-      });
+  Future<Response> createAvailabilityWindow(
+    String portId,
+    Map<String, dynamic> data,
+  ) => _dio.post('/availability/', data: {'charger_port_id': portId, ...data});
 
   /// GET /businesses/{id}/analytics
   Future<Response> getAnalytics(String businessId) =>
@@ -379,7 +399,8 @@ class _ErrorInterceptor extends Interceptor {
       final data = response.data as Map<String, dynamic>;
       final code = data['code'] as String? ?? 'UNKNOWN_ERROR';
       final detail = data['detail'];
-      final message = data['message'] as String? ??
+      final message =
+          data['message'] as String? ??
           (detail is String ? detail : 'An error occurred');
       final fieldErrors = data['field_errors'] as List?;
 

@@ -47,7 +47,7 @@ class RazorpayPaymentResult {
 ///   amount: 20500, // in paise
 ///   orderId: 'order_xxx', // from backend
 ///   name: 'VoltEZ Charging',
-///   description: 'Charging session at Phoenix Mall',
+///   description: 'Charging session at the selected charger',
 ///   prefill: RazorpayPrefill(email: 'user@example.com', contact: '+919999999999'),
 /// );
 /// service.dispose();

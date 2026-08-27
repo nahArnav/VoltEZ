@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../network/session_api.dart';
 import '../network/session_websocket.dart';
+import '../network/api_service.dart';
 
 /// Phase of the session flow.
 enum SessionPhase {
@@ -39,8 +40,12 @@ class SessionProvider extends ChangeNotifier {
   SessionProvider({
     SessionApi? sessionApi,
     SessionWebSocket? webSocket,
-  })  : _api = sessionApi ?? MockSessionApi(),
-        _webSocket = webSocket ?? MockSessionWebSocket();
+  })  : _api = sessionApi ?? LiveSessionApi(ApiService()),
+        _webSocket = webSocket ??
+            LiveSessionWebSocket(
+              userIdGetter: () => null,
+              tokenGetter: () => null,
+            );
 
   final SessionApi _api;
   final SessionWebSocket _webSocket;

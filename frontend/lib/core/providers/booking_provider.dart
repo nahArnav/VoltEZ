@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../shared/models/models.dart';
 import '../network/booking_api.dart';
+import '../network/api_service.dart';
 
 /// Phase of the booking flow.
 enum BookingPhase {
@@ -36,11 +37,11 @@ enum BookingPhase {
 /// Manages the full driver booking flow:
 /// charger → slots → hold → countdown → payment → confirmation.
 ///
-/// Inject [MockBookingApi] for dev/testing, swap to [LiveBookingApi]
-/// when the backend is ready.
+/// The production default is the live backend adapter. Tests can still inject
+/// a purpose-built [BookingApi] implementation explicitly.
 class BookingProvider extends ChangeNotifier {
   BookingProvider({BookingApi? bookingApi})
-      : _api = bookingApi ?? MockBookingApi();
+      : _api = bookingApi ?? LiveBookingApi(ApiService());
 
   final BookingApi _api;
 

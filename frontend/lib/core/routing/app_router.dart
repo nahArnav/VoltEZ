@@ -81,7 +81,7 @@ class AppRouter {
       GoRoute(
         path: '/driver/charger/:id',
         builder: (context, state) => ChargerDetailsScreen(
-          chargerId: state.pathParameters['id'] ?? 'c1',
+          chargerId: state.pathParameters['id'] ?? '',
         ),
       ),
       GoRoute(

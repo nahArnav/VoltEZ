@@ -17,7 +17,7 @@ class ServerConfig extends ChangeNotifier {
 
   static const String _defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8001/api/v1',
+    defaultValue: 'http://127.0.0.1:8000/api/v1',
   );
 
   final ApiService _api;
@@ -26,10 +26,10 @@ class ServerConfig extends ChangeNotifier {
   String? _testResult;
   bool? _testSuccess;
 
-  /// Current active HTTP API base URL (e.g. `http://10.98.69.20:8001/api/v1`).
+  /// Current active HTTP API base URL (e.g. `http://10.98.69.20:8000/api/v1`).
   String get activeUrl => _activeUrl;
 
-  /// Corresponding WebSocket base URL (e.g. `ws://10.98.69.20:8001/api/v1`).
+  /// Corresponding WebSocket base URL (e.g. `ws://10.98.69.20:8000/api/v1`).
   String get wsBaseUrl => httpToWsUrl(_activeUrl);
 
   bool get isTesting => _isTesting;
