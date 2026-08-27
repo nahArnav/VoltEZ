@@ -10,8 +10,7 @@ val googleMapsApiKey = providers.gradleProperty("GOOGLE_MAPS_API_KEY")
 
 android {
     namespace = "com.voltez.app"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 37
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
