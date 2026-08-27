@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.charger import ChargerResponse
 
@@ -8,6 +8,18 @@ from app.schemas.charger import ChargerResponse
 class RecommendationRequest(BaseModel):
     latitude: float = Field(..., description="Current latitude of the user/vehicle")
     longitude: float = Field(..., description="Current longitude of the user/vehicle")
+    destination_latitude: float | None = Field(
+        None,
+        description="Optional destination latitude for detour-aware ranking",
+        ge=-90.0,
+        le=90.0,
+    )
+    destination_longitude: float | None = Field(
+        None,
+        description="Optional destination longitude for detour-aware ranking",
+        ge=-180.0,
+        le=180.0,
+    )
     radius_meters: float = Field(5000.0, description="Search radius in meters")
     vehicle_id: UUID = Field(..., description="ID of the vehicle to charge")
     current_soc: float = Field(
@@ -22,6 +34,14 @@ class RecommendationRequest(BaseModel):
     preferences: dict | None = Field(
         None, description="Optional user preferences (e.g. prioritize_cost, prioritize_speed)"
     )
+
+    @model_validator(mode="after")
+    def validate_destination_pair(self):
+        if (self.destination_latitude is None) != (self.destination_longitude is None):
+            raise ValueError(
+                "destination_latitude and destination_longitude must be provided together"
+            )
+        return self
 
 
 class RecommendationResult(BaseModel):
@@ -39,6 +59,11 @@ class RecommendationResult(BaseModel):
     estimated_cost: float = Field(..., description="Estimated cost for the charging session")
     ranking_score: float = Field(
         ..., description="Computed score used to sort recommendations (higher is better)"
+    )
+    estimated_detour_km: float = Field(
+        0.0,
+        description="Additional distance versus the direct origin-to-destination route",
+        ge=0.0,
     )
 
 

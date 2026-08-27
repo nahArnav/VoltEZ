@@ -56,6 +56,15 @@ class RecommendationService:
         results = []
         from app.schemas.charger import ChargerResponse
 
+        direct_route_km = None
+        if req.destination_latitude is not None and req.destination_longitude is not None:
+            direct_route_km = _haversine(
+                req.latitude,
+                req.longitude,
+                req.destination_latitude,
+                req.destination_longitude,
+            )
+
         # 3. Process each candidate
         for charger in candidates:
             # We hard-filter inactive chargers
@@ -68,6 +77,15 @@ class RecommendationService:
 
             # Calculate Distance
             dist_km = _haversine(req.latitude, req.longitude, charger_lat, charger_lon)
+            detour_km = 0.0
+            if direct_route_km is not None:
+                via_charger_km = dist_km + _haversine(
+                    charger_lat,
+                    charger_lon,
+                    req.destination_latitude,
+                    req.destination_longitude,
+                )
+                detour_km = max(0.0, via_charger_km - direct_route_km)
 
             # Reachability Math - Route-Energy Physics Implementation
             veh_battery = get_float(vehicle, "battery_kwh")
@@ -148,6 +166,7 @@ class RecommendationService:
                     + (1.0 * estimated_charge_min)
                     + (0.5 * (estimated_cost / 10.0))
                     + (2.0 * predicted_wait_min)
+                    + (8.0 * detour_km)
                 )
                 + (50.0 * rel_score)
             )
@@ -164,6 +183,7 @@ class RecommendationService:
                     estimated_charge_minutes=float(round(estimated_charge_min, 1)),
                     estimated_cost=float(round(estimated_cost, 2)),
                     ranking_score=float(round(score, 2)),
+                    estimated_detour_km=float(round(detour_km, 2)),
                 )
             )
 
