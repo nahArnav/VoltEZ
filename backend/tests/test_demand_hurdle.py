@@ -6,7 +6,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import pytest
-from test_demand_window import _suite
+from tests.test_demand_window import _suite
 
 from voltez_ml.evaluation.demand import DemandEvaluationSettings, evaluate_demand_model
 from voltez_ml.synthetic.io import file_sha256

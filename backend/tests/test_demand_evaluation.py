@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-from test_demand_window import _point_partition, _suite
+from tests.test_demand_window import _point_partition, _suite
 
 from voltez_ml.evaluation.demand import (
     DemandEvaluationSettings,
