@@ -110,3 +110,7 @@ node_modules/
 
 # Logs
 *.log
+
+# Local IDE configuration files
+*.iml
+*.local
