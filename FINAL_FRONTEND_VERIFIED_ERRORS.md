@@ -1,85 +1,65 @@
-# VoltEZ `final-frontend` Verified Error Report
+# VoltEZ `final-frontend` current error and readiness report
 
 Reviewed branch: `final-frontend`
+Reviewed local commit at start of this pass: `df25b9f`
+Remote comparison after fetch: local was **0 commits behind** and **1 commit ahead** of `origin/final-frontend`; no remote changes were pending.
+Review date: 2026-08-27
 
-Reviewed local commit: `90a4df1`
+This is the current report. Defects from the original `errors.md` and the first
+audit were rechecked; fixed items are listed separately so they are not
+mistaken for active failures.
 
-Remote comparison: local is 3 commits ahead of `origin/final-frontend` and 0 commits behind. No pull was required.
+## Current shortcomings and deployment blockers
 
-Review date: 2026-08-26
+- `(backend/app/services/fcm.py) - Push delivery is still a development mock: notifications are persisted and sent over the in-app WebSocket, but no Firebase credentials or real FCM provider call is configured.`
+- `(lib/core/network/razorpay_service.dart) - Web checkout intentionally fails with a clear mobile-only message because the Flutter Razorpay plugin has no web implementation; a production web payment adapter (for example Checkout.js) is still required if web payments are in scope.`
+- `(backend/app/api/v1/session.py + lib/core/network/session_api.dart) - Session energy/telemetry is client-supplied/simulated; there is no physical charger/OCPP telemetry adapter. Production charging truth needs a provider integration and server-side meter readings.`
+- `(backend/app/services/recommendation.py + database schema) - No tariff table/provider is implemented; cost uses the configured DEFAULT_PRICE_PER_KWH_INR fallback. A live tariff source is required for authoritative billing.`
+- `(backend/app/api/v1/recommendations.py) - The business recommendation route returns an explicit placeholder response; owner-facing ML opportunity recommendations are not yet a real model-backed feature.`
+- `(lib/core/network/business_api.dart) - A legacy mock business adapter remains in the repository. The active dashboard uses BusinessProvider and the live API, but the unused adapter is technical debt and can confuse future contributors.`
+- `(lib/core/network/route_recommendation_api.dart + backend/app/api/v1/recommendations.py) - The live route request currently uses origin/vehicle/SOC and nearby chargers; destination-aware detour calculation and recommendation-impression persistence are not complete end-to-end.`
+- `(backend/app/api/v1/ws.py + lib/core/network/session_websocket.dart) - JWT is still carried in the WebSocket query string. Use a short-lived ticket or a secured subprotocol at the edge before production deployment to avoid access-log leakage.`
+- `(backend/app/services/ml_features.py + models/*) - The checked-in models are validated synthetic Pune artifacts. Real-world accuracy still depends on collecting live searches, requests, bookings, availability observations, and session outcomes, then monitoring drift and retraining.`
+- `(android/ + ios/) - Native release artifacts cannot be built on this Mac yet: Flutter reports no Android SDK, incomplete Xcode, and no CocoaPods. Release signing, restricted Maps keys, and device builds remain environment/setup work.`
+- `(.github/workflows/ci.yml) - CI enforces fatal Python checks, migrations, tests, Flutter analysis/tests, and a web build, but it does not build signed Android/iOS artifacts or run device tests.`
+- `(.ruff configuration) - Full Ruff still reports pre-existing non-fatal style findings (mainly import ordering, line length, and framework call-site rules). The fatal syntax/name-error subset is clean, but the codebase is not style-clean.`
+- `(test/ + backend/tests/) - Automated coverage is strong for current contracts (133 ML tests and 6 backend integration tests), but there is no real-device test, payment-provider sandbox test, FCM delivery test, or charger/OCPP integration test.`
 
-This report records issues verified against the current local branch. The older `errors.md` and `FINAL_FRONTEND_READINESS_ERRORS.md` reports contain many defects that have already been fixed and are not repeated here.
+## Verified fixed from the original error list
 
-Requested format: `(Filename) - (Error in it)`.
+- `(database/models/*.py + alembic/versions/*) - ORM table names, fields, foreign keys, and the operational-integrity migration now align; `alembic check` passes with one head.`
+- `(database/models/booking.py) - Duplicate `hold_expires_at` declaration removed.`
+- `(docker-compose.yml + backend/Dockerfile + .dockerignore) - Reproducible PostGIS, Redis, migration, API, and ARQ worker stack added; Docker context reduced to runtime files and API image builds successfully.`
+- `(docker-compose.yml + .env.example + backend/.env.example) - Local CORS defaults now allow both localhost and 127.0.0.1 web origins; LAN phone web testing still requires explicitly adding the Mac's IP origin.`
+- `(backend/app/api/v1/payments.py + backend/app/services/booking.py) - Server-side price/ownership checks, payment verification, commits, idempotency, and enqueue-before-commit hold handling are implemented.`
+- `(backend/app/worker.py) - Expiry processing uses the 10-minute hold policy and writes booking audit events.`
+- `(backend/app/api/v1/booking.py + businesses.py + analytics.py) - Owner-scoped bookings, business ownership checks, live owner dashboard data, charger/port mutations, and availability persistence are wired to PostgreSQL.`
+- `(backend/app/services/recommendation.py) - Vehicle ownership, connector compatibility, normalized reliability, and configured price fallback are enforced.`
+- `(backend/app/api/v1/session.py) - Authenticated session list/get/rating endpoints and persistent issue flags are available.`
+- `(backend/app/api/v1/ws.py + backend/app/main.py) - WebSocket pong handling, Redis `aclose()`, and a real DB/Redis/ML readiness check are implemented.`
+- `(lib/core/auth/ + lib/core/network/ + lib/core/providers/) - Secure token restore/refresh, live booking cancellation, server-computed availability slots, and persisted owner actions are connected.`
+- `(android/ + ios/ + web/) - VoltEZ package/label, build-time Maps key injection, debug-only Android cleartext networking, iOS local-network allowance, and web metadata are configured.`
+- `(.github/workflows/ci.yml + scripts/smoke_test.py) - CI gates and smoke probes now target the actual `/health/live`, `/health/ready`, `/version`, and `/api/v1/openapi.json` contracts.`
 
-## P0 — Build and deployment blockers
+## Verification performed on this branch
 
-- `(lib/screens/dashboard/ai_recommendations_screen.dart) - Flutter analysis fails because fetchRecommendations is called without five required parameters and updateStatus no longer exists.`
-- `(lib/screens/profile/profile_screen.dart) - Flutter analysis fails because updateProfile receives removed email/businessName parameters and updatePreferences no longer exists.`
-- `(alembic/versions/314159265358_missing_tables.py + database/models/*.py) - Alembic check detects substantial schema drift: ML/analytics ORM table names and fields do not match migrated tables, booking_events has incompatible id/types/columns, and context_events fields differ. A fresh deployment and the ORM do not share one canonical schema.`
-- `(database/models/booking.py) - hold_expires_at is declared twice on the Booking ORM model.`
-- `(docker-compose.yml) - The root deployment stack defines only PostgreSQL. It does not start Redis, the ARQ expiry worker, FastAPI, or the Flutter web build, so the application cannot be deployed as one reproducible stack.`
-- `(.env.example + backend/.env.example) - Environment templates are incomplete and inconsistent with required Settings fields and production integrations. They do not provide one authoritative contract for PROJECT_NAME, SECRET_KEY, database, Redis, CORS, Razorpay, Maps, and public frontend URLs.`
-
-## P0 — Payment and booking correctness/security
-
-- `(backend/app/api/v1/payments.py) - create-order trusts amount and currency supplied by the client instead of verifying booking ownership and using a server-side quote, which permits price tampering.`
-- `(backend/app/api/v1/payments.py + app/repositories/base.py) - Payment creation only flushes and never commits, so a successful response can still be rolled back at request teardown.`
-- `(backend/app/api/v1/payments.py) - There is no authenticated client verification endpoint for Razorpay checkout signatures; only the asynchronous webhook exists.`
-- `(lib/features/driver/payment/payment_screen.dart) - Uses the literal YOUR_RAZORPAY_KEY_ID instead of build-time configuration.`
-- `(lib/core/network/razorpay_service.dart) - Web builds report a fabricated successful payment with a fake payment id. This can mislead users and must never exist in a production payment flow.`
-- `(lib/core/network/booking_api.dart) - LiveBookingApi.verifyPayment always throws, so a genuine successful mobile Razorpay checkout cannot confirm the booking in the UI.`
-- `(backend/app/api/v1/booking.py + backend/app/services/booking.py) - The HELD booking is committed before the expiry job is enqueued. If Redis/ARQ enqueueing fails, a persisted active hold remains without a scheduled expiry.`
-- `(backend/app/worker.py) - The expiry worker updates the booking status but does not create a BookingEvent audit record and its documentation says 15 minutes while the actual hold is 10 minutes.`
-
-## P0 — Owner/business experience is not integrated
-
-- `(lib/core/routing/app_router.dart) - Business chargers, availability, bookings, analytics, and profile routes still render Coming soon placeholders.`
-- `(lib/features/business/dashboard/dashboard_screen.dart) - Dashboard totals, chargers, bookings, utilization, analytics, and profile data are hardcoded rather than loaded from authenticated backend data.`
-- `(lib/features/business/chargers/charger_management_screen.dart) - Charger records and Pause/Resume actions mutate an in-memory list and are not persisted.`
-- `(lib/features/business/availability/availability_scheduler_screen.dart) - Availability windows and Save actions mutate local state only and are not stored in PostgreSQL.`
-- `(backend/app/api/v1/booking.py) - Only a driver's own bookings can be listed. There is no owner-scoped booking view for bookings placed against the owner's ports.`
-- `(backend/app/api/v1/analytics.py) - Business analytics checks the owner role but does not verify that the requested business belongs to the authenticated owner.`
-
-## P1 — Recommendation and ML serving correctness
-
-- `(backend/app/services/recommendation.py) - Selects the highest-power active port without filtering it against the vehicle's connector types, so incompatible chargers can be recommended.`
-- `(backend/app/services/recommendation.py) - Uses a fixed INR 15/kWh value because there is no implemented tariff model/table, so displayed cost is not authoritative.`
-- `(backend/app/services/recommendation.py) - Adds 50 * reliability_score while reliability_score is stored on a 0–100 scale; this can overwhelm every other ranking factor.`
-- `(backend/app/services/ml_features.py) - Runtime features use calendar context but still lack sufficient persisted history/entity telemetry for real production distribution quality. The models can serve, but real-world quality requires live observation collection and retraining.`
-- `(backend/app/api/v1/recommendations.py + backend/app/services/recommendation.py) - Route recommendations bypass search impression/result persistence, so searches, unserved demand, rankings shown, and selections are not fully captured for later model training.`
-
-## P1 — Session and realtime gaps
-
-- `(backend/app/api/v1/ws.py + lib/core/network/session_websocket.dart) - The access token is placed in the WebSocket query string, which can leak through proxy/access logs.`
-- `(backend/app/api/v1/ws.py) - The server receives ping messages but never returns a pong, despite the frontend protocol documenting pong support.`
-- `(backend/app/api/v1/session.py) - Session APIs support check-in/start/complete but provide no authenticated GET/status/history endpoints, forcing the frontend to reconstruct history from bookings and local state.`
-
-## P1 — Mobile configuration blockers
-
-- `(android/app/src/main/AndroidManifest.xml) - Google Maps uses YOUR_GOOGLE_MAPS_API_KEY and the application label/package configuration is still generic.`
-- `(ios/Runner/AppDelegate.swift) - Google Maps uses YOUR_GOOGLE_MAPS_API_KEY instead of an injected build configuration value.`
-- `(lib/core/network/api_service.dart + lib/main.dart) - Default API and WebSocket URLs point to 127.0.0.1. On a physical phone that address is the phone itself, so phone builds must inject the Mac LAN address or a deployed HTTPS/WSS endpoint.`
-- `(ios/Runner/Info.plist + Android network policy) - A physical phone using a local HTTP backend needs explicit development network allowances; a production build must use HTTPS/WSS.`
-
-## P1 — Tests, quality gates, and stale code
-
-- `(backend/tests/integration/*.py) - All 6 backend integration tests fail. They use uppercase roles, deleted app.models imports, and obsolete request fields, so they do not validate the current API.`
-- `(pyproject.toml) - Default pytest discovery includes only tests/ and excludes backend/tests/, allowing backend regressions to pass the default command.`
-- `(test/) - Flutter has only two small widget-test files; there are no live API contract, auth persistence, booking lifecycle, owner workflow, or failure-state tests.`
-- `(.github/workflows/) - No CI workflow enforces Python compilation/tests, Alembic consistency, Flutter analysis/tests, or production builds.`
-- `(lib/screens/, lib/services/, lib/providers/, lib/widgets/) - A parallel legacy Flutter architecture remains alongside lib/core and lib/features. It contains broken contracts and placeholder services, causes analyzer failures, and makes it unclear which implementation is authoritative.`
-- `(scripts/smoke_test.py) - The smoke test still probes /api/v1/health instead of /health/ready and does not validate auth, persistence, ML readiness, bookings, or owner operations.`
-- `(backend/app/main.py) - Uses deprecated redis.close() instead of aclose(), producing warnings on every test lifespan.`
-
-## Verified working before fixes
-
-- Python syntax compilation passes for `backend`, `database`, `src`, and `scripts`.
-- Alembic has one revision head (`20260826a005`).
-- Both deployable ML artifacts load during backend startup.
-- Flutter widget tests pass (4 tests).
-- Core driver auth, charger discovery, route recommendation, availability, and booking-history adapters are connected to FastAPI.
+- `python -m compileall -q backend database src scripts` — passed.
+- `ruff check --select E9,F63,F7,F82 backend database src scripts tests` — passed.
+- `pytest -q tests` — **133 passed**.
+- Backend integration suite with local PostGIS/Redis — **6 passed**.
+- `alembic upgrade head` and `alembic check` — passed in the isolated Compose database.
+- `flutter analyze` — **No issues found**.
+- `flutter test` — **4 passed**.
+- `flutter build web --release` — passed.
+- Isolated Compose stack — PostGIS/Redis healthy, migration exited 0, API and worker running, `/health/ready` returned `{"database":true,"redis":true,"ml":true}`.
 
 ## Honest readiness verdict
 
-The current branch is demo-capable for part of the driver web flow, but it is not production ready. The highest-risk blockers are canonical database drift, unsafe/incomplete payments, non-persistent owner screens, stale backend tests, placeholder mobile secrets, and the absence of a reproducible deployment/CI pipeline.
+The branch is deployment-ready for the verified **development/staging** path:
+the API, database migrations, Redis worker, ML artifacts, live Flutter web
+bundle, driver booking flow, and owner persistence are connected and tested.
+
+It is **not yet a fully production charging network** until real Razorpay/Maps
+credentials, HTTPS/WSS, FCM, a tariff source, charger telemetry, native SDKs,
+release signing, and live-data ML monitoring are supplied. Those are explicit
+external/integration prerequisites—not hidden code failures.

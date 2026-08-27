@@ -2,9 +2,9 @@
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.141+-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-PostGIS-336791?style=flat-square&logo=postgresql)](https://postgis.net)
-[![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-3776AB?style=flat-square&logo=python)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python)](https://python.org)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=flat-square&logo=flutter)](https://flutter.dev)
-[![Status](https://img.shields.io/badge/Audit-PASSED%20%26%20READY-brightgreen?style=flat-square)](#audit-verification--test-results)
+[![Status](https://img.shields.io/badge/Status-Integration%20verified-blue?style=flat-square)](#audit-verification--test-results)
 
 VoltEZ is an end-to-end EV charging discovery, atomic reservation, session telemetry, and machine-learning decision-intelligence platform. It bridges driver mobile UX with commercial charger station owners through real-time geospatial search, route-energy physics math, dynamic demand forecasting, and zero-trust reliability scoring.
 
@@ -67,7 +67,7 @@ flowchart TB
 - **Route-Energy Physics Assessment**: Computes aerodynamic drag, rolling resistance, climbing elevation, and battery State of Charge (SoC) reserve to calculate real-world reachability before sending the driver to a charger.
 - **Dynamic ML Wait-Time Prediction**: ML Model 2 predicts port occupancy probability at ETA and returns calibrated congestion levels (`LOW`, `MEDIUM`, `HIGH`).
 - **Atomic 10-Minute Reservation Holds**: Prevents double-booking via Redis key locks (`set(lock_key, user_id, nx=True, ex=600)`). If unpaid, background ARQ workers automatically expire the slot.
-- **Session Check-In & Telemetry**: Drivers check in upon arrival, track energy delivered (kWh), and complete sessions with server-side pricing verification.
+- **Session Check-In & Telemetry**: Drivers check in upon arrival and complete sessions with server-side pricing verification. Physical charger/OCPP telemetry is an explicit production integration still to be added.
 - **No-IoT Trust System**: Drivers can report broken chargers, instantly penalizing station reliability scores by 20% to prevent bad recommendations for other users.
 - **Razorpay Payment Integration**: Integrated order creation and HMAC-SHA256 signature verification webhooks.
 
@@ -75,7 +75,7 @@ flowchart TB
 - **Business Location Profiles**: Register commercial locations with PostGIS geography coordinates.
 - **Charger & Port Management**: Dynamic station capacity configuration (AC/DC power kW ratings, connector types).
 - **AI Intelligence & Dynamic Pricing**: ML Model 1 (Demand Forecasting) analyzes historical demand windows to recommend off-peak discounts or peak pricing strategies.
-- **Live Notifications**: Real-time push updates via WebSockets and Firebase Cloud Messaging (FCM).
+- **Live Notifications**: Real-time in-app updates via WebSockets; the FCM adapter currently persists notifications and logs a development mock until Firebase credentials/provider delivery are configured.
 
 ---
 
@@ -107,8 +107,10 @@ flowchart TB
 An end-to-end architecture and integration audit was completed across all backend endpoints, database schemas, and frontend API services.
 
 ### 🔍 Verification Highlights
-- **FastAPI Startup Verification**: `All Pydantic models & routes loaded successfully without warnings!` (**PASS**)
-- **ML Physics & Prediction Suite**: `133 passed in 29.39s` (**100% PASS**)
+- **FastAPI deployment stack**: PostGIS + Redis + Alembic + API + ARQ worker start successfully; `/health/ready` reports database, Redis, and ML checks (**PASS**).
+- **ML suite**: `133 passed` (**100% PASS**).
+- **Backend integration suite**: `6 passed` against local PostGIS/Redis (**PASS**).
+- **Flutter client**: analyzer reports no issues, `4` widget tests pass, and the release web bundle builds (**PASS**).
 - **Pydantic V2 Migration**: All response models updated to `model_config = ConfigDict(from_attributes=True)`.
 - **Database Model Integrity**: All 24 SQLAlchemy ORM models verified and registered in `database/base.py`.
 
@@ -117,7 +119,7 @@ An end-to-end architecture and integration audit was completed across all backen
 ## 🚀 Quickstart & Installation Guide
 
 ### Prerequisites
-- Python 3.12+
+- Python 3.12
 - PostgreSQL 16+ with PostGIS extension enabled (`CREATE EXTENSION postgis;`)
 - Redis 7+
 - Flutter SDK (for mobile app)
@@ -125,44 +127,35 @@ An end-to-end architecture and integration audit was completed across all backen
 ### 1. Backend Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/nahArnav/VoltEZ.git
-cd VoltEZ/backend
-
-# Create virtual environment and install dependencies
-python -m venv .venv
+# From the repository root
+cp .env.example .env
+python3.12 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-# Configure environment variables
-copy .env.example .env
+pip install -r backend/requirements.txt
+pip install -e .
 ```
 
 Ensure `.env` contains your PostgreSQL and Redis connections:
-```env
-PROJECT_NAME="VoltEZ API"
-DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/voltez"
-REDIS_URL="redis://localhost:6379/0"
-SECRET_KEY="your-production-secret-key"
-```
+Use `.env.example` as the single variable contract. In particular, local
+Compose uses `postgresql+psycopg://...@postgres:5432/voltez` inside containers;
+direct host Uvicorn uses the host database URL from `backend/.env.example`.
 
 ### 2. Run Database Migrations
 
 ```bash
-# Run Alembic migrations to set up the app schema
-cd VoltEZ
 alembic upgrade head
+alembic check
 ```
 
 ### 3. Start API Server & Worker
 
 ```bash
-# Start FastAPI backend (port 8000)
-cd VoltEZ/backend
-uvicorn app.main:app --reload --port 8000
+# Recommended: start PostGIS, Redis, migration, API, and worker together
+/opt/homebrew/bin/docker-compose up -d --build
 
-# Start ARQ background worker (in a separate terminal)
-arq app.worker.WorkerSettings
+# Or run API/worker directly after starting Postgres and Redis
+PYTHONPATH=backend:src uvicorn app.main:app --host 0.0.0.0 --port 8000
+PYTHONPATH=backend:src arq app.worker.WorkerSettings
 ```
 
 API Documentation will be live at:
@@ -172,14 +165,14 @@ API Documentation will be live at:
 ### 4. Frontend Mobile App Setup
 
 ```bash
-cd VoltEZ
-
-# Install Flutter dependencies
 flutter pub get
-
-# Run application locally
-flutter run
+flutter run -d chrome \
+  --dart-define=API_BASE_URL=http://127.0.0.1:8000/api/v1 \
+  --dart-define=WS_BASE_URL=ws://127.0.0.1:8000/api/v1
 ```
+
+For native phone setup and LAN/HTTPS configuration, see
+[`docs/DEPLOYMENT_AND_PHONE_TESTING.md`](docs/DEPLOYMENT_AND_PHONE_TESTING.md).
 
 ---
 
