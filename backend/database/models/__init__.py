@@ -22,6 +22,7 @@ from database.models.ml_model_registry import ModelRegistry
 from database.models.ml_prediction import MLPrediction
 from database.models.ml_simulation_run import SimulationRun
 from database.models.notification import Notification
+from database.models.payment import Payment
 from database.models.review import Review
 from database.models.user import User
 from database.models.vehicle import Vehicle

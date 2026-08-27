@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, pool
 
 from alembic import context
 from database.base_class import Base
+import database.models  # noqa: F401
 
 load_dotenv()
 
