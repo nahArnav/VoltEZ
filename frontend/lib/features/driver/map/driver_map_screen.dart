@@ -69,7 +69,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
   // ─── Marker hue mapping (backend status strings) ───
   double _markerHue(String status) {
-    switch (status) {
+    switch (_normalizedStatus(status)) {
       case 'available':
         return BitmapDescriptor.hueGreen;
       case 'unavailable':
@@ -83,7 +83,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   }
 
   Color _statusColor(String status) {
-    switch (status) {
+    switch (_normalizedStatus(status)) {
       case 'available':
         return AppColors.success;
       case 'unavailable':
@@ -99,16 +99,38 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
 
   String _waitTimeEstimate(String status) {
-    switch (status) {
+    switch (_normalizedStatus(status)) {
       case 'available':
-        return '< 5 min';
+        return 'Open now';
       case 'unavailable':
-        return '~15 min';
+        return 'Currently occupied';
       case 'offline':
       case 'maintenance':
         return 'N/A';
       default:
         return 'N/A';
+    }
+  }
+
+  /// Normalise the backend's operational vocabulary before rendering.
+  /// The API uses available/unavailable/maintenance/offline, while older
+  /// clients may still return active/paused/inactive.
+  String _normalizedStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+      case 'available':
+        return 'available';
+      case 'paused':
+      case 'unavailable':
+      case 'busy':
+        return 'unavailable';
+      case 'maintenance':
+        return 'maintenance';
+      case 'inactive':
+      case 'offline':
+        return 'offline';
+      default:
+        return 'offline';
     }
   }
 
@@ -307,7 +329,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                               Text(charger.name,
                                   style: AppTypography.headlineSmall),
                               const SizedBox(height: 2),
-                              Text(charger.address ?? '',
+                              Text(charger.address ?? '${charger.latitude.toStringAsFixed(5)}, ${charger.longitude.toStringAsFixed(5)}',
                                   style: AppTypography.bodySmall,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis),
@@ -323,7 +345,9 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                                   .copyWith(color: AppColors.primary),
                             ),
                             Text(
-                              '₹${charger.pricePerKwh.round()}/kWh',
+                              charger.pricePerKwh > 0
+                                  ? '₹${charger.pricePerKwh.round()}/kWh'
+                                  : 'Price pending',
                               style: AppTypography.labelSmall,
                             ),
                           ],

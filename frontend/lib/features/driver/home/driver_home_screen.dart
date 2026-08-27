@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/providers/session_provider.dart';
+import '../../../core/providers/charger_discovery_provider.dart';
+import '../../../core/providers/route_planner_provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
@@ -19,43 +21,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   int _selectedNav = 0;
   final _searchController = TextEditingController();
 
-  // Mock data — replace with real API calls
-  final double _batteryPercent = 72;
-  final double _batteryKwh = 38.9;
-  final double _rangeKm = 245;
-
-  final List<Map<String, dynamic>> _nearbyChargers = [
-    {
-      'id': 'c1',
-      'name': 'Phoenix Mall Charger',
-      'address': 'Phoenix Mall, 2.3 km away',
-      'power': '60 kW',
-      'price': '₹14/kWh',
-      'status': ChargerStatus.available,
-      'amenities': ['WiFi', 'Food Court', 'Parking'],
-      'rating': 4.6,
-    },
-    {
-      'id': 'c2',
-      'name': 'Highway Fast Charge',
-      'address': 'Mumbai-Pune Expressway, 5.1 km',
-      'power': '120 kW',
-      'price': '₹18/kWh',
-      'status': ChargerStatus.available,
-      'amenities': ['Restroom', 'Cafe'],
-      'rating': 4.2,
-    },
-    {
-      'id': 'c3',
-      'name': 'Tech Park Station',
-      'address': 'Infosys Campus, 3.7 km',
-      'power': '30 kW',
-      'price': '₹11/kWh',
-      'status': ChargerStatus.busy,
-      'amenities': ['WiFi'],
-      'rating': 4.8,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ChargerDiscoveryProvider>().init();
+      context.read<RoutePlannerProvider>().loadVehicles();
+    });
+  }
 
   @override
   void dispose() {
@@ -128,19 +101,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const SizedBox(height: 28),
               _buildSectionHeader('NEARBY CHARGERS', 'See all'),
               const SizedBox(height: 14),
-              ..._nearbyChargers.map((c) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: ChargerCard(
-                      name: c['name'],
-                      power: c['power'],
-                      price: c['price'],
-                      status: c['status'],
-                      address: c['address'],
-                      rating: c['rating'],
-                      amenities: List<String>.from(c['amenities']),
-                      onTap: () => context.go('/driver/charger/${c["id"]}'),
-                    ),
-                  )),
+              _buildNearbyChargers(),
               const SizedBox(height: 20),
             ]),
           ),
@@ -269,63 +230,78 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Widget _buildBatteryCard() {
-    final color = _batteryPercent > 50
-        ? AppColors.success
-        : _batteryPercent > 20
-            ? AppColors.warning
-            : AppColors.error;
+    return Consumer<RoutePlannerProvider>(
+      builder: (context, planner, _) {
+        final vehicle = planner.selectedVehicle;
+        if (vehicle == null) {
+          return _emptyVehicleCard(context, planner.vehiclesError);
+        }
 
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            color.withValues(alpha: 0.15),
-            AppColors.card,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        final range = vehicle.estimatedRangeKm;
+        return Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.primary.withValues(alpha: 0.14), AppColors.card],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('BATTERY STATUS', style: AppTypography.labelSmall.copyWith(
-                color: color,
-              )),
+              Text('VEHICLE PROFILE', style: AppTypography.labelSmall.copyWith(color: AppColors.primary)),
+              const SizedBox(height: 6),
+              Text(vehicle.displayName, style: AppTypography.headlineSmall),
+              const SizedBox(height: 8),
               Text(
-                '${_batteryPercent.round()}%',
-                style: TextStyle(
-                  color: color,
-                  fontSize: 36,
-                  fontWeight: FontWeight.w900,
-                ),
+                'Live battery telemetry is not connected. Route estimates use the saved vehicle specification.',
+                style: AppTypography.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _batteryMetric(Icons.bolt_rounded, '${vehicle.batteryKwh.toStringAsFixed(1)} kWh', 'Capacity', AppColors.primary),
+                  _batteryMetric(Icons.route_rounded, range == null ? '—' : '${range.round()} km', 'Range', AppColors.primary),
+                  _batteryMetric(Icons.ev_station_rounded, vehicle.primaryConnector, 'Connector', AppColors.secondary),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: _batteryPercent / 100,
-              color: color,
-              backgroundColor: AppColors.surface,
-              minHeight: 8,
+        );
+      },
+    );
+  }
+
+  Widget _emptyVehicleCard(BuildContext context, String? error) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.directions_car_filled_rounded, color: AppColors.primary, size: 34),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Add your vehicle', style: AppTypography.headlineSmall),
+                const SizedBox(height: 4),
+                Text(
+                  error == null ? 'Save battery and connector details for accurate route recommendations.' : 'Vehicle data could not be loaded. Check your connection and retry.',
+                  style: AppTypography.bodySmall,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _batteryMetric(Icons.bolt_rounded, '${_batteryKwh.toStringAsFixed(1)} kWh', 'Capacity', color),
-              _batteryMetric(Icons.route_rounded, '${_rangeKm.round()} km', 'Range', AppColors.primary),
-              _batteryMetric(Icons.ev_station_rounded, 'CCS2', 'Connector', AppColors.secondary),
-            ],
-          ),
+          TextButton(onPressed: () => context.go('/driver/onboarding'), child: const Text('SET UP')),
         ],
       ),
     );
@@ -438,27 +414,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             prefixIcon: Icons.search_rounded,
           ),
           const SizedBox(height: 16),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _nearbyChargers.length,
-              itemBuilder: (context, index) {
-                final c = _nearbyChargers[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: ChargerCard(
-                    name: c['name'],
-                    power: c['power'],
-                    price: c['price'],
-                    status: c['status'],
-                    address: c['address'],
-                    rating: c['rating'],
-                    amenities: List<String>.from(c['amenities']),
-                    onTap: () => context.go('/driver/charger/${c["id"]}'),
-                  ),
-                );
-              },
-            ),
-          ),
+          Expanded(child: _buildNearbyChargers(showAll: true)),
         ],
       ),
     );
@@ -508,11 +464,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           const SizedBox(height: 32),
 
           // Profile options
-          _profileOption(
-            Icons.directions_car_rounded,
-            'My Vehicle',
-            'Tata Nexon EV, 2024',
-            () {},
+          Consumer<RoutePlannerProvider>(
+            builder: (context, planner, _) => _profileOption(
+              Icons.directions_car_rounded,
+              'My Vehicle',
+              planner.selectedVehicle?.displayName ?? 'No vehicle added',
+              () => context.go('/driver/onboarding'),
+            ),
           ),
           _profileOption(
             Icons.receipt_long_rounded,
@@ -608,5 +566,60 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     return const Center(
       child: Text('Coming soon', style: TextStyle(color: AppColors.textMuted)),
     );
+  }
+
+  Widget _buildNearbyChargers({bool showAll = false}) {
+    return Consumer<ChargerDiscoveryProvider>(
+      builder: (context, discovery, _) {
+        if (discovery.chargersLoading && discovery.allChargers.isEmpty) {
+          return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+        }
+        if (discovery.filteredChargers.isEmpty) {
+          return Column(
+            children: [
+              Text(
+                discovery.chargersError == null ? 'No chargers found near you.' : 'Chargers could not be loaded.',
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyMedium,
+              ),
+              if (discovery.chargersError != null) ...[
+                const SizedBox(height: 4),
+                Text('Check the API connection and try again.', style: AppTypography.bodySmall),
+              ],
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: discovery.chargersLoading ? null : discovery.refreshLocation,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('RETRY'),
+              ),
+            ],
+          );
+        }
+
+        final chargers = showAll ? discovery.filteredChargers : discovery.filteredChargers.take(3).toList();
+        return Column(
+          children: chargers
+              .map((charger) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ChargerCard(
+                      name: charger.name,
+                      power: '${charger.powerKw.round()} kW',
+                      price: charger.pricePerKwh > 0 ? '₹${charger.pricePerKwh.round()}' : '—',
+                      status: charger.chargerStatus,
+                      address: _chargerLocation(charger),
+                      rating: charger.rating > 0 ? charger.rating : null,
+                      amenities: charger.amenitiesList,
+                      onTap: () => context.go('/driver/charger/${charger.id}'),
+                    ),
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+
+  String _chargerLocation(Charger charger) {
+    if (charger.address != null && charger.address!.trim().isNotEmpty) return charger.address!;
+    return '${charger.latitude.toStringAsFixed(5)}, ${charger.longitude.toStringAsFixed(5)}';
   }
 }

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/providers/booking_provider.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/booking_api.dart';
 import '../../../core/network/razorpay_service.dart';
 import '../../../shared/widgets/widgets.dart';
@@ -42,7 +43,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     {
       'icon': Icons.wallet_rounded,
       'label': 'VoltEZ Wallet',
-      'subtitle': 'Balance: ₹500',
+      'subtitle': 'Wallet balance (if enabled on your account)',
     },
   ];
 
@@ -67,6 +68,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _razorpay?.dispose();
     _razorpay = RazorpayService();
 
+    final auth = context.read<AuthProvider>();
     final result = await _razorpay!.openCheckout(
       razorpayKey: kRazorpayKeyId,
       amount: (order.amount * 100).round(), // ₹ → paise
@@ -75,7 +77,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       description: 'Charging at ${hold.slot.connectorLabel} · '
           '${_formatTime(hold.slot.startTime)} – ${_formatTime(hold.slot.endTime)}',
       prefill: RazorpayPrefill(
-        contact: '+919999999999',
+        contact: auth.user?.phone ?? '',
+        email: auth.user?.email ?? '',
       ),
     );
 

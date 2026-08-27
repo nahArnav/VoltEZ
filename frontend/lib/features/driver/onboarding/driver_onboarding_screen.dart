@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/providers/route_planner_provider.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
 
@@ -23,6 +27,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   double _currentBattery = 72;
   ConnectorType? _connectorType;
   double _reserveBattery = 15;
+  bool _saving = false;
+  String? _saveError;
 
   final _makes = ['Tata', 'MG', 'Hyundai', 'Mahindra', 'Kia', 'BYD', 'Ather', 'Ola'];
   final _modelsByMake = {
@@ -38,7 +44,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
 
   List<String> get _selectedModels => _modelsByMake[_selectedMake] ?? [];
 
-  void _next() {
+  Future<void> _next() async {
     if (_step < 2) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -46,10 +52,52 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       );
       setState(() => _step++);
     } else {
-      // Complete onboarding
-      context.go('/driver/home');
+      await _saveVehicle();
     }
   }
+
+  Future<void> _saveVehicle() async {
+    final make = _selectedMake;
+    final model = _selectedModel;
+    final connector = _connectorType;
+    if (make == null || model == null || connector == null || _saving) return;
+
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+
+    try {
+      await context.read<ApiService>().createVehicle({
+        'make': make,
+        'model': model,
+        'vehicle_class': 'car',
+        'battery_kwh': _batteryCapacity,
+        'connector_type_ids': [_connectorId(connector)],
+      });
+      if (!mounted) return;
+      context.read<RoutePlannerProvider>().loadVehicles();
+      context.go('/driver/home');
+    } on DioException catch (error) {
+      if (!mounted) return;
+      final detail = error.response?.data;
+      setState(() => _saveError = detail is Map && detail['detail'] is String
+          ? detail['detail'] as String
+          : 'Vehicle could not be saved. Check your connection and try again.');
+    } catch (_) {
+      if (mounted) setState(() => _saveError = 'Vehicle could not be saved. Check your connection and try again.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  int _connectorId(ConnectorType connector) => switch (connector) {
+        ConnectorType.ccs2 => 1,
+        ConnectorType.type2 => 2,
+        ConnectorType.chademo => 3,
+        ConnectorType.gbT => 4,
+        ConnectorType.type1 => 2,
+      };
 
   void _back() {
     if (_step > 0) {
@@ -129,12 +177,17 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
             // ─── Bottom Button ───
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              child: PrimaryButton(
-                text: _step == 2 ? 'COMPLETE SETUP' : 'CONTINUE',
-                onPressed: _canProceed ? _next : null,
+            child: PrimaryButton(
+                text: _saving ? 'SAVING…' : _step == 2 ? 'COMPLETE SETUP' : 'CONTINUE',
+                onPressed: _canProceed && !_saving ? _next : null,
                 isExpanded: true,
               ),
             ),
+            if (_saveError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
+                child: Text(_saveError!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.error)),
+              ),
           ],
         ),
       ),

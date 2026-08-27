@@ -7,6 +7,7 @@ import '../../../core/theme/typography.dart';
 import '../../../core/providers/booking_provider.dart';
 import '../../../core/providers/route_planner_provider.dart';
 import '../../../core/providers/charger_discovery_provider.dart';
+import '../../../core/network/api_service.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/widgets.dart';
 
@@ -30,15 +31,20 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
   int _detourMinutes = 0;
   double _reliabilityScore = 0.0;
   bool _connectorCompatible = true;
+  bool _resolving = false;
+  bool _notFound = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _resolveCharger();
+    if (!_resolving && _charger == null && !_notFound) {
+      _resolveCharger();
+    }
   }
 
-  void _resolveCharger() {
-    if (_charger != null) return;
+  Future<void> _resolveCharger() async {
+    if (_charger != null || _resolving) return;
+    _resolving = true;
 
     // Try recommendation data first
     try {
@@ -51,6 +57,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
             _reliabilityScore = rec.reliabilityScore;
             _connectorCompatible = rec.connectorCompatible;
           });
+          _resolving = false;
           return;
         }
       }
@@ -67,36 +74,69 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
             _reliabilityScore = c.rating / 5.0;
             _connectorCompatible = true;
           });
+          _resolving = false;
           return;
         }
       }
     } catch (_) {}
 
-    // Final fallback — use default charger
-    setState(() {
-      _charger = const Charger(
-        id: '1', businessId: '1',
-        name: 'Phoenix Mall Charger',
-        address: 'Phoenix Mall, Lower Parel, Mumbai',
-        latitude: 19.0760,
-        longitude: 72.8777,
-        powerKw: 60,
-        accessType: 'public',
-        basePrice: 14,
-        status: 'active',
-        reliabilityScore: 0.92,
-        amenities: 'WiFi,Food Court,Parking,Restroom,AC Waiting Lounge',
-      );
-      _detourMinutes = 6;
-      _reliabilityScore = 0.94;
-      _connectorCompatible = true;
-    });
+    // Direct navigation/deep links may not have discovery data in memory yet.
+    // Resolve the real charger from the backend instead of inventing a fallback.
+    try {
+      final response = await context.read<ApiService>().getChargerById(widget.chargerId);
+      final charger = Charger.fromJson(response.data as Map<String, dynamic>);
+      if (!mounted) return;
+      setState(() {
+        _charger = charger;
+        _detourMinutes = 0;
+        _reliabilityScore = (charger.reliabilityScore > 1
+                ? charger.reliabilityScore / 100
+                : charger.reliabilityScore)
+            .clamp(0.0, 1.0);
+        _connectorCompatible = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _notFound = true);
+    } finally {
+      _resolving = false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final charger = _charger;
     if (charger == null) {
+      if (_notFound) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Charger unavailable')),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.ev_station_outlined, size: 64, color: AppColors.textMuted),
+                  const SizedBox(height: 16),
+                  Text('This charger is no longer available.', textAlign: TextAlign.center, style: AppTypography.headlineSmall),
+                  const SizedBox(height: 8),
+                  Text('Refresh the map and choose a charger that is currently returned by the server.', textAlign: TextAlign.center, style: AppTypography.bodyMedium),
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() => _notFound = false);
+                      _resolveCharger();
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('RETRY'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
       return const Scaffold(
         backgroundColor: AppColors.background,
         body: Center(child: CircularProgressIndicator()),

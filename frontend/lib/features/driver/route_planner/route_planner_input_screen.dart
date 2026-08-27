@@ -78,7 +78,10 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                     const SizedBox(height: 28),
 
                     // ─── Battery SOC ───
-                    _buildSectionLabel('BATTERY STATE', Icons.battery_charging_full_rounded),
+                    _buildSectionLabel(
+                      'BATTERY STATE',
+                      Icons.battery_charging_full_rounded,
+                    ),
                     const SizedBox(height: 12),
                     _buildSOCSlider(planner),
                     const SizedBox(height: 20),
@@ -122,8 +125,11 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                     context.go('/driver/home');
                   }
                 },
-                icon: const Icon(Icons.arrow_back_rounded,
-                    color: AppColors.textPrimary, size: 24),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AppColors.textPrimary,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 4),
               Expanded(
@@ -131,8 +137,10 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Route Planner',
-                        style: AppTypography.headlineLarge.copyWith(fontSize: 18)),
+                    Text(
+                      'Route Planner',
+                      style: AppTypography.headlineLarge.copyWith(fontSize: 18),
+                    ),
                     Text(
                       'Find the best charging stop on your trip',
                       style: AppTypography.bodySmall.copyWith(fontSize: 11),
@@ -304,8 +312,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.gps_fixed_rounded,
-                color: AppColors.success, size: 14),
+            Icon(Icons.gps_fixed_rounded, color: AppColors.success, size: 14),
             const SizedBox(width: 4),
             Text(
               'GPS',
@@ -331,8 +338,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final vehicle = planner.availableVehicles[index];
-          final selected =
-              planner.selectedVehicle?.id == vehicle.id;
+          final selected = planner.selectedVehicle?.id == vehicle.id;
 
           return GestureDetector(
             onTap: () => planner.selectVehicle(vehicle),
@@ -346,9 +352,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                     : AppColors.card,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: selected
-                      ? AppColors.primary
-                      : AppColors.border,
+                  color: selected ? AppColors.primary : AppColors.border,
                   width: selected ? 1.5 : 1,
                 ),
               ),
@@ -404,16 +408,16 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                   Row(
                     children: [
                       _vehicleSpec(
-                          Icons.battery_full_rounded,
-                          '${vehicle.batteryCapacityKwh.round()} kWh',
-                          selected),
+                        Icons.battery_full_rounded,
+                        '${vehicle.batteryCapacityKwh.round()} kWh',
+                        selected,
+                      ),
                       const SizedBox(width: 8),
                       _vehicleSpec(
-                          Icons.power_rounded,
-                          vehicle.connectorType == 'CCS2'
-                              ? 'CCS2'
-                              : 'Type 2',
-                          selected),
+                        Icons.power_rounded,
+                        vehicle.connectorType == 'CCS2' ? 'CCS2' : 'Type 2',
+                        selected,
+                      ),
                     ],
                   ),
                 ],
@@ -429,9 +433,11 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon,
-            size: 12,
-            color: selected ? AppColors.primary : AppColors.textMuted),
+        Icon(
+          icon,
+          size: 12,
+          color: selected ? AppColors.primary : AppColors.textMuted,
+        ),
         const SizedBox(width: 3),
         Text(
           text,
@@ -451,8 +457,8 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
     final color = soc > 50
         ? AppColors.success
         : soc > 20
-            ? AppColors.warning
-            : AppColors.error;
+        ? AppColors.warning
+        : AppColors.error;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -474,8 +480,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Current Battery',
-                        style: AppTypography.headlineSmall),
+                    Text('Current Battery', style: AppTypography.headlineSmall),
                     Text(
                       'How charged is your vehicle right now?',
                       style: AppTypography.bodySmall.copyWith(fontSize: 11),
@@ -486,8 +491,10 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
 
               // Big percentage
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(16),
@@ -511,8 +518,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
               activeTrackColor: color,
               inactiveTrackColor: AppColors.surface,
               thumbColor: color,
-              thumbShape:
-                  const RoundSliderThumbShape(enabledThumbRadius: 8),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
               overlayColor: color.withValues(alpha: 0.15),
               trackHeight: 6,
             ),
@@ -554,11 +560,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
         alignment: Alignment.center,
         children: [
           // Battery outline
-          Icon(
-            Icons.battery_std_rounded,
-            color: color,
-            size: 32,
-          ),
+          Icon(Icons.battery_std_rounded, color: color, size: 32),
           // Fill level
           Positioned(
             bottom: 10,
@@ -598,16 +600,18 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                   color: AppColors.warning.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.shield_rounded,
-                    color: AppColors.warning, size: 20),
+                child: Icon(
+                  Icons.shield_rounded,
+                  color: AppColors.warning,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Reserve Battery',
-                        style: AppTypography.headlineSmall),
+                    Text('Reserve Battery', style: AppTypography.headlineSmall),
                     Text(
                       'Minimum charge to keep as safety buffer',
                       style: AppTypography.bodySmall.copyWith(fontSize: 10),
@@ -616,8 +620,10 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.warning.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
@@ -639,8 +645,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
               activeTrackColor: AppColors.warning,
               inactiveTrackColor: AppColors.surface,
               thumbColor: AppColors.warning,
-              thumbShape:
-                  const RoundSliderThumbShape(enabledThumbRadius: 7),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
               overlayColor: AppColors.warning.withValues(alpha: 0.15),
               trackHeight: 5,
             ),
@@ -715,9 +720,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: selected
-                  ? p.$5.withValues(alpha: 0.12)
-                  : AppColors.card,
+              color: selected ? p.$5.withValues(alpha: 0.12) : AppColors.card,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: selected ? p.$5 : AppColors.border,
@@ -728,8 +731,11 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(p.$2,
-                    color: selected ? p.$5 : AppColors.textMuted, size: 22),
+                Icon(
+                  p.$2,
+                  color: selected ? p.$5 : AppColors.textMuted,
+                  size: 22,
+                ),
                 const SizedBox(height: 6),
                 Text(
                   p.$3,
@@ -752,7 +758,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
 
   // ─── CTA ───
   Widget _buildCTA(RoutePlannerProvider planner) {
-    final valid = planner.isRouteValid;
+    final valid = planner.canAttemptSearch;
 
     return Column(
       children: [
@@ -771,8 +777,11 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline_rounded,
-                      color: AppColors.primary, size: 18),
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -805,6 +814,8 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
             text: 'FIND BEST CHARGING STOP',
             onPressed: valid
                 ? () async {
+                    await planner.resolveTypedLocations();
+                    if (!planner.isRouteValid) return;
                     await planner.findRecommendations();
                     if (!mounted) return;
                     if (planner.hasSearched && context.mounted) {
@@ -841,6 +852,9 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
     }
     if (planner.originName.isEmpty) return 'Enter your origin';
     if (planner.destinationName.isEmpty) return 'Enter your destination';
+    if (planner.originLat == null || planner.destinationLat == null) {
+      return 'Use GPS or enter places your phone can locate';
+    }
     if (planner.selectedVehicle == null) return 'Select your vehicle';
     return '';
   }

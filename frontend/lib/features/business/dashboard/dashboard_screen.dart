@@ -100,10 +100,10 @@ class _BusinessOnboarding extends StatefulWidget {
 class _BusinessOnboardingState extends State<_BusinessOnboarding> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
-  final _category = TextEditingController(text: 'mall');
-  final _address = TextEditingController(text: 'Pune, Maharashtra');
-  final _latitude = TextEditingController(text: '18.5204');
-  final _longitude = TextEditingController(text: '73.8567');
+  final _category = TextEditingController();
+  final _address = TextEditingController();
+  final _latitude = TextEditingController();
+  final _longitude = TextEditingController();
 
   @override
   void dispose() {
@@ -407,8 +407,8 @@ Widget _bookingTile(Map<String, dynamic> booking) {
 Future<void> _showAddCharger(BuildContext context, BusinessProvider provider) async {
   final name = TextEditingController();
   final power = TextEditingController(text: '60');
-  final lat = TextEditingController(text: '18.5204');
-  final lng = TextEditingController(text: '73.8567');
+  final lat = TextEditingController(text: provider.business?['latitude']?.toString() ?? '');
+  final lng = TextEditingController(text: provider.business?['longitude']?.toString() ?? '');
   final accepted = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -426,12 +426,19 @@ Future<void> _showAddCharger(BuildContext context, BusinessProvider provider) as
     ),
   );
   if (accepted == true && context.mounted) {
+    final powerKw = double.tryParse(power.text);
+    final latitude = double.tryParse(lat.text);
+    final longitude = double.tryParse(lng.text);
+    if (name.text.trim().isEmpty || powerKw == null || latitude == null || longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a name, valid power, latitude, and longitude.')));
+      return;
+    }
     await provider.createCharger(
       name: name.text.trim(),
       chargerType: 'public',
-      powerKw: double.tryParse(power.text) ?? 60,
-      latitude: double.tryParse(lat.text) ?? 18.5204,
-      longitude: double.tryParse(lng.text) ?? 73.8567,
+      powerKw: powerKw,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 }
