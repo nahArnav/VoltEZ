@@ -4,8 +4,7 @@ VoltEZ Core Security Module
 JWT access/refresh token creation and validation, password hashing with Argon2.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -29,10 +28,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 # --- JWT Tokens ---
 
+
 def create_access_token(
     subject: str,
     role: str,
-    expires_delta: Optional[timedelta] = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
     """
     Create a short-lived JWT access token.
@@ -45,7 +45,7 @@ def create_access_token(
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + expires_delta
 
     payload = {
@@ -60,7 +60,7 @@ def create_access_token(
 
 def create_refresh_token(
     subject: str,
-    expires_delta: Optional[timedelta] = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
     """
     Create a longer-lived JWT refresh token.
@@ -72,7 +72,7 @@ def create_refresh_token(
     if expires_delta is None:
         expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + expires_delta
 
     payload = {

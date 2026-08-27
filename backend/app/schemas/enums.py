@@ -1,11 +1,13 @@
-from enum import Enum
+from enum import StrEnum
 
-class UserRole(str, Enum):
+
+class UserRole(StrEnum):
     DRIVER = "driver"
     OWNER = "owner"
     ADMIN = "admin"
 
-class BookingStatus(str, Enum):
+
+class BookingStatus(StrEnum):
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
     COMPLETED = "completed"
@@ -16,7 +18,8 @@ class BookingStatus(str, Enum):
     CHECKED_IN = "checked_in"
     CHARGING = "charging"
 
-class ChargerStatus(str, Enum):
+
+class ChargerStatus(StrEnum):
     AVAILABLE = "available"
     IN_USE = "in_use"
     MAINTENANCE = "maintenance"

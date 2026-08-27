@@ -77,9 +77,7 @@ def assign_purged_temporal_splits(
         invalid = set(declared_roles.values()) - required_roles - {"stress_test"}
         if invalid:
             raise ValueError(f"unsupported experiment roles in source manifests: {sorted(invalid)}")
-        result["run_holdout_split"] = result["simulation_run_id"].astype(str).map(
-            declared_roles
-        )
+        result["run_holdout_split"] = result["simulation_run_id"].astype(str).map(declared_roles)
         present_roles = set(declared_roles.values())
         report["cross_seed"] = {
             "available": required_roles.issubset(present_roles),

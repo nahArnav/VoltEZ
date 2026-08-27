@@ -1,11 +1,12 @@
-from fastapi import WebSocket
-from typing import Dict, Set
 from uuid import UUID
+
+from fastapi import WebSocket
+
 
 class ConnectionManager:
     def __init__(self):
         # Maps user_id to a set of active websocket connections
-        self.active_connections: Dict[UUID, Set[WebSocket]] = {}
+        self.active_connections: dict[UUID, set[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, user_id: UUID):
         await websocket.accept()
@@ -27,5 +28,6 @@ class ConnectionManager:
                 except Exception:
                     # Ignore if the connection is dead, disconnect logic will handle cleanup
                     pass
+
 
 manager = ConnectionManager()

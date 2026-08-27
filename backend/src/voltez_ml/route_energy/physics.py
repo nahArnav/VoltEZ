@@ -109,19 +109,16 @@ def estimate_physics_energy(
         / JOULES_PER_KWH
     )
     climbing_wheel_kwh = (
-        vehicle.total_mass_kg
-        * STANDARD_GRAVITY_M_S2
-        * route.elevation_gain_m
-        / JOULES_PER_KWH
+        vehicle.total_mass_kg * STANDARD_GRAVITY_M_S2 * route.elevation_gain_m / JOULES_PER_KWH
     )
 
     # Each full stop loses kinetic energy. Acceleration draws through drivetrain losses while a
     # bounded portion of the following deceleration can return through regenerative braking.
-    kinetic_kwh_per_stop = (
-        0.5 * vehicle.total_mass_kg * mean_speed_mps**2 / JOULES_PER_KWH
-    )
-    stop_start_kwh = route.full_stop_count * kinetic_kwh_per_stop * (
-        1 / vehicle.drivetrain_efficiency - vehicle.regenerative_braking_efficiency
+    kinetic_kwh_per_stop = 0.5 * vehicle.total_mass_kg * mean_speed_mps**2 / JOULES_PER_KWH
+    stop_start_kwh = (
+        route.full_stop_count
+        * kinetic_kwh_per_stop
+        * (1 / vehicle.drivetrain_efficiency - vehicle.regenerative_braking_efficiency)
     )
 
     traction_battery_kwh = (
@@ -137,10 +134,7 @@ def estimate_physics_energy(
     )
     estimated = max(
         0.0,
-        traction_battery_kwh
-        + stop_start_kwh
-        + auxiliary_kwh
-        - descent_regen_credit_kwh,
+        traction_battery_kwh + stop_start_kwh + auxiliary_kwh - descent_regen_credit_kwh,
     )
     return PhysicsEstimate(
         rolling_kwh=rolling_wheel_kwh / vehicle.drivetrain_efficiency,
@@ -173,9 +167,7 @@ def assess_reachability(
         raise ValueError("minimum borderline buffer cannot be negative")
 
     usable_capacity = vehicle.battery_capacity_kwh * vehicle.usable_capacity_fraction
-    energy_above_reserve = usable_capacity * (
-        current_soc_percent - reserve_soc_percent
-    ) / 100
+    energy_above_reserve = usable_capacity * (current_soc_percent - reserve_soc_percent) / 100
     safety_margin = energy_above_reserve - conservative_energy_kwh
     borderline_width = max(minimum_borderline_buffer_kwh, usable_capacity * 0.03)
     status: Literal["reachable", "borderline", "unreachable"]
@@ -187,9 +179,7 @@ def assess_reachability(
         status = "reachable"
 
     expected_arrival_soc = current_soc_percent - expected_energy_kwh / usable_capacity * 100
-    conservative_arrival_soc = (
-        current_soc_percent - conservative_energy_kwh / usable_capacity * 100
-    )
+    conservative_arrival_soc = current_soc_percent - conservative_energy_kwh / usable_capacity * 100
     return ReachabilityAssessment(
         status=status,
         expected_arrival_soc_percent=expected_arrival_soc,

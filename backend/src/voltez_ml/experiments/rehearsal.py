@@ -105,9 +105,7 @@ def _availability_statistics(
     roles = sorted(all_rows["run_holdout_split"].astype(str).unique())
     for role in roles:
         role_all = all_rows[all_rows["run_holdout_split"].astype(str) == role]
-        role_labeled = labeled_rows[
-            labeled_rows["run_holdout_split"].astype(str) == role
-        ]
+        role_labeled = labeled_rows[labeled_rows["run_holdout_split"].astype(str) == role]
         by_role[role] = {
             "all_rows": len(role_all),
             "labeled_rows": len(role_labeled),
@@ -139,14 +137,10 @@ def audit_rehearsal(rehearsal_root: Path) -> dict[str, Any]:
     }
     role_counts = dict(sorted(Counter(roles_by_run.values()).items()))
     if role_counts != EXPECTED_ROLE_COUNTS:
-        failures.append(
-            f"experiment roles do not match canonical plan: {role_counts}"
-        )
+        failures.append(f"experiment roles do not match canonical plan: {role_counts}")
     if any(bool(manifest.get("code_is_dirty")) for manifest in source_manifests):
         warnings.append("at least one source run was generated from an uncommitted worktree")
-    structural_namespaces = {
-        manifest.get("structural_namespace") for manifest in source_manifests
-    }
+    structural_namespaces = {manifest.get("structural_namespace") for manifest in source_manifests}
     if len(structural_namespaces) != 1 or None in structural_namespaces:
         failures.append("canonical rehearsal worlds do not share one structural namespace")
     dynamic_seeds = {manifest.get("dynamic_seed") for manifest in source_manifests}
@@ -237,9 +231,7 @@ def audit_rehearsal(rehearsal_root: Path) -> dict[str, Any]:
         "trains_models": False,
         "rehearsal_root": str(rehearsal_root),
         "feature_snapshot_id": feature_manifest["feature_snapshot_id"],
-        "feature_reproducibility_fingerprint": feature_manifest[
-            "reproducibility_fingerprint"
-        ],
+        "feature_reproducibility_fingerprint": feature_manifest["reproducibility_fingerprint"],
         "role_counts": role_counts,
         "failures": failures,
         "warnings": warnings,
@@ -253,16 +245,12 @@ def audit_rehearsal(rehearsal_root: Path) -> dict[str, Any]:
                 "structural_seed": manifest["structural_seed"],
                 "structural_namespace": manifest["structural_namespace"],
                 "row_counts": manifest["row_counts"],
-                "reproducibility_fingerprint": manifest[
-                    "reproducibility_fingerprint"
-                ],
+                "reproducibility_fingerprint": manifest["reproducibility_fingerprint"],
             }
             for manifest in sorted(source_manifests, key=lambda value: value["run_id"])
         ],
         "demand_by_role": _demand_statistics(demand),
-        "availability_by_role": _availability_statistics(
-            availability_all, availability_labeled
-        ),
+        "availability_by_role": _availability_statistics(availability_all, availability_labeled),
         "waiting_time": {
             "all_rows": len(waiting_all),
             "labeled_rows": len(waiting_labeled),

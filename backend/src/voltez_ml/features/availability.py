@@ -59,21 +59,15 @@ def _enrich_ports(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
         validate="many_to_one",
     )
     ports = ports.merge(
-        tables["businesses"][
-            [run_key, "business_id", "category", "verification_status"]
-        ],
+        tables["businesses"][[run_key, "business_id", "category", "verification_status"]],
         on=[run_key, "business_id"],
         validate="many_to_one",
     ).merge(
-        tables["connector_types"][
-            [run_key, "connector_type_id", "code", "charging_type"]
-        ],
+        tables["connector_types"][[run_key, "connector_type_id", "code", "charging_type"]],
         on=[run_key, "connector_type_id"],
         validate="many_to_one",
     )
-    ports["site_port_count"] = ports.groupby([run_key, "charger_id"])["port_id"].transform(
-        "size"
-    )
+    ports["site_port_count"] = ports.groupby([run_key, "charger_id"])["port_id"].transform("size")
     return ports
 
 
@@ -137,8 +131,7 @@ def build_availability_features(
 
     ports = _enrich_ports(tables)
     port_lookup = {
-        (str(row["simulation_run_id"]), str(row["port_id"])): row
-        for row in _records(ports)
+        (str(row["simulation_run_id"]), str(row["port_id"])): row for row in _records(ports)
     }
     hours_lookup = {
         (
@@ -163,9 +156,7 @@ def build_availability_features(
         status_by_port[key].append(row)
     for port_key, status_rows in status_by_port.items():
         status_rows.sort(key=lambda row: pd.Timestamp(row["ingested_at"]))
-        status_ingestion_times[port_key] = [
-            pd.Timestamp(row["ingested_at"]) for row in status_rows
-        ]
+        status_ingestion_times[port_key] = [pd.Timestamp(row["ingested_at"]) for row in status_rows]
     own_booking_lookup = {
         (
             str(row["simulation_run_id"]),
@@ -187,9 +178,7 @@ def build_availability_features(
         run_id = str(observation["simulation_run_id"])
         port_key = (run_id, port_id)
         port = port_lookup[port_key]
-        own_booking_id = own_booking_lookup.get(
-            (run_id, str(observation["request_id"]), port_id)
-        )
+        own_booking_id = own_booking_lookup.get((run_id, str(observation["request_id"]), port_id))
 
         known_conflicts = 0
         known_nearby_bookings = 0
@@ -350,8 +339,7 @@ def build_availability_features(
                 "charger_reliability_evidence_count": charger_reliability_evidence,
                 "smoothed_charger_reliability": smoothed_charger_reliability,
                 "reliability_cold_start": int(
-                    charger_reliability_evidence
-                    < config.features.cold_start_evidence_threshold
+                    charger_reliability_evidence < config.features.cold_start_evidence_threshold
                 ),
                 "latest_status": str(latest_status["status"])
                 if latest_status is not None

@@ -90,9 +90,7 @@ def _suite(tmp_path: Path) -> Path:
         {
             "evaluation_role": "test",
             "run_id": "locked-test",
-            "tables": {
-                "reliability_features_labeled": str(data_root / "must-not-open.parquet")
-            },
+            "tables": {"reliability_features_labeled": str(data_root / "must-not-open.parquet")},
         }
     )
     readiness_path = tmp_path / "training_readiness.json"

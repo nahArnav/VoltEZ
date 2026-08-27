@@ -13,110 +13,286 @@ Prerequisites:
 """
 
 import asyncio
-import sys
 import os
 import random
-from datetime import datetime, timedelta, timezone
+import sys
+from datetime import UTC, datetime, timedelta
 
 # Add the backend directory to the path so we can import app modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from sqlalchemy import text
-from app.db.session import AsyncSessionLocal
-from app.core.security import hash_password
 from app.models import (
-    User, UserRole, Vehicle, Business, Charger, ChargerPort,
-    AvailabilityWindow, Booking, BookingStatus, BookingEvent,
-    ChargingSession, ChargerStatusEvent, DemandHistory, Notification,
+    AvailabilityWindow,
+    Booking,
+    BookingStatus,
+    Business,
+    Charger,
+    ChargerPort,
+    ChargerStatusEvent,
+    ChargingSession,
+    DemandHistory,
+    User,
+    UserRole,
+    Vehicle,
 )
+from sqlalchemy import text
 
+from app.core.security import hash_password
+from app.db.session import AsyncSessionLocal
 
 # --- Pune Coordinates for Demo ---
 # Approximate center: 18.5204° N, 73.8567° E
 PUNE_LOCATIONS = {
-    "phoenix_mall": {"lat": 18.5623, "lng": 73.9166, "name": "Phoenix Marketcity", "category": "mall"},
+    "phoenix_mall": {
+        "lat": 18.5623,
+        "lng": 73.9166,
+        "name": "Phoenix Marketcity",
+        "category": "mall",
+    },
     "eon_it_park": {"lat": 18.5535, "lng": 73.9435, "name": "EON IT Park", "category": "office"},
-    "blue_ridge": {"lat": 18.5880, "lng": 73.9286, "name": "Blue Ridge Society", "category": "apartment"},
-    "kalyani_nagar": {"lat": 18.5471, "lng": 73.9026, "name": "Kalyani Nagar Plaza", "category": "mall"},
-    "magarpatta_city": {"lat": 18.5159, "lng": 73.9272, "name": "Magarpatta Cybercity", "category": "office"},
-    "viman_nagar": {"lat": 18.5679, "lng": 73.9143, "name": "Viman Nagar Hub", "category": "office"},
-    "koregaon_park": {"lat": 18.5362, "lng": 73.8939, "name": "Koregaon Park Arcade", "category": "mall"},
+    "blue_ridge": {
+        "lat": 18.5880,
+        "lng": 73.9286,
+        "name": "Blue Ridge Society",
+        "category": "apartment",
+    },
+    "kalyani_nagar": {
+        "lat": 18.5471,
+        "lng": 73.9026,
+        "name": "Kalyani Nagar Plaza",
+        "category": "mall",
+    },
+    "magarpatta_city": {
+        "lat": 18.5159,
+        "lng": 73.9272,
+        "name": "Magarpatta Cybercity",
+        "category": "office",
+    },
+    "viman_nagar": {
+        "lat": 18.5679,
+        "lng": 73.9143,
+        "name": "Viman Nagar Hub",
+        "category": "office",
+    },
+    "koregaon_park": {
+        "lat": 18.5362,
+        "lng": 73.8939,
+        "name": "Koregaon Park Arcade",
+        "category": "mall",
+    },
     "fc_road": {"lat": 18.5183, "lng": 73.8441, "name": "FC Road Hub", "category": "retail"},
-    "baner_balewadi": {"lat": 18.5590, "lng": 73.7868, "name": "Baner Highstreet", "category": "retail"},
-    "hinjewadi_ph1": {"lat": 18.5913, "lng": 73.7389, "name": "Hinjewadi Phase 1", "category": "office"},
-    "hinjewadi_ph2": {"lat": 18.5955, "lng": 73.7196, "name": "Hinjewadi Phase 2", "category": "office"},
-    "hinjewadi_ph3": {"lat": 18.5828, "lng": 73.7029, "name": "Hinjewadi Phase 3", "category": "office"},
+    "baner_balewadi": {
+        "lat": 18.5590,
+        "lng": 73.7868,
+        "name": "Baner Highstreet",
+        "category": "retail",
+    },
+    "hinjewadi_ph1": {
+        "lat": 18.5913,
+        "lng": 73.7389,
+        "name": "Hinjewadi Phase 1",
+        "category": "office",
+    },
+    "hinjewadi_ph2": {
+        "lat": 18.5955,
+        "lng": 73.7196,
+        "name": "Hinjewadi Phase 2",
+        "category": "office",
+    },
+    "hinjewadi_ph3": {
+        "lat": 18.5828,
+        "lng": 73.7029,
+        "name": "Hinjewadi Phase 3",
+        "category": "office",
+    },
     "wakad": {"lat": 18.5987, "lng": 73.7688, "name": "Wakad Junction", "category": "apartment"},
-    "pimple_saudagar": {"lat": 18.5932, "lng": 73.7937, "name": "Pimple Saudagar Square", "category": "retail"},
+    "pimple_saudagar": {
+        "lat": 18.5932,
+        "lng": 73.7937,
+        "name": "Pimple Saudagar Square",
+        "category": "retail",
+    },
     "aundh": {"lat": 18.5577, "lng": 73.8078, "name": "Aundh IT Park", "category": "office"},
-    "shivaji_nagar": {"lat": 18.5314, "lng": 73.8446, "name": "Shivaji Nagar Metro", "category": "transit"},
-    "swargate": {"lat": 18.5018, "lng": 73.8586, "name": "Swargate Bus Stand", "category": "transit"},
+    "shivaji_nagar": {
+        "lat": 18.5314,
+        "lng": 73.8446,
+        "name": "Shivaji Nagar Metro",
+        "category": "transit",
+    },
+    "swargate": {
+        "lat": 18.5018,
+        "lng": 73.8586,
+        "name": "Swargate Bus Stand",
+        "category": "transit",
+    },
     "camp": {"lat": 18.5135, "lng": 73.8767, "name": "Camp Cantonment", "category": "retail"},
-    "hadapsar": {"lat": 18.5089, "lng": 73.9259, "name": "Hadapsar Industrial Area", "category": "office"},
+    "hadapsar": {
+        "lat": 18.5089,
+        "lng": 73.9259,
+        "name": "Hadapsar Industrial Area",
+        "category": "office",
+    },
     "kharadi": {"lat": 18.5515, "lng": 73.9348, "name": "Kharadi Bypass", "category": "retail"},
 }
 
 # Charger configurations matching real Indian EV ecosystem
 CHARGER_CONFIGS = [
     # Phoenix Mall chargers - high-traffic, mixed types
-    {"business": "phoenix_mall", "name": "Phoenix Fast Charger A1", "power_kw": 50.0, "base_price": 18.0,
-     "ports": [("CCS2", 50.0), ("CHAdeMO", 50.0)], "reliability": 0.94},
-    {"business": "phoenix_mall", "name": "Phoenix Fast Charger A2", "power_kw": 50.0, "base_price": 18.0,
-     "ports": [("CCS2", 50.0)], "reliability": 0.91},
-    {"business": "phoenix_mall", "name": "Phoenix AC Charger B1", "power_kw": 7.4, "base_price": 12.0,
-     "ports": [("Type2", 7.4), ("Type2", 7.4)], "reliability": 0.88},
-    {"business": "phoenix_mall", "name": "Phoenix AC Charger B2", "power_kw": 22.0, "base_price": 14.0,
-     "ports": [("Type2", 22.0)], "reliability": 0.95},
+    {
+        "business": "phoenix_mall",
+        "name": "Phoenix Fast Charger A1",
+        "power_kw": 50.0,
+        "base_price": 18.0,
+        "ports": [("CCS2", 50.0), ("CHAdeMO", 50.0)],
+        "reliability": 0.94,
+    },
+    {
+        "business": "phoenix_mall",
+        "name": "Phoenix Fast Charger A2",
+        "power_kw": 50.0,
+        "base_price": 18.0,
+        "ports": [("CCS2", 50.0)],
+        "reliability": 0.91,
+    },
+    {
+        "business": "phoenix_mall",
+        "name": "Phoenix AC Charger B1",
+        "power_kw": 7.4,
+        "base_price": 12.0,
+        "ports": [("Type2", 7.4), ("Type2", 7.4)],
+        "reliability": 0.88,
+    },
+    {
+        "business": "phoenix_mall",
+        "name": "Phoenix AC Charger B2",
+        "power_kw": 22.0,
+        "base_price": 14.0,
+        "ports": [("Type2", 22.0)],
+        "reliability": 0.95,
+    },
     # EON IT Park chargers - office hours focused
-    {"business": "eon_it_park", "name": "EON DC Fast 1", "power_kw": 60.0, "base_price": 16.0,
-     "ports": [("CCS2", 60.0)], "reliability": 0.92},
-    {"business": "eon_it_park", "name": "EON DC Fast 2", "power_kw": 60.0, "base_price": 16.0,
-     "ports": [("CCS2", 60.0), ("CHAdeMO", 50.0)], "reliability": 0.89},
-    {"business": "eon_it_park", "name": "EON AC Slow 1", "power_kw": 7.4, "base_price": 10.0,
-     "ports": [("Type2", 7.4), ("Type2", 7.4)], "reliability": 0.96},
-    {"business": "eon_it_park", "name": "EON AC Slow 2", "power_kw": 7.4, "base_price": 10.0,
-     "ports": [("Type2", 7.4)], "reliability": 0.85},
+    {
+        "business": "eon_it_park",
+        "name": "EON DC Fast 1",
+        "power_kw": 60.0,
+        "base_price": 16.0,
+        "ports": [("CCS2", 60.0)],
+        "reliability": 0.92,
+    },
+    {
+        "business": "eon_it_park",
+        "name": "EON DC Fast 2",
+        "power_kw": 60.0,
+        "base_price": 16.0,
+        "ports": [("CCS2", 60.0), ("CHAdeMO", 50.0)],
+        "reliability": 0.89,
+    },
+    {
+        "business": "eon_it_park",
+        "name": "EON AC Slow 1",
+        "power_kw": 7.4,
+        "base_price": 10.0,
+        "ports": [("Type2", 7.4), ("Type2", 7.4)],
+        "reliability": 0.96,
+    },
+    {
+        "business": "eon_it_park",
+        "name": "EON AC Slow 2",
+        "power_kw": 7.4,
+        "base_price": 10.0,
+        "ports": [("Type2", 7.4)],
+        "reliability": 0.85,
+    },
     # Blue Ridge apartment chargers
-    {"business": "blue_ridge", "name": "Blue Ridge Charger 1", "power_kw": 22.0, "base_price": 11.0,
-     "ports": [("Type2", 22.0), ("CCS2", 22.0)], "reliability": 0.90},
-    {"business": "blue_ridge", "name": "Blue Ridge Charger 2", "power_kw": 7.4, "base_price": 9.0,
-     "ports": [("Type2", 7.4)], "reliability": 0.93},
+    {
+        "business": "blue_ridge",
+        "name": "Blue Ridge Charger 1",
+        "power_kw": 22.0,
+        "base_price": 11.0,
+        "ports": [("Type2", 22.0), ("CCS2", 22.0)],
+        "reliability": 0.90,
+    },
+    {
+        "business": "blue_ridge",
+        "name": "Blue Ridge Charger 2",
+        "power_kw": 7.4,
+        "base_price": 9.0,
+        "ports": [("Type2", 7.4)],
+        "reliability": 0.93,
+    },
     # Intentionally UNRELIABLE charger (for demo: shows low reliability in recommendations)
-    {"business": "blue_ridge", "name": "Blue Ridge Old Charger X", "power_kw": 3.3, "base_price": 8.0,
-     "ports": [("Type1", 3.3)], "reliability": 0.25},  # Low reliability!
+    {
+        "business": "blue_ridge",
+        "name": "Blue Ridge Old Charger X",
+        "power_kw": 3.3,
+        "base_price": 8.0,
+        "ports": [("Type1", 3.3)],
+        "reliability": 0.25,
+    },  # Low reliability!
     # Intentionally INCOMPATIBLE-ONLY charger (CHAdeMO only - won't match most modern Indian EVs with CCS2)
-    {"business": "phoenix_mall", "name": "Phoenix Legacy Charger Z", "power_kw": 50.0, "base_price": 15.0,
-     "ports": [("CHAdeMO", 50.0)], "reliability": 0.80},
+    {
+        "business": "phoenix_mall",
+        "name": "Phoenix Legacy Charger Z",
+        "power_kw": 50.0,
+        "base_price": 15.0,
+        "ports": [("CHAdeMO", 50.0)],
+        "reliability": 0.80,
+    },
 ]
 
 # Auto-generate basic chargers for the remaining 17 hubs
 for loc_key in list(PUNE_LOCATIONS.keys())[3:]:
     # Each new hub gets a Fast DC charger and an AC charger
-    CHARGER_CONFIGS.append({
-        "business": loc_key,
-        "name": f"{PUNE_LOCATIONS[loc_key]['name']} DC Fast",
-        "power_kw": 50.0,
-        "base_price": random.choice([15.0, 16.0, 18.0, 20.0]),
-        "ports": [("CCS2", 50.0), ("Type2", 22.0)],
-        "reliability": random.uniform(0.80, 0.99)
-    })
-    CHARGER_CONFIGS.append({
-        "business": loc_key,
-        "name": f"{PUNE_LOCATIONS[loc_key]['name']} AC Slow",
-        "power_kw": 7.4,
-        "base_price": random.choice([8.0, 10.0, 12.0]),
-        "ports": [("Type2", 7.4), ("Type2", 7.4)],
-        "reliability": random.uniform(0.85, 0.99)
-    })
+    CHARGER_CONFIGS.append(
+        {
+            "business": loc_key,
+            "name": f"{PUNE_LOCATIONS[loc_key]['name']} DC Fast",
+            "power_kw": 50.0,
+            "base_price": random.choice([15.0, 16.0, 18.0, 20.0]),
+            "ports": [("CCS2", 50.0), ("Type2", 22.0)],
+            "reliability": random.uniform(0.80, 0.99),
+        }
+    )
+    CHARGER_CONFIGS.append(
+        {
+            "business": loc_key,
+            "name": f"{PUNE_LOCATIONS[loc_key]['name']} AC Slow",
+            "power_kw": 7.4,
+            "base_price": random.choice([8.0, 10.0, 12.0]),
+            "ports": [("Type2", 7.4), ("Type2", 7.4)],
+            "reliability": random.uniform(0.85, 0.99),
+        }
+    )
 
 # Demo vehicles matching Indian EV market
 VEHICLES = [
-    {"make": "Tata", "model": "Nexon EV Max", "battery_kwh": 40.5, "connectors": ["CCS2", "Type2"],
-     "max_ac_kw": 7.4, "max_dc_kw": 50.0, "range_km": 437},
-    {"make": "MG", "model": "ZS EV", "battery_kwh": 50.3, "connectors": ["CCS2", "Type2"],
-     "max_ac_kw": 7.4, "max_dc_kw": 76.0, "range_km": 461},
-    {"make": "Hyundai", "model": "Ioniq 5", "battery_kwh": 72.6, "connectors": ["CCS2"],
-     "max_ac_kw": 11.0, "max_dc_kw": 220.0, "range_km": 481},
+    {
+        "make": "Tata",
+        "model": "Nexon EV Max",
+        "battery_kwh": 40.5,
+        "connectors": ["CCS2", "Type2"],
+        "max_ac_kw": 7.4,
+        "max_dc_kw": 50.0,
+        "range_km": 437,
+    },
+    {
+        "make": "MG",
+        "model": "ZS EV",
+        "battery_kwh": 50.3,
+        "connectors": ["CCS2", "Type2"],
+        "max_ac_kw": 7.4,
+        "max_dc_kw": 76.0,
+        "range_km": 461,
+    },
+    {
+        "make": "Hyundai",
+        "model": "Ioniq 5",
+        "battery_kwh": 72.6,
+        "connectors": ["CCS2"],
+        "max_ac_kw": 11.0,
+        "max_dc_kw": 220.0,
+        "range_km": 481,
+    },
 ]
 
 
@@ -180,7 +356,7 @@ async def seed():
             # --- 2. Create Vehicles ---
             print("  → Creating vehicles...")
             vehicles = []
-            for i, (driver, v) in enumerate(zip(drivers, VEHICLES)):
+            for _i, (driver, v) in enumerate(zip(drivers, VEHICLES)):
                 vehicle = Vehicle(
                     user_id=driver.id,
                     make=v["make"],
@@ -205,7 +381,7 @@ async def seed():
                     owner_id=owner.id,
                     name=loc["name"],
                     category=loc["category"],
-                    address=f"Pune, Maharashtra, India",
+                    address="Pune, Maharashtra, India",
                     location=f"SRID=4326;POINT({loc['lng']} {loc['lat']})",
                     opening_hours={
                         "mon": {"open": "08:00", "close": "22:00"},
@@ -266,7 +442,7 @@ async def seed():
 
             # --- 5. Create Availability Windows ---
             print("  → Creating availability windows...")
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             window_count = 0
             for port in all_ports:
                 # Create availability windows for the next 7 days
@@ -319,17 +495,17 @@ async def seed():
             # --- 6.5 Create Synthetic Historical Bookings ---
             print("  → Creating historical bookings and sessions...")
             historical_booking_count = 0
-            for i in range(50):
+            for _i in range(50):
                 # Random time in the last 30 days
                 days_ago = random.randint(1, 30)
                 book_time = now - timedelta(days=days_ago, hours=random.randint(0, 23))
                 start_time = book_time + timedelta(minutes=random.randint(5, 60))
                 end_time = start_time + timedelta(minutes=random.randint(20, 120))
-                
+
                 # Pick a random driver and port
                 driver = random.choice(drivers)
                 port = random.choice(all_ports)
-                
+
                 b = Booking(
                     user_id=driver.id,
                     port_id=port.id,
@@ -340,7 +516,7 @@ async def seed():
                 )
                 session.add(b)
                 await session.flush()
-                
+
                 # Associated charging session
                 cs = ChargingSession(
                     booking_id=b.id,
@@ -349,11 +525,11 @@ async def seed():
                     end_at=end_time,
                     energy_kwh=round(random.uniform(10.0, 45.0), 2),
                     final_amount=round(random.uniform(150.0, 700.0), 2),
-                    status="completed"
+                    status="completed",
                 )
                 session.add(cs)
                 historical_booking_count += 1
-            
+
             await session.flush()
             print(f"    ✓ Created {historical_booking_count} historical bookings")
 
@@ -407,7 +583,7 @@ async def seed():
             print("   Driver: rahul@voltez.demo / driver123")
             print("   Driver: ananya@voltez.demo / driver123")
             print("   Driver: vikram@voltez.demo / driver123")
-            print(f"\n📊 Summary:")
+            print("\n📊 Summary:")
             print(f"   Users: {len(drivers) + 2}")
             print(f"   Vehicles: {len(vehicles)}")
             print(f"   Businesses: {len(businesses)}")
@@ -415,9 +591,11 @@ async def seed():
             print(f"   Ports: {len(all_ports)}")
             print(f"   Availability Windows: {window_count}")
             print(f"   Demand History Records: {demand_count}")
-            print(f"\n⚠️  Special Demo Chargers:")
-            print(f"   'Blue Ridge Old Charger X' → Intentionally LOW reliability (0.25)")
-            print(f"   'Phoenix Legacy Charger Z' → CHAdeMO only (incompatible with most modern EVs)")
+            print("\n⚠️  Special Demo Chargers:")
+            print("   'Blue Ridge Old Charger X' → Intentionally LOW reliability (0.25)")
+            print(
+                "   'Phoenix Legacy Charger Z' → CHAdeMO only (incompatible with most modern EVs)"
+            )
 
 
 if __name__ == "__main__":

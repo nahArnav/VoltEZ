@@ -1,20 +1,21 @@
-from datetime import datetime, timedelta, timezone
 import logging
-from uuid import UUID
+from datetime import UTC, datetime, timedelta
 from typing import Any
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from uuid import UUID
 
-from database.models.ml_prediction import MLPrediction
-from app.schemas.enums import BookingStatus
-from database.models.booking import Booking
-from database.models.charging_session import ChargingSession
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.repositories.operations import ml_prediction_repo
+from app.schemas.enums import BookingStatus
 from app.schemas.ml_prediction import MLPredictionCreate
-from app.services.ml_features import build_demand_features, build_availability_features
+from app.services.ml_features import build_availability_features, build_demand_features
+from database.models.booking import Booking
+from database.models.ml_prediction import MLPrediction
 from voltez_ml.serving import AvailabilityFeatureRequest, DemandFeatureRequest
 
 logger = logging.getLogger(__name__)
+
 
 class MLAdapter:
     """
@@ -30,7 +31,7 @@ class MLAdapter:
         model_version: str,
         prediction_type: str,
         value: float,
-        confidence: float
+        confidence: float,
     ) -> MLPrediction:
         """Saves every prediction to the database for auditability and drift monitoring."""
         prediction_in = MLPredictionCreate(
@@ -39,7 +40,7 @@ class MLAdapter:
             model_version=model_version,
             prediction_type=prediction_type,
             predicted_value=value,
-            confidence_score=confidence
+            confidence_score=confidence,
         )
         prediction = await ml_prediction_repo.create(db, obj_in=prediction_in)
         await db.commit()
@@ -52,9 +53,9 @@ class MLAdapter:
         Model 1: Demand Forecasting
         Runs the verified joblib model using point-in-time features.
         """
-        prediction_origin = datetime.now(timezone.utc)
+        prediction_origin = datetime.now(UTC)
         features_df = build_demand_features(charger_id, prediction_origin)
-        
+
         # If model is loaded, run inference. Else fallback.
         if model is not None:
             prediction = model.predict(
@@ -73,7 +74,7 @@ class MLAdapter:
             expected_demand = 1.0
             confidence = 0.50
             model_version = "demand-fallback-v1"
-            
+
         # Log wait time using UUID directly instead of string prefix
         await MLAdapter.log_prediction(
             db=db,
@@ -82,21 +83,20 @@ class MLAdapter:
             model_version=model_version,
             prediction_type="expected_demand",
             value=expected_demand,
-            confidence=confidence
+            confidence=confidence,
         )
-        
-        return {
-            "expected_demand": expected_demand,
-            "confidence": confidence
-        }
+
+        return {"expected_demand": expected_demand, "confidence": confidence}
 
     @staticmethod
-    async def predict_wait_time(db: AsyncSession, charger_id: UUID, port_id: UUID, model: Any = None) -> dict:
+    async def predict_wait_time(
+        db: AsyncSession, charger_id: UUID, port_id: UUID, model: Any = None
+    ) -> dict:
         """
         Model 2: Availability / Wait-time Predictor
         Uses the probability of being 'available' and transforms it into expected wait time or availability score.
         """
-        prediction_origin = datetime.now(timezone.utc)
+        prediction_origin = datetime.now(UTC)
         target_time = prediction_origin + timedelta(minutes=30)
         features_df = build_availability_features(
             charger_id,
@@ -106,7 +106,7 @@ class MLAdapter:
         )
         decision = "unknown"
         probability_unavailable = None
-        
+
         if model is not None:
             prediction = model.predict(
                 AvailabilityFeatureRequest(
@@ -128,10 +128,12 @@ class MLAdapter:
                 result = await db.execute(
                     select(Booking).where(
                         Booking.charger_port_id == port_id,
-                        Booking.status.in_([
-                            BookingStatus.CHECKED_IN.value,
-                            BookingStatus.CHARGING.value,
-                        ]),
+                        Booking.status.in_(
+                            [
+                                BookingStatus.CHECKED_IN.value,
+                                BookingStatus.CHARGING.value,
+                            ]
+                        ),
                     )
                 )
                 wait_minutes = len(result.scalars().all()) * 40.0
@@ -140,13 +142,18 @@ class MLAdapter:
             # Fallback queue heuristic
             logger.warning("Availability model not loaded. Using fallback.")
             result = await db.execute(
-                select(Booking).where(Booking.charger_port_id == port_id, Booking.status.in_([BookingStatus.CHECKED_IN.value, BookingStatus.CHARGING.value]))
+                select(Booking).where(
+                    Booking.charger_port_id == port_id,
+                    Booking.status.in_(
+                        [BookingStatus.CHECKED_IN.value, BookingStatus.CHARGING.value]
+                    ),
+                )
             )
             active_bookings = result.scalars().all()
             wait_minutes = len(active_bookings) * 40.0
             confidence = 0.50
             model_version = "availability-fallback-v1"
-            
+
         if wait_minutes == 0:
             congestion = "LOW"
             congestion_val = 0.0
@@ -156,7 +163,7 @@ class MLAdapter:
         else:
             congestion = "HIGH"
             congestion_val = 2.0
-        
+
         # Log prediction
         await MLAdapter.log_prediction(
             db=db,
@@ -165,9 +172,9 @@ class MLAdapter:
             model_version=model_version,
             prediction_type="wait_minutes",
             value=wait_minutes,
-            confidence=confidence
+            confidence=confidence,
         )
-        
+
         return {
             "wait_minutes": wait_minutes,
             "congestion_level": congestion,
@@ -175,5 +182,6 @@ class MLAdapter:
             "availability_decision": decision,
             "probability_unavailable": probability_unavailable,
         }
+
 
 ml_adapter = MLAdapter()

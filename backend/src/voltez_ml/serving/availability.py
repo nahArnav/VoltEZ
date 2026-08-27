@@ -289,9 +289,7 @@ class AvailabilityPredictor:
     @classmethod
     def from_artifact(cls, artifact_dir: Path, contract_path: Path) -> Self:
         manifest, payload = _load_artifact(artifact_dir)
-        contract = AvailabilityFeatureContract.model_validate_json(
-            contract_path.read_text("utf-8")
-        )
+        contract = AvailabilityFeatureContract.model_validate_json(contract_path.read_text("utf-8"))
         if contract.model_id != manifest["model_id"]:
             raise ValueError("feature contract belongs to a different model id")
         if contract.model_artifact_sha256 != manifest["artifact"]["sha256"]:
@@ -378,12 +376,16 @@ class AvailabilityPredictor:
                 hard_violations.append(f"{feature} is below its semantic minimum")
             if rule.hard_max is not None and number > rule.hard_max + 1e-6:
                 hard_violations.append(f"{feature} is above its semantic maximum")
-            if rule.train_min is not None and rule.train_max is not None and (
-                number < rule.train_min or number > rule.train_max
+            if (
+                rule.train_min is not None
+                and rule.train_max is not None
+                and (number < rule.train_min or number > rule.train_max)
             ):
                 outside_training.append(feature)
-            if rule.soft_min is not None and rule.soft_max is not None and (
-                number < rule.soft_min or number > rule.soft_max
+            if (
+                rule.soft_min is not None
+                and rule.soft_max is not None
+                and (number < rule.soft_min or number > rule.soft_max)
             ):
                 outside_soft.append(feature)
             row[feature] = number
@@ -417,9 +419,7 @@ class AvailabilityPredictor:
         )
 
     def _probabilities(self, prepared: Sequence[_PreparedAvailabilityRequest]) -> np.ndarray:
-        frame = pd.DataFrame(
-            [value.row for value in prepared], columns=self.contract.feature_order
-        )
+        frame = pd.DataFrame([value.row for value in prepared], columns=self.contract.feature_order)
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -432,9 +432,7 @@ class AvailabilityPredictor:
                 1 - 1e-6,
             )
         logits = np.log(raw / (1 - raw)).reshape(-1, 1)
-        calibrated = np.asarray(
-            self.calibrator.predict_proba(logits)[:, 1], dtype="float64"
-        )
+        calibrated = np.asarray(self.calibrator.predict_proba(logits)[:, 1], dtype="float64")
         if len(calibrated) != len(prepared) or not bool(np.isfinite(calibrated).all()):
             raise RuntimeError("model returned invalid availability probabilities")
         return np.clip(calibrated, 1e-6, 1 - 1e-6)

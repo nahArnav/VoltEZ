@@ -11,11 +11,11 @@ from database.base_class import Base
 class BusinessHourException(Base):
     __tablename__ = "business_hour_exceptions"
     __table_args__ = (
-    CheckConstraint(
-        "end_at > start_at",
-        name="ck_business_hour_exception_time_order",
-    ),
-    {"schema": "app"},
+        CheckConstraint(
+            "end_at > start_at",
+            name="ck_business_hour_exception_time_order",
+        ),
+        {"schema": "app"},
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -55,4 +55,3 @@ class BusinessHourException(Base):
         server_default=func.now(),
         nullable=False,
     )
-    

@@ -1,20 +1,21 @@
 from uuid import UUID
-from typing import List
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from geoalchemy2 import Geometry as GeometryType
 from geoalchemy2.types import Geography
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models.charger import Charger
-from app.schemas.charger import ChargerCreate
-from app.repositories.business import business_repo
 from app.core.errors import NotFoundError
+from app.repositories.business import business_repo
+from app.schemas.charger import ChargerCreate
+from database.models.charger import Charger
 
 
 class ChargerService:
-
     @staticmethod
-    async def create_charger(db: AsyncSession, business_id: UUID, charger_in: ChargerCreate) -> Charger:
+    async def create_charger(
+        db: AsyncSession, business_id: UUID, charger_in: ChargerCreate
+    ) -> Charger:
         """Business logic for creating a new charger with spatial data."""
 
         # 1. Ensure the business (location) actually exists first
@@ -39,28 +40,25 @@ class ChargerService:
         await db.refresh(db_charger, attribute_names=["ports"])
 
         # 5. Attach lat/lng for Pydantic serialization (ChargerResponse expects these fields)
-        setattr(db_charger, "latitude", lat)
-        setattr(db_charger, "longitude", lon)
+        db_charger.latitude = lat
+        db_charger.longitude = lon
 
         return db_charger
 
     @staticmethod
     async def get_charger(db: AsyncSession, charger_id: UUID) -> Charger | None:
         """Fetch one charger with ports and decoded map coordinates."""
-        query = (
-            select(
-                Charger,
-                func.ST_Y(Charger.location.cast(GeometryType)).label("latitude"),
-                func.ST_X(Charger.location.cast(GeometryType)).label("longitude"),
-            )
-            .where(Charger.id == charger_id)
-        )
+        query = select(
+            Charger,
+            func.ST_Y(Charger.location.cast(GeometryType)).label("latitude"),
+            func.ST_X(Charger.location.cast(GeometryType)).label("longitude"),
+        ).where(Charger.id == charger_id)
         row = (await db.execute(query)).one_or_none()
         if row is None:
             return None
         charger, lat, lng = row
-        setattr(charger, "latitude", lat)
-        setattr(charger, "longitude", lng)
+        charger.latitude = lat
+        charger.longitude = lng
         return charger
 
     @staticmethod
@@ -69,7 +67,7 @@ class ChargerService:
         latitude: float,
         longitude: float,
         radius_meters: int = 5000,
-    ) -> List[Charger]:
+    ) -> list[Charger]:
         """
         Find all chargers within a given radius using PostGIS spatial indexing.
 
@@ -79,14 +77,11 @@ class ChargerService:
         driver_location = func.ST_GeographyFromText(f"POINT({longitude} {latitude})")
 
         # Query chargers with coordinates extracted in the same SELECT
-        query = (
-            select(
-                Charger,
-                func.ST_Y(Charger.location.cast(GeometryType)).label("latitude"),
-                func.ST_X(Charger.location.cast(GeometryType)).label("longitude"),
-            )
-            .where(func.ST_DWithin(Charger.location.cast(Geography), driver_location, radius_meters))
-        )
+        query = select(
+            Charger,
+            func.ST_Y(Charger.location.cast(GeometryType)).label("latitude"),
+            func.ST_X(Charger.location.cast(GeometryType)).label("longitude"),
+        ).where(func.ST_DWithin(Charger.location.cast(Geography), driver_location, radius_meters))
 
         result = await db.execute(query)
         rows = result.all()
@@ -94,8 +89,8 @@ class ChargerService:
         # Attach lat/lng onto each ORM object so Pydantic's from_attributes picks them up
         chargers = []
         for charger, lat, lng in rows:
-            setattr(charger, "latitude", lat)
-            setattr(charger, "longitude", lng)
+            charger.latitude = lat
+            charger.longitude = lng
             chargers.append(charger)
 
         return chargers

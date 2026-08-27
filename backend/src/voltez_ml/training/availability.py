@@ -369,9 +369,7 @@ def _out_of_world_probability(
             spec,
             _confidence_weight(train.loc[~held_out]),
         )
-        probability[held_out.to_numpy()] = _positive_probability(
-            fitted, train.loc[held_out], spec
-        )
+        probability[held_out.to_numpy()] = _positive_probability(fitted, train.loc[held_out], spec)
     if not bool(np.isfinite(probability).all()):
         raise ValueError("out-of-world calibration probabilities are incomplete")
     return probability
@@ -442,9 +440,7 @@ def _probability_metrics(
         "expected_calibration_error_10_bins": _expected_calibration_error(truth, probability),
         "accuracy_at_0_5": float(accuracy_score(truth, prediction)),
         "balanced_accuracy_at_0_5": float(balanced_accuracy_score(truth, prediction)),
-        "unavailable_precision_at_0_5": float(
-            precision_score(truth, prediction, zero_division=0)
-        ),
+        "unavailable_precision_at_0_5": float(precision_score(truth, prediction, zero_division=0)),
         "unavailable_recall_at_0_5": float(recall_score(truth, prediction, zero_division=0)),
         "unavailable_f1_at_0_5": float(f1_score(truth, prediction, zero_division=0)),
         "confusion_at_0_5": {
@@ -576,17 +572,13 @@ def _decision_metrics(
         "abstention_rate": float((~decided).mean()),
         "available_rate": float(available.mean()),
         "unavailable_rate": float(unavailable.mean()),
-        "decided_accuracy": float(
-            (predicted_binary[decided] == truth[decided]).mean()
-        )
+        "decided_accuracy": float((predicted_binary[decided] == truth[decided]).mean())
         if bool(decided.any())
         else None,
         "available_precision": float((truth[available] == 0).mean())
         if bool(available.any())
         else None,
-        "unsafe_available_rate": float(truth[available].mean())
-        if bool(available.any())
-        else None,
+        "unsafe_available_rate": float(truth[available].mean()) if bool(available.any()) else None,
         "unavailable_precision": float(truth[unavailable].mean())
         if bool(unavailable.any())
         else None,
@@ -687,19 +679,13 @@ def _role_report(
         },
         "baselines": {
             "always_available": _probability_metrics(truth, always_available),
-            "training_prevalence_constant": _probability_metrics(
-                truth, prevalence_constant
-            ),
+            "training_prevalence_constant": _probability_metrics(truth, prevalence_constant),
             "latest_fresh_status": _probability_metrics(truth, status_probability),
             "logistic_regression": _probability_metrics(truth, logistic_probability),
         },
         "hist_gradient_boosting_raw": _probability_metrics(truth, raw_probability),
-        "hist_gradient_boosting_calibrated": _probability_metrics(
-            truth, calibrated_probability
-        ),
-        "three_state_decision": _decision_metrics(
-            truth, calibrated_probability, thresholds
-        ),
+        "hist_gradient_boosting_calibrated": _probability_metrics(truth, calibrated_probability),
+        "three_state_decision": _decision_metrics(truth, calibrated_probability, thresholds),
         "segments": {
             column: _segment_metrics(frame, calibrated_probability, column)
             for column in (
@@ -725,8 +711,7 @@ def _development_gates(
     checks = {
         "validation_roc_auc_at_least_0_75": validation_model["roc_auc"] >= 0.75,
         "validation_pr_auc_at_least_twice_prevalence": (
-            validation_model["average_precision"]
-            >= 2 * validation_model["unavailable_prevalence"]
+            validation_model["average_precision"] >= 2 * validation_model["unavailable_prevalence"]
         ),
         "validation_brier_better_than_prevalence_baseline": (
             validation_model["brier_score"] < validation_prior["brier_score"]
@@ -735,12 +720,10 @@ def _development_gates(
             validation_model["expected_calibration_error_10_bins"] <= 0.03
         ),
         "validation_available_risk_meets_target": (
-            validation_decision["unsafe_available_rate"]
-            <= settings.target_available_risk + 1e-12
+            validation_decision["unsafe_available_rate"] <= settings.target_available_risk + 1e-12
         ),
         "stress_available_risk_at_most_target_plus_0_02": (
-            stress_decision["unsafe_available_rate"]
-            <= settings.target_available_risk + 0.02
+            stress_decision["unsafe_available_rate"] <= settings.target_available_risk + 0.02
         ),
         "stress_unavailable_precision_at_least_0_50": (
             stress_decision["unavailable_precision"] is not None
@@ -812,19 +795,13 @@ def train_availability_model(
     )
     oof_calibrated = _calibrated_probability(calibrator, oof_raw)
 
-    candidate = _fit_pipeline(
-        _candidate_pipeline(spec, settings), train, spec, train_weight
-    )
-    logistic = _fit_pipeline(
-        _logistic_pipeline(spec, settings), train, spec, train_weight
-    )
+    candidate = _fit_pipeline(_candidate_pipeline(spec, settings), train, spec, train_weight)
+    logistic = _fit_pipeline(_logistic_pipeline(spec, settings), train, spec, train_weight)
 
     validation_raw = _positive_probability(candidate, validation, spec)
     validation_calibrated = _calibrated_probability(calibrator, validation_raw)
     validation_logistic = _positive_probability(logistic, validation, spec)
-    thresholds = _select_thresholds(
-        _target(validation), validation_calibrated, settings
-    )
+    thresholds = _select_thresholds(_target(validation), validation_calibrated, settings)
     stress_raw = _positive_probability(candidate, stress, spec)
     stress_calibrated = _calibrated_probability(calibrator, stress_raw)
     stress_logistic = _positive_probability(logistic, stress, spec)
@@ -898,9 +875,7 @@ def train_availability_model(
             "method": "Platt sigmoid on probabilities from leave-one-training-world-out fits",
             "uses_validation_labels": False,
             "out_of_world_raw": _probability_metrics(train_truth, oof_raw),
-            "out_of_world_calibrated": _probability_metrics(
-                train_truth, oof_calibrated
-            ),
+            "out_of_world_calibrated": _probability_metrics(train_truth, oof_calibrated),
         },
         "thresholds": thresholds,
         "validation_permutation_importance": _permutation_importance_report(
@@ -908,13 +883,11 @@ def train_availability_model(
         ),
         "validation": validation_report,
         "stress_test": stress_report,
-        "development_gates": _development_gates(
-            validation_report, stress_report, settings
-        ),
+        "development_gates": _development_gates(validation_report, stress_report, settings),
         "data_readiness": readiness["models"]["availability"],
         "code_state": code_state,
     }
-    
+
     if unlock_test:
         locked_test = _load_role(suite, "test", unlock_test=unlock_test)
         locked_test_raw = _positive_probability(candidate, locked_test, spec)
@@ -949,9 +922,7 @@ def train_availability_model(
         "model_name": "charger_availability_prediction",
         "model_version": "v1",
         "created_at": datetime.now(UTC).isoformat(),
-        "feature_suite_manifest": _portable_reference(
-            suite_manifest_path, output_dir
-        ),
+        "feature_suite_manifest": _portable_reference(suite_manifest_path, output_dir),
         "feature_suite_manifest_sha256": file_sha256(suite_manifest_path),
         "trainer_source_sha256": trainer_source_hash,
         "artifact": {"path": model_path.name, "sha256": file_sha256(model_path)},

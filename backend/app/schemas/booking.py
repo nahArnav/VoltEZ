@@ -1,8 +1,10 @@
-from app.schemas.enums import BookingStatus
+from datetime import UTC, datetime
 from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict, model_validator
-from typing import Optional
-from datetime import datetime, timezone
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.schemas.enums import BookingStatus
+
 
 # Shared properties for both incoming requests and API responses.
 class BookingBase(BaseModel):
@@ -18,7 +20,7 @@ class BookingCreate(BookingBase):
     def validate_time_rules(self):
         if self.end_at <= self.start_at:
             raise ValueError("end_at must be strictly after start_at")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if self.start_at < now:
             raise ValueError("Booking start_at cannot be in the past")
         return self
@@ -27,7 +29,7 @@ class BookingCreate(BookingBase):
 # Properties to receive via API on state transitions
 class BookingStatusUpdate(BaseModel):
     status: BookingStatus
-    reason: Optional[str] = Field(default=None, description="Optional cancellation or failure reason")
+    reason: str | None = Field(default=None, description="Optional cancellation or failure reason")
 
 
 # Properties to return to client

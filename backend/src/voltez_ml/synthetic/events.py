@@ -186,9 +186,7 @@ def _generate_outages_and_initial_reports(
     outages: list[dict[str, Any]] = []
     reports: list[dict[str, Any]] = []
     dataset_start = pd.Timestamp(config.synthetic.start_date, tz=config.project.timezone)
-    health_lookup = {
-        str(row["port_id"]): row for row in _records(latent_port_profiles)
-    }
+    health_lookup = {str(row["port_id"]): row for row in _records(latent_port_profiles)}
 
     for port in _records(ports):
         health = health_lookup[str(port["port_id"])]

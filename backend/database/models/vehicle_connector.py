@@ -9,9 +9,7 @@ from database.base_class import Base
 
 class VehicleConnector(Base):
     __tablename__ = "vehicle_connectors"
-    __table_args__ = (
-        {"schema": "app"},
-    )
+    __table_args__ = ({"schema": "app"},)
 
     vehicle_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

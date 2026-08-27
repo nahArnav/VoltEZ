@@ -1,7 +1,8 @@
-from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Shared properties
@@ -12,7 +13,7 @@ class MLPredictionBase(BaseModel):
     prediction_type: str = Field(..., description="e.g., demand, wait_minutes, congestion_level")
     predicted_value: float = Field(..., description="The predicted numerical value")
     confidence_score: float = Field(..., ge=0.0, le=1.0, description="Model confidence score")
-    features_used: Optional[Dict[str, Any]] = None
+    features_used: dict[str, Any] | None = None
 
 
 # Properties for internal ML worker insertion

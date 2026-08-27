@@ -1,8 +1,9 @@
 import math
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
+
 import pandas as pd
 
 PUNE_TIMEZONE = ZoneInfo("Asia/Kolkata")
@@ -16,7 +17,7 @@ def build_demand_features(
     Point-in-time feature builder for Model 1 (Demand).
     Constructs the 52 features required by the demand prediction model.
     """
-    origin = prediction_origin or datetime.now(timezone.utc)
+    origin = prediction_origin or datetime.now(UTC)
     target = origin.astimezone(PUNE_TIMEZONE) + timedelta(minutes=15)
     target_hour = target.hour + target.minute / 60
     target_day = target.weekday()
@@ -25,7 +26,7 @@ def build_demand_features(
     # analytics aggregation job has accumulated live VoltEZ history. Calendar
     # values are derived from the actual prediction timestamp because the
     # serving contract validates them exactly.
-    features: Dict[str, Any] = {
+    features: dict[str, Any] = {
         "request_lag_1": 0.0,
         "search_lag_1": 0.0,
         "unserved_lag_1": 0.0,
@@ -82,6 +83,7 @@ def build_demand_features(
     # Return as a DataFrame for scikit-learn/joblib
     return pd.DataFrame([features])
 
+
 def build_availability_features(
     charger_id: UUID,
     port_id: UUID,
@@ -92,13 +94,13 @@ def build_availability_features(
     Point-in-time feature builder for Model 2 (Availability).
     Constructs the 35 features required by the availability prediction model.
     """
-    origin = prediction_origin or datetime.now(timezone.utc)
+    origin = prediction_origin or datetime.now(UTC)
     target = target_time or origin + timedelta(minutes=30)
     local_target = target.astimezone(PUNE_TIMEZONE)
     target_hour = local_target.hour + local_target.minute / 60
     target_day = local_target.weekday()
 
-    features: Dict[str, Any] = {
+    features: dict[str, Any] = {
         "eta_minutes": (target - origin).total_seconds() / 60,
         "target_hour_sin": math.sin(2 * math.pi * target_hour / 24),
         "target_hour_cos": math.cos(2 * math.pi * target_hour / 24),
@@ -133,6 +135,6 @@ def build_availability_features(
         "connector_code": "type_2",
         "charging_type": "AC",
         "business_category": "mall",
-        "access_type": "public"
+        "access_type": "public",
     }
     return pd.DataFrame([features])

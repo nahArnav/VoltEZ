@@ -1,15 +1,16 @@
 from uuid import UUID
-from typing import List
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.base import BaseRepository
-from database.models.vehicle import Vehicle
-from database.models.connector import ConnectorType
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate
+from database.models.connector import ConnectorType
+from database.models.vehicle import Vehicle
+
 
 class RepositoryVehicle(BaseRepository[Vehicle, VehicleCreate, VehicleUpdate]):
-    async def get_by_owner(self, db: AsyncSession, user_id: UUID) -> List[Vehicle]:
+    async def get_by_owner(self, db: AsyncSession, user_id: UUID) -> list[Vehicle]:
         """Fetch all vehicles registered to a specific driver."""
         result = await db.execute(select(Vehicle).where(Vehicle.user_id == user_id))
         return list(result.scalars().all())
@@ -58,5 +59,6 @@ class RepositoryVehicle(BaseRepository[Vehicle, VehicleCreate, VehicleUpdate]):
         await db.commit()
         await db.refresh(db_obj, attribute_names=["connector_types"])
         return db_obj
+
 
 vehicle_repo = RepositoryVehicle(Vehicle)

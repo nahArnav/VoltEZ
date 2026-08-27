@@ -1,21 +1,21 @@
-from app.schemas.enums import BookingStatus
-from uuid import UUID
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import cast
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models.booking import Booking
-from database.models.booking_event import BookingEvent
-from app.schemas.booking import BookingCreate
+from app.core.config import settings
+from app.core.errors import BadRequestError, ConflictError, ForbiddenError, NotFoundError
 from app.repositories.booking import booking_repo
 from app.repositories.charger import charger_port_repo
-from app.core.errors import NotFoundError, ConflictError, BadRequestError, ForbiddenError
-from app.core.config import settings
+from app.schemas.booking import BookingCreate
+from app.schemas.enums import BookingStatus
 from app.services.availability import availability_service
+from database.models.booking import Booking
+from database.models.booking_event import BookingEvent
 
 
 class BookingService:
-
     # Valid cancellation source statuses (BR-008)
     CANCELLABLE_STATUSES = {
         BookingStatus.PENDING,
@@ -66,7 +66,7 @@ class BookingService:
             )
 
         # 3. Prevent Double-Bookings (Time Conflict Check)
-        current_time = datetime.now(timezone.utc)
+        current_time = datetime.now(UTC)
         active_bookings = await booking_repo.get_active_by_port(
             db, port_id=cast(UUID, port.id), current_time=current_time
         )
@@ -75,9 +75,7 @@ class BookingService:
             existing_start_at = cast(datetime, existing_booking.start_at)
             existing_end_at = cast(datetime, existing_booking.end_at)
             # Overlap logic: A starts before B ends AND A ends after B starts
-            if (booking_in.start_at < existing_end_at) and (
-                booking_in.end_at > existing_start_at
-            ):
+            if (booking_in.start_at < existing_end_at) and (booking_in.end_at > existing_start_at):
                 raise ConflictError(
                     code="SLOT_UNAVAILABLE",
                     message="This time slot overlaps with an existing booking.",
@@ -88,7 +86,7 @@ class BookingService:
         booking_data["user_id"] = user_id
         booking_data["status"] = BookingStatus.HELD.value
         booking_data["estimated_amount"] = settings.BOOKING_HOLD_FEE_INR
-        
+
         # Set the 10-minute hold expiry
         booking_data["hold_expires_at"] = current_time + timedelta(minutes=10)
 
@@ -131,7 +129,7 @@ class BookingService:
             )
 
         old_status = booking_status.value
-        setattr(booking, "status", BookingStatus.CANCELLED.value)
+        booking.status = BookingStatus.CANCELLED.value
         db.add(booking)
 
         # Write audit event (BR-009)

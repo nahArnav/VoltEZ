@@ -1,4 +1,5 @@
 from app.schemas.enums import UserRole
+
 """
 Shared FastAPI dependencies for authentication and authorization.
 
@@ -6,13 +7,14 @@ Used across all route files — never duplicate these in individual routers.
 """
 
 from uuid import UUID
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 from jose import JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.core.security import decode_access_token
+from app.db.session import get_db
 from app.repositories.user import user_repo
 from database.models.user import User
 
@@ -57,6 +59,7 @@ def require_role(*roles: UserRole):
     Usage:
         current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN))
     """
+
     async def _check_role(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in roles:
             raise HTTPException(
@@ -64,4 +67,5 @@ def require_role(*roles: UserRole):
                 detail=f"This action requires one of: {[r.value for r in roles]}",
             )
         return current_user
+
     return _check_role

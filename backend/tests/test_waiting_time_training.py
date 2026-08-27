@@ -34,13 +34,15 @@ def test_hurdle_prediction_multiplies_probability_by_positive_mean() -> None:
     model.occurrence_model_ = _OccurrenceStub()
     model.positive_count_model_ = _PositiveCountStub()
     model.n_features_in_ = 1
-    
+
     # Mock _transform instead of directly passing arrays to models
     import pandas as pd
+
     def _mock_transform(frame):
         return np.array([[1.0], [2.0]], dtype="float32")
+
     model._transform = _mock_transform
-    
+
     features = pd.DataFrame({"f1": [1.0, 2.0]})
 
     np.testing.assert_allclose(model.predict_nonzero_probability(features), [0.2, 0.8])
@@ -62,18 +64,20 @@ def _suite(tmp_path: Path) -> Path:
         path = data_root / f"{world}.parquet"
         rng = np.random.default_rng(seed)
         rows = 180
-        pd.DataFrame({
-            "simulation_run_id": world,
-            "run_holdout_split": role,
-            TARGET: np.resize(np.array([0.0, 10.0, 0.0, 25.0], dtype="float64"), rows),
-            "eta_minutes": rng.choice([15.0, 30.0, 60.0, 120.0], size=rows),
-            "target_hour_sin": rng.uniform(-1, 1, size=rows),
-            "active_session_count": rng.binomial(1, 0.18, size=rows),
-            "status_expired": rng.binomial(1, 0.65, size=rows),
-            "latest_status": rng.choice(["available", "occupied", "faulted"], size=rows),
-            "reliability_cold_start": rng.binomial(1, 0.1, size=rows),
-            "connector_code": rng.choice(["ccs2", "type_2"], size=rows),
-        }).to_parquet(path, index=False)
+        pd.DataFrame(
+            {
+                "simulation_run_id": world,
+                "run_holdout_split": role,
+                TARGET: np.resize(np.array([0.0, 10.0, 0.0, 25.0], dtype="float64"), rows),
+                "eta_minutes": rng.choice([15.0, 30.0, 60.0, 120.0], size=rows),
+                "target_hour_sin": rng.uniform(-1, 1, size=rows),
+                "active_session_count": rng.binomial(1, 0.18, size=rows),
+                "status_expired": rng.binomial(1, 0.65, size=rows),
+                "latest_status": rng.choice(["available", "occupied", "faulted"], size=rows),
+                "reliability_cold_start": rng.binomial(1, 0.1, size=rows),
+                "connector_code": rng.choice(["ccs2", "type_2"], size=rows),
+            }
+        ).to_parquet(path, index=False)
         entries.append(
             {
                 "evaluation_role": role,
@@ -129,6 +133,7 @@ def test_hurdle_training_writes_reusable_locked_test_safe_artifact(
     assert report["locked_test_unlocked"] is False
     assert payload["prediction_contract"]["expected_wait"] == "predict"
     assert file_sha256(artifact / "model.joblib") == manifest["artifact"]["sha256"]
+
 
 def test_hurdle_settings_reject_invalid_values() -> None:
     with pytest.raises(ValueError):

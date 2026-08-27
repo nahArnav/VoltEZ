@@ -61,7 +61,7 @@ NON_FEATURE_COLUMNS = {
     "target_time",
     "latest_wait_observed_at_feature",
     "split",
-    "run_holdout_split"
+    "run_holdout_split",
 }
 
 
@@ -126,6 +126,7 @@ def _load_role(suite: dict[str, Any], role: str, unlock_test: bool = False) -> p
     if set(frame["run_holdout_split"].astype(str)) != {role}:
         raise ValueError(f"{role} waiting_time rows contain a mismatched holdout role")
     return frame
+
 
 def _feature_spec(frame: pd.DataFrame) -> tuple[list[str], list[str]]:
     numeric = []
@@ -216,7 +217,7 @@ class HurdleWaitingTimeRegressor(RegressorMixin, BaseEstimator):  # type: ignore
             l2_regularization=self.classifier_l2_regularization,
             early_stopping=False,
             categorical_features=new_cat_indices if new_cat_indices else None,
-            class_weight="balanced", # Wait times > 0 are extremely rare (~1%)
+            class_weight="balanced",  # Wait times > 0 are extremely rare (~1%)
             random_state=self.random_seed,
         )
         self.positive_count_model_ = HistGradientBoostingRegressor(
@@ -231,7 +232,7 @@ class HurdleWaitingTimeRegressor(RegressorMixin, BaseEstimator):  # type: ignore
         )
         self.occurrence_model_.fit(X_processed, occurrence)
         self.positive_count_model_.fit(X_processed[positive], values[positive])
-        
+
         self.training_rows_ = len(df)
         self.positive_training_rows_ = int(positive.sum())
         return self
@@ -279,6 +280,7 @@ def _binary_stage_metrics(
         "roc_auc": float(roc_auc_score(occurrence, probability)),
     }
 
+
 def _metrics(
     truth: NDArray[np.float64], prediction: NDArray[np.float64]
 ) -> dict[str, float | None]:
@@ -286,9 +288,7 @@ def _metrics(
     denominator = float(np.abs(truth).sum())
     return {
         "mae": float(mean_absolute_error(truth, prediction)),
-        "wape": float(np.abs(truth - prediction).sum() / denominator)
-        if denominator > 0
-        else None,
+        "wape": float(np.abs(truth - prediction).sum() / denominator) if denominator > 0 else None,
         "nonzero_mae": float(mean_absolute_error(truth[nonzero], prediction[nonzero]))
         if bool(nonzero.any())
         else None,
@@ -314,9 +314,7 @@ def _stage_report(
         "zero_prediction_baseline_mae": float(mean_absolute_error(truth, zero_pred)),
         "occurrence_classifier": _binary_stage_metrics(truth, probability),
         "positive_wait_regressor": (
-            _metrics(truth[positive], positive_mean[positive])
-            if positive.any()
-            else None
+            _metrics(truth[positive], positive_mean[positive]) if positive.any() else None
         ),
         "formula_integrity_max_absolute_error": float(
             np.max(np.abs(model.predict(frame) - expected_wait))
@@ -326,9 +324,7 @@ def _stage_report(
 
 def _portable_artifact_reference(target: Path, artifact_dir: Path) -> str:
     try:
-        return Path(
-            os.path.relpath(target.resolve(), start=artifact_dir.resolve())
-        ).as_posix()
+        return Path(os.path.relpath(target.resolve(), start=artifact_dir.resolve())).as_posix()
     except ValueError:
         return target.name
 
@@ -368,10 +364,10 @@ def train_hurdle_waiting_time_model(
         count_l2_regularization=model_settings.count_l2_regularization,
         random_seed=model_settings.random_seed,
     )
-    
+
     train_y = train[TARGET].to_numpy(dtype="float64")
     model.fit(train, train_y)
-    
+
     report: dict[str, Any] = {
         "model": "waiting_time_hurdle",
         "algorithm": {
@@ -390,7 +386,7 @@ def train_hurdle_waiting_time_model(
         "locked_test_unlocked": unlock_test,
         "data_readiness": readiness["models"]["waiting_time"],
     }
-    
+
     if unlock_test:
         locked_test = _load_role(suite, "test", unlock_test=unlock_test)
         report["locked_test"] = _stage_report(model, locked_test)

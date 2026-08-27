@@ -1,22 +1,18 @@
-from uuid import UUID
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-import logging
 import json
+import logging
+from uuid import UUID
 
-from app.websockets.manager import manager
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+
 from app.core.security import decode_access_token
+from app.websockets.manager import manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ws", tags=["WebSockets"])
 
 
 @router.websocket("/{user_id}")
-async def websocket_endpoint(
-    websocket: WebSocket, 
-    user_id: UUID,
-    token: str = Query(None)
-):
+async def websocket_endpoint(websocket: WebSocket, user_id: UUID, token: str = Query(None)):
     """
     WebSocket endpoint for real-time updates.
     Clients connect to ws://{host}/api/v1/ws/{user_id}?token=...
@@ -24,7 +20,7 @@ async def websocket_endpoint(
     if not token:
         await websocket.close(code=1008, reason="Missing token")
         return
-        
+
     try:
         payload = decode_access_token(token)
         token_sub = payload.get("sub")

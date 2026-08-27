@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -73,7 +73,7 @@ class AvailabilityService:
         same_day = [window for window in windows if window.day_of_week == local_date.weekday()]
         positive = [window for window in same_day if not window.is_unavailable]
         blocked = [window for window in same_day if window.is_unavailable]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         bookings = await booking_repo.get_active_by_port(db, port_id=port_id, current_time=now)
 
         slots: dict[tuple[datetime, datetime], dict] = {}
@@ -82,11 +82,10 @@ class AvailabilityService:
             window_end = datetime.combine(local_date, window.end_local_time, tzinfo=local_zone)
             while cursor + timedelta(minutes=self.slot_minutes) <= window_end:
                 slot_end = cursor + timedelta(minutes=self.slot_minutes)
-                start_utc = cursor.astimezone(timezone.utc)
-                end_utc = slot_end.astimezone(timezone.utc)
+                start_utc = cursor.astimezone(UTC)
+                end_utc = slot_end.astimezone(UTC)
                 blocked_by_owner = any(
-                    cursor.time() < item.end_local_time
-                    and slot_end.time() > item.start_local_time
+                    cursor.time() < item.end_local_time and slot_end.time() > item.start_local_time
                     for item in blocked
                 )
                 overlaps_booking = any(

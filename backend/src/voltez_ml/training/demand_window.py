@@ -99,9 +99,7 @@ def build_rolling_demand_window(
     for offset in range(bucket_count):
         target = group[TARGET].shift(-offset)
         shifted_time = pd.to_datetime(group["target_time"].shift(-offset))
-        expected_time = target_start + pd.to_timedelta(
-            offset * settings.bucket_minutes, unit="m"
-        )
+        expected_time = target_start + pd.to_timedelta(offset * settings.bucket_minutes, unit="m")
         complete &= target.notna() & shifted_time.eq(expected_time)
         target_sum += target.fillna(0.0)
 
@@ -119,18 +117,10 @@ def build_rolling_demand_window(
     result = base.loc[complete].copy()
     result[TARGET] = target_sum.loc[complete].round().astype("int64")
     result[WINDOW_BASELINE] = baseline_sum.loc[complete].astype("float64")
-    result["request_sum_same_window_yesterday"] = yesterday_sum.loc[complete].astype(
-        "float64"
-    )
-    result["request_sum_same_window_last_week"] = last_week_sum.loc[complete].astype(
-        "float64"
-    )
-    result["missing_same_window_yesterday"] = (~yesterday_complete.loc[complete]).astype(
-        "int8"
-    )
-    result["missing_same_window_last_week"] = (~last_week_complete.loc[complete]).astype(
-        "int8"
-    )
+    result["request_sum_same_window_yesterday"] = yesterday_sum.loc[complete].astype("float64")
+    result["request_sum_same_window_last_week"] = last_week_sum.loc[complete].astype("float64")
+    result["missing_same_window_yesterday"] = (~yesterday_complete.loc[complete]).astype("int8")
+    result["missing_same_window_last_week"] = (~last_week_complete.loc[complete]).astype("int8")
     result["forecast_lead_minutes"] = settings.forecast_lead_minutes
     result["target_window_minutes"] = settings.window_minutes
     result["target_window_start"] = pd.to_datetime(result["target_time"])
@@ -167,9 +157,7 @@ def _git_state(project_root: Path) -> dict[str, str | bool | None]:
         return {"commit": None, "dirty": None}
 
 
-def _window_role(
-    suite: dict[str, Any], role: str, settings: DemandWindowSettings
-) -> pd.DataFrame:
+def _window_role(suite: dict[str, Any], role: str, settings: DemandWindowSettings) -> pd.DataFrame:
     return build_rolling_demand_window(_load_role(suite, role), settings)
 
 
@@ -192,9 +180,7 @@ def train_demand_window_model(
     features = _feature_columns(train)
     missing_validation = set(features) - set(validation.columns)
     if missing_validation:
-        raise ValueError(
-            f"validation partition is missing features: {sorted(missing_validation)}"
-        )
+        raise ValueError(f"validation partition is missing features: {sorted(missing_validation)}")
 
     model = HistGradientBoostingRegressor(
         loss="poisson",
@@ -228,9 +214,7 @@ def train_demand_window_model(
                 validation_y,
                 validation[WINDOW_BASELINE].to_numpy(dtype="float64"),
             ),
-            "poisson_hist_gradient_boosting": _metrics(
-                validation_y, validation_prediction
-            ),
+            "poisson_hist_gradient_boosting": _metrics(validation_y, validation_prediction),
         },
         "locked_test_unlocked": unlock_test,
         "data_readiness": readiness["models"]["demand"],
@@ -244,9 +228,7 @@ def train_demand_window_model(
             ),
             "poisson_hist_gradient_boosting": _metrics(
                 test_y,
-                np.clip(
-                    model.predict(locked_test[features].astype("float32")), 0.0, None
-                ),
+                np.clip(model.predict(locked_test[features].astype("float32")), 0.0, None),
             ),
         }
 
@@ -267,10 +249,7 @@ def train_demand_window_model(
             sort_keys=True,
         ).encode("utf-8")
     )
-    model_id = (
-        f"demand-window-{window_settings.window_minutes}m-hgbr-"
-        f"{identity.hexdigest()[:16]}"
-    )
+    model_id = f"demand-window-{window_settings.window_minutes}m-hgbr-{identity.hexdigest()[:16]}"
     output_root.mkdir(parents=True, exist_ok=True)
     output_dir = output_root / model_id
     incomplete = output_root / f".{model_id}.incomplete"
@@ -292,9 +271,7 @@ def train_demand_window_model(
         "model_name": "demand_forecasting_rolling_window",
         "model_version": "v1-experiment",
         "created_at": datetime.now(UTC).isoformat(),
-        "feature_suite_manifest": _portable_artifact_reference(
-            suite_manifest_path, output_dir
-        ),
+        "feature_suite_manifest": _portable_artifact_reference(suite_manifest_path, output_dir),
         "feature_suite_manifest_sha256": file_sha256(suite_manifest_path),
         "trainer_source_sha256": trainer_source_hash,
         "training_code": code_state,

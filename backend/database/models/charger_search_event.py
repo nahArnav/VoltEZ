@@ -12,30 +12,30 @@ from database.base_class import Base
 class ChargerSearchEvent(Base):
     __tablename__ = "charger_search_events"
     __table_args__ = (
-    CheckConstraint(
-        "requested_power_kw IS NULL OR requested_power_kw >= 0",
-        name="ck_charger_search_event_power_nonnegative",
-    ),
-    CheckConstraint(
-        "search_radius_km IS NULL OR search_radius_km >= 0",
-        name="ck_charger_search_event_radius_nonnegative",
-    ),
-    CheckConstraint(
-        "chargers_found >= 0",
-        name="ck_charger_search_event_chargers_found_nonnegative",
-    ),
-    Index(
-        "ix_charger_search_events_location",
-        "search_location",
-        postgresql_using="gist",
-    ),
-    Index(
-        "idx_charger_search_events_search_location",
-        "search_location",
-        postgresql_using="gist",
-    ),
-    {"schema": "app"},
-)
+        CheckConstraint(
+            "requested_power_kw IS NULL OR requested_power_kw >= 0",
+            name="ck_charger_search_event_power_nonnegative",
+        ),
+        CheckConstraint(
+            "search_radius_km IS NULL OR search_radius_km >= 0",
+            name="ck_charger_search_event_radius_nonnegative",
+        ),
+        CheckConstraint(
+            "chargers_found >= 0",
+            name="ck_charger_search_event_chargers_found_nonnegative",
+        ),
+        Index(
+            "ix_charger_search_events_location",
+            "search_location",
+            postgresql_using="gist",
+        ),
+        Index(
+            "idx_charger_search_events_search_location",
+            "search_location",
+            postgresql_using="gist",
+        ),
+        {"schema": "app"},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

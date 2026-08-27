@@ -19,6 +19,7 @@ def test_waiting_time_feature_request_validation() -> None:
             features={"eta_minutes": 15.0},
         )
 
+
 def test_waiting_time_ood_policy() -> None:
     policy = WaitingTimeOODPolicy(max_outside_training_range=5, max_outside_soft_range=10)
     assert policy.action == "zero_wait_fallback"

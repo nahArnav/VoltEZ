@@ -153,9 +153,7 @@ def build_data_readiness_report(
                 "row_safety_ceiling": maximum_rows,
                 "estimated_peak_memory_gb": _memory_gb(estimated_rows),
                 "scenario_mix": config.synthetic.scenario_mix,
-                "generation_command": _generation_command(
-                    environment, synthetic_profile, profile
-                ),
+                "generation_command": _generation_command(environment, synthetic_profile, profile),
             }
         )
 

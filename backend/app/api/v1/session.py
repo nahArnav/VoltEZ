@@ -1,31 +1,36 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
-from app.schemas.charging_session import ChargingSessionResponse
-from app.services.session import session_service
 from app.api.v1.deps import get_current_user_id
+from app.db.session import get_db
 from app.repositories.session import review_repo, session_repo
+from app.schemas.charging_session import ChargingSessionResponse
 from app.schemas.review import ReviewCreate, ReviewResponse
+from app.services.session import session_service
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
 
 # --- Request Bodies ---
 
+
 class CheckInRequest(BaseModel):
     """Driver has arrived at the charger and is checking in."""
+
     booking_id: UUID
 
 
 class CompleteSessionRequest(BaseModel):
     """Final telemetry sent when the driver unplugs. Cost is calculated server-side."""
+
     energy_kwh: float = Field(..., ge=0.0, description="Total energy delivered in kWh")
 
 
 # --- Endpoints ---
+
 
 @router.get("/", response_model=list[ChargingSessionResponse])
 async def list_sessions(
@@ -46,7 +51,10 @@ async def get_session(
         raise HTTPException(status_code=404, detail="Charging session not found")
     return session
 
-@router.post("/check-in", response_model=ChargingSessionResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/check-in", response_model=ChargingSessionResponse, status_code=status.HTTP_201_CREATED
+)
 async def check_in(
     request: CheckInRequest,
     user_id: UUID = Depends(get_current_user_id),
@@ -56,9 +64,7 @@ async def check_in(
     Check in at the charger.
     Creates a charging session. Booking must be CONFIRMED.
     """
-    session = await session_service.check_in(
-        db=db, booking_id=request.booking_id, user_id=user_id
-    )
+    session = await session_service.check_in(db=db, booking_id=request.booking_id, user_id=user_id)
     return session
 
 
@@ -72,9 +78,7 @@ async def start_charging(
     Mark that charging has begun (plug connected, power flowing).
     Transitions session from checked_in → charging.
     """
-    session = await session_service.start_charging(
-        db=db, session_id=session_id, user_id=user_id
-    )
+    session = await session_service.start_charging(db=db, session_id=session_id, user_id=user_id)
     return session
 
 
@@ -95,7 +99,9 @@ async def complete_session(
     return session
 
 
-@router.post("/{session_id}/rating", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{session_id}/rating", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED
+)
 async def submit_rating(
     session_id: UUID,
     review_in: ReviewCreate,

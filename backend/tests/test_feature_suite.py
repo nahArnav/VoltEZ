@@ -60,12 +60,8 @@ def test_readiness_is_reported_per_model_not_as_one_undifferentiated_gate(
     assert ready["status"] == "ready"
     assert all(values["status"] == "ready" for values in ready["models"].values())
 
-    validation_waiting = Path(
-        entries[1]["tables"]["waiting_time_features_labeled"]
-    )
-    pd.DataFrame({"label_wait_minutes": [0.0] * 300}).to_parquet(
-        validation_waiting, index=False
-    )
+    validation_waiting = Path(entries[1]["tables"]["waiting_time_features_labeled"])
+    pd.DataFrame({"label_wait_minutes": [0.0] * 300}).to_parquet(validation_waiting, index=False)
     blocked = _readiness(entries)
     assert blocked["status"] == "not_ready"
     assert blocked["models"]["waiting_time"]["status"] == "not_ready"
@@ -179,9 +175,7 @@ def test_suite_manifest_uses_portable_relative_paths(
         )
 
     monkeypatch.setattr(suite_module, "_source_manifests", lambda root: sources)
-    monkeypatch.setattr(
-        suite_module, "_require_matching_clean_commit", lambda root, commit: None
-    )
+    monkeypatch.setattr(suite_module, "_require_matching_clean_commit", lambda root, commit: None)
     monkeypatch.setattr(suite_module, "build_feature_dataset", fake_build)
     monkeypatch.setattr(
         suite_module,
@@ -199,8 +193,5 @@ def test_suite_manifest_uses_portable_relative_paths(
 
     assert manifest["source_root"] == "../raw"
     assert manifest["training_readiness"]["path"] == "training_readiness.json"
-    assert all(
-        not Path(entry["feature_manifest"]).is_absolute()
-        for entry in manifest["datasets"]
-    )
+    assert all(not Path(entry["feature_manifest"]).is_absolute() for entry in manifest["datasets"])
     assert file_sha256(result.readiness_path) == manifest["training_readiness"]["sha256"]

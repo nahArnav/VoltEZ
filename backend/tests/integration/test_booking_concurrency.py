@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -14,9 +14,7 @@ async def _auth(client, role: str) -> dict[str, str]:
             json={"email": email, "password": password, "name": "Lock Test", "role": role},
         )
     ).status_code == 201
-    login = await client.post(
-        "/api/v1/auth/login", data={"username": email, "password": password}
-    )
+    login = await client.post("/api/v1/auth/login", data={"username": email, "password": password})
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
 
@@ -54,7 +52,7 @@ async def test_booking_lock_rejects_duplicate_slot(client):
     local_start = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=1)).replace(
         hour=14, minute=0, second=0, microsecond=0
     )
-    start = local_start.astimezone(timezone.utc)
+    start = local_start.astimezone(UTC)
     availability = await client.post(
         "/api/v1/availability/",
         headers=owner,

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -69,7 +69,7 @@ async def test_full_booking_lifecycle(client):
     local_start = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=1)).replace(
         hour=10, minute=0, second=0, microsecond=0
     )
-    start = local_start.astimezone(timezone.utc)
+    start = local_start.astimezone(UTC)
     window = await client.post(
         "/api/v1/availability/",
         headers=owner_headers,
@@ -111,8 +111,12 @@ async def test_full_booking_lifecycle(client):
         patch.object(payments.settings, "RAZORPAY_KEY_ID", "rzp_test_configured"),
         patch.object(payments.settings, "RAZORPAY_KEY_SECRET", "configured_secret"),
         patch.object(payments.settings, "RAZORPAY_WEBHOOK_SECRET", "configured_webhook"),
-        patch.object(payments.razorpay_client.order, "create", return_value={"id": "order_test_123"}),
-        patch.object(payments.razorpay_client.utility, "verify_payment_signature", return_value=None),
+        patch.object(
+            payments.razorpay_client.order, "create", return_value={"id": "order_test_123"}
+        ),
+        patch.object(
+            payments.razorpay_client.utility, "verify_payment_signature", return_value=None
+        ),
     ):
         tampered_order = await client.post(
             "/api/v1/payments/create-order",
@@ -142,9 +146,7 @@ async def test_full_booking_lifecycle(client):
         assert verified.status_code == 200, verified.text
         assert verified.json()["status"] == "completed"
 
-    booking = await client.get(
-        f"/api/v1/bookings/{held.json()['id']}", headers=driver_headers
-    )
+    booking = await client.get(f"/api/v1/bookings/{held.json()['id']}", headers=driver_headers)
     assert booking.json()["status"] == "confirmed"
 
     checked_in = await client.post(

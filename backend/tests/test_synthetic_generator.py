@@ -137,9 +137,7 @@ def test_route_energy_profiles_cover_every_vehicle_with_public_priors(
     assert len(profiles) == len(vehicles)
     assert profiles["vehicle_id"].is_unique
     assert set(profiles["vehicle_id"]) == set(vehicles["vehicle_id"])
-    assert set(profiles["source"]).issubset(
-        {"catalogue", "owner_declared", "class_default"}
-    )
+    assert set(profiles["source"]).issubset({"catalogue", "owner_declared", "class_default"})
     assert bool(profiles["confidence"].between(0, 1).all())
     assert bool(profiles["drivetrain_efficiency"].between(0.5, 1).all())
     assert bool(profiles["usable_capacity_fraction"].between(0.5, 1).all())
@@ -281,9 +279,7 @@ def test_waiting_labels_reconcile_to_service_ready_evidence(
         on="session_id",
         validate="one_to_one",
     )
-    expected = (
-        known["service_ready_at"] - known["check_in_at"]
-    ).dt.total_seconds() / 60
+    expected = (known["service_ready_at"] - known["check_in_at"]).dt.total_seconds() / 60
 
     assert not known.empty
     assert bool((expected >= 0).all())
@@ -382,9 +378,7 @@ def test_dynamic_seeds_share_one_physical_pune_network() -> None:
     train_drivers = train["users"].query("role == 'driver'")
     validation_drivers = validation["users"].query("role == 'driver'")
     assert set(train_drivers["user_id"]).isdisjoint(validation_drivers["user_id"])
-    assert set(train["vehicles"]["vehicle_id"]).isdisjoint(
-        validation["vehicles"]["vehicle_id"]
-    )
+    assert set(train["vehicles"]["vehicle_id"]).isdisjoint(validation["vehicles"]["vehicle_id"])
 
 
 def test_structural_shift_profile_creates_a_different_network() -> None:
@@ -404,9 +398,7 @@ def test_structural_shift_profile_creates_a_different_network() -> None:
     shifted = generate_static_entities(shifted_config, "shifted-run")
 
     assert set(baseline["zones"]["zone_id"]).isdisjoint(shifted["zones"]["zone_id"])
-    assert set(baseline["charger_ports"]["port_id"]).isdisjoint(
-        shifted["charger_ports"]["port_id"]
-    )
+    assert set(baseline["charger_ports"]["port_id"]).isdisjoint(shifted["charger_ports"]["port_id"])
     assert not baseline["qa_latent_zones"]["base_demand_multiplier"].equals(
         shifted["qa_latent_zones"]["base_demand_multiplier"]
     )

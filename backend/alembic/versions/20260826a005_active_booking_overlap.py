@@ -9,16 +9,13 @@ from collections.abc import Sequence
 
 from alembic import op
 
-
 revision: str = "20260826a005"
 down_revision: str = "20260826a004"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-ACTIVE_STATUSES = (
-    "'pending', 'held', 'confirmed', 'checked_in', 'charging', 'in_progress'"
-)
+ACTIVE_STATUSES = "'pending', 'held', 'confirmed', 'checked_in', 'charging', 'in_progress'"
 
 
 def upgrade() -> None:

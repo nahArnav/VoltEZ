@@ -1,9 +1,10 @@
-from app.schemas.enums import UserRole
-from uuid import UUID
-from pydantic import BaseModel, EmailStr, ConfigDict
-from typing import Literal, Optional
 from datetime import datetime
+from typing import Literal
+from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict, EmailStr
+
+from app.schemas.enums import UserRole
 
 
 # Shared properties
@@ -16,13 +17,14 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     # Lock down the role to only these two options. Reject anything else.
-    role: Literal["driver", "owner"] = "driver" 
-    phone: Optional[str] = None
+    role: Literal["driver", "owner"] = "driver"
+    phone: str | None = None
+
 
 # Properties to receive via API on update (PATCH /users/me)
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    phone: Optional[str] = None
+    name: str | None = None
+    phone: str | None = None
 
 
 # Login request
@@ -47,7 +49,7 @@ class TokenRefresh(BaseModel):
 class UserResponse(UserBase):
     id: UUID
     role: UserRole
-    phone: Optional[str] = None
+    phone: str | None = None
     verification_status: str
     created_at: datetime
 

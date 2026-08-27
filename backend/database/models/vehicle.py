@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
-import sqlalchemy
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, UUID, func
+import sqlalchemy
+from sqlalchemy import UUID, CheckConstraint, DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
+
 from database.base_class import Base
 
 
@@ -31,8 +32,8 @@ class Vehicle(Base):
             name="ck_vehicles_efficiency_positive",
         ),
         CheckConstraint(
-        "model_year IS NULL OR model_year BETWEEN 1886 AND 2100",
-        name="ck_vehicles_model_year",
+            "model_year IS NULL OR model_year BETWEEN 1886 AND 2100",
+            name="ck_vehicles_model_year",
         ),
         {"schema": "app"},
     )
@@ -82,10 +83,7 @@ class Vehicle(Base):
     )
 
     connector_types = sqlalchemy.orm.relationship(
-        "ConnectorType",
-        secondary="app.vehicle_connectors",
-        backref="vehicles",
-        lazy="selectin"
+        "ConnectorType", secondary="app.vehicle_connectors", backref="vehicles", lazy="selectin"
     )
 
     @property

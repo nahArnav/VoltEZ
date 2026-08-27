@@ -182,8 +182,7 @@ def generate_vehicle_energy_profiles(
         priors = _VEHICLE_CLASS_PRIORS[vehicle_class]
         source = str(rng.choice(source_names, p=source_probabilities))
         values = {
-            field: _bounded_triangular(rng, bounds, source)
-            for field, bounds in priors.items()
+            field: _bounded_triangular(rng, bounds, source) for field, bounds in priors.items()
         }
         # Health is an estimated, planning-time value. It is intentionally not the hidden true
         # health that Step 3 will use when producing an energy label.
@@ -239,16 +238,11 @@ def _destination_point(
     longitude_radians = math.radians(longitude)
     destination_latitude = math.asin(
         math.sin(latitude_radians) * math.cos(angular_distance)
-        + math.cos(latitude_radians)
-        * math.sin(angular_distance)
-        * math.cos(bearing_radians)
+        + math.cos(latitude_radians) * math.sin(angular_distance) * math.cos(bearing_radians)
     )
     destination_longitude = longitude_radians + math.atan2(
-        math.sin(bearing_radians)
-        * math.sin(angular_distance)
-        * math.cos(latitude_radians),
-        math.cos(angular_distance)
-        - math.sin(latitude_radians) * math.sin(destination_latitude),
+        math.sin(bearing_radians) * math.sin(angular_distance) * math.cos(latitude_radians),
+        math.cos(angular_distance) - math.sin(latitude_radians) * math.sin(destination_latitude),
     )
     return math.degrees(destination_latitude), math.degrees(destination_longitude)
 
@@ -348,9 +342,7 @@ def _public_weather(
         wind_sigma = 4.0
     else:
         precipitation = (
-            float(np.clip(rng.gamma(1.4, 1.1), 0.1, 8.0))
-            if rng.random() < 0.035
-            else 0.0
+            float(np.clip(rng.gamma(1.4, 1.1), 0.1, 8.0)) if rng.random() < 0.035 else 0.0
         )
         wind_sigma = 2.4
     headwind = float(np.clip(rng.normal(0.3, wind_sigma), -9.0, 12.0))
@@ -384,8 +376,8 @@ def _route_morphology(
     highway_fraction = 1.0 - urban_fraction
     urban_speed_kph = float(np.clip(rng.normal(27.0, 3.2), 16.0, 36.0))
     highway_speed_kph = float(np.clip(rng.normal(67.0, 7.5), 45.0, 88.0))
-    normal_duration = 60 * distance_km * (
-        urban_fraction / urban_speed_kph + highway_fraction / highway_speed_kph
+    normal_duration = (
+        60 * distance_km * (urban_fraction / urban_speed_kph + highway_fraction / highway_speed_kph)
     )
     scenario_multiplier = {
         "normal_weekday": 1.0,
@@ -458,9 +450,7 @@ def _build_route_snapshot(
     scenario_lookup: dict[tuple[str, date], str],
 ) -> dict[str, Any]:
     leg_key = candidate_charger_id or "destination"
-    route_snapshot_id = stable_id(
-        run_id, "route-snapshot", f"{trip['trip_id']}:{leg_key}"
-    )
+    route_snapshot_id = stable_id(run_id, "route-snapshot", f"{trip['trip_id']}:{leg_key}")
     route_snapshot_at = requested_at + timedelta(seconds=int(rng.integers(1, 5)))
     scenario = scenario_lookup.get(
         (destination_zone_id, route_snapshot_at.date()), "normal_weekday"
@@ -479,12 +469,8 @@ def _build_route_snapshot(
         route_quality == "fallback"
         or rng.random() < config.synthetic.route_energy.missing_elevation_probability
     )
-    weather_missing = bool(
-        rng.random() < config.synthetic.route_energy.missing_weather_probability
-    )
-    morphology = _route_morphology(
-        rng, distance_km, scenario, steep_route, elevation_missing
-    )
+    weather_missing = bool(rng.random() < config.synthetic.route_energy.missing_weather_probability)
+    morphology = _route_morphology(rng, distance_km, scenario, steep_route, elevation_missing)
     peak_multiplier = 1 + 0.62 * _traffic_peak(route_snapshot_at.hour) * float(
         morphology["urban_fraction"]
     )
@@ -498,10 +484,14 @@ def _build_route_snapshot(
     )
     normal_duration = float(morphology["normal_duration_minutes"])
     traffic_duration = normal_duration * traffic_delay_ratio
-    stop_rate = distance_km * (
-        0.68 * float(morphology["urban_fraction"])
-        + 0.045 * float(morphology["highway_fraction"])
-    ) * min(1.75, traffic_delay_ratio)
+    stop_rate = (
+        distance_km
+        * (
+            0.68 * float(morphology["urban_fraction"])
+            + 0.045 * float(morphology["highway_fraction"])
+        )
+        * min(1.75, traffic_delay_ratio)
+    )
     full_stops = int(rng.poisson(max(0.05, stop_rate)))
     weather = _public_weather(rng, route_snapshot_at, scenario, weather_missing)
     provider = (
@@ -568,9 +558,7 @@ def generate_route_snapshots(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Create immutable direct/candidate route snapshots and attach their foreign keys."""
 
-    coverage_trips, coverage_context = _generate_coverage_trips(
-        config, run_id, vehicles, zones
-    )
+    coverage_trips, coverage_context = _generate_coverage_trips(config, run_id, vehicles, zones)
     trips_with_routes = pd.DataFrame(
         [*_records(trips), *_records(coverage_trips)], columns=TRIP_COLUMNS
     )
@@ -588,9 +576,7 @@ def generate_route_snapshots(
     requests_by_trip = {
         str(request["trip_id"]): request for request in requests if request.get("trip_id")
     }
-    charger_lookup = {
-        str(charger["charger_id"]): charger for charger in _records(chargers)
-    }
+    charger_lookup = {str(charger["charger_id"]): charger for charger in _records(chargers)}
     option_indices_by_trip: dict[str, list[int]] = {}
     option_records = _records(options_with_routes)
     for index, option in enumerate(option_records):
@@ -621,9 +607,7 @@ def generate_route_snapshots(
             scenario_lookup=scenario_lookup,
         )
         rows.append(direct)
-        trips_with_routes.at[trip_index, "direct_route_snapshot_id"] = direct[
-            "route_snapshot_id"
-        ]
+        trips_with_routes.at[trip_index, "direct_route_snapshot_id"] = direct["route_snapshot_id"]
 
         option_indices = sorted(
             option_indices_by_trip.get(trip_id, []),

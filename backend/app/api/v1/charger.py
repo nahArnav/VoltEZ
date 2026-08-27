@@ -1,19 +1,18 @@
-from app.schemas.enums import UserRole
 from uuid import UUID
-from typing import List
-from fastapi import APIRouter, Depends, status, Query
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.deps import get_current_user, require_role
 from app.db.session import get_db
+from app.repositories.business import business_repo
+from app.repositories.charger import charger_port_repo, charger_repo
 from app.schemas.charger import ChargerCreate, ChargerResponse, ChargerUpdate
 from app.schemas.charger_port import ChargerPortCreate, ChargerPortResponse, ChargerPortUpdate
+from app.schemas.enums import UserRole
 from app.services.charger import charger_service
-from database.models.user import User
-from app.api.v1.deps import require_role, get_current_user
 from database.models.charger_search_event import ChargerSearchEvent
-from app.repositories.charger import charger_repo, charger_port_repo
-from app.repositories.business import business_repo
-from fastapi import HTTPException
+from database.models.user import User
 
 router = APIRouter(prefix="/chargers", tags=["Chargers"])
 
@@ -55,7 +54,7 @@ async def create_charger(
     return charger
 
 
-@router.get("/nearby", response_model=List[ChargerResponse])
+@router.get("/nearby", response_model=list[ChargerResponse])
 async def get_nearby_chargers(
     latitude: float = Query(..., description="Driver's current latitude", ge=-90.0, le=90.0),
     longitude: float = Query(..., description="Driver's current longitude", ge=-180.0, le=180.0),
@@ -70,21 +69,21 @@ async def get_nearby_chargers(
     chargers = await charger_service.get_nearby_chargers(
         db=db, latitude=latitude, longitude=longitude, radius_meters=radius_meters
     )
-    
+
     # Telemetry
     search_event = ChargerSearchEvent(
         user_id=current_user.id,
         search_location=f"SRID=4326;POINT({longitude} {latitude})",
         search_radius_km=radius_meters / 1000.0,
-        chargers_found=len(chargers)
+        chargers_found=len(chargers),
     )
     db.add(search_event)
     await db.commit()
-    
+
     return chargers
 
 
-@router.get("/", response_model=List[ChargerResponse])
+@router.get("/", response_model=list[ChargerResponse])
 async def list_chargers(
     business_id: UUID = Query(...),
     db: AsyncSession = Depends(get_db),
@@ -96,10 +95,7 @@ async def list_chargers(
     if current_user.role != UserRole.ADMIN and business.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized for this business")
     chargers = await charger_repo.get_by_business(db, business_id=business_id)
-    return [
-        await charger_service.get_charger(db, charger.id)
-        for charger in chargers
-    ]
+    return [await charger_service.get_charger(db, charger.id) for charger in chargers]
 
 
 @router.get("/{charger_id}", response_model=ChargerResponse)
@@ -126,7 +122,9 @@ async def update_charger(
     lat = update_data.pop("latitude", None)
     lon = update_data.pop("longitude", None)
     if (lat is None) != (lon is None):
-        raise HTTPException(status_code=422, detail="latitude and longitude must be updated together")
+        raise HTTPException(
+            status_code=422, detail="latitude and longitude must be updated together"
+        )
     if lat is not None and lon is not None:
         update_data["location"] = f"SRID=4326;POINT({lon} {lat})"
     await charger_repo.update(db, db_obj=charger, obj_in=update_data)
@@ -146,7 +144,9 @@ async def delete_charger(
     return None
 
 
-@router.post("/{charger_id}/ports", response_model=ChargerPortResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{charger_id}/ports", response_model=ChargerPortResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_charger_port(
     charger_id: UUID,
     port_in: ChargerPortCreate,
@@ -189,21 +189,18 @@ async def report_charger_issue(
     Allow drivers to report a broken charger. This leverages the No-IoT trust system
     to heavily penalize the charger's reliability score.
     """
-    from app.services.trust import trust_service
     from app.repositories.charger import charger_repo
-    
+    from app.services.trust import trust_service
+
     charger = await charger_repo.get(db, id=charger_id)
     if not charger:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Charger not found")
-        
+
     await trust_service.record_event(
-        db=db,
-        charger_id=charger_id,
-        status="offline",
-        source="DRIVER_REPORT",
-        confidence=0.9
+        db=db, charger_id=charger_id, status="offline", source="DRIVER_REPORT", confidence=0.9
     )
-    
+
     await db.commit()
     return None

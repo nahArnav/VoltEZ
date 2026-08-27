@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from database.base_class import Base
 
+
 class Payment(Base):
     __tablename__ = "payments"
     __table_args__ = (
@@ -16,9 +17,7 @@ class Payment(Base):
         {"schema": "app"},
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     booking_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("app.bookings.id"), nullable=False
     )
@@ -27,10 +26,8 @@ class Payment(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="pending")
     provider_order_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     provider_payment_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    
-    verified_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -23,9 +23,7 @@ def test_canonical_plan_has_isolated_roles_and_unique_seeds() -> None:
     seeds = [run["seed"] for run in report["runs"]]
     assert len(seeds) == len(set(seeds))
     assert {run["structural_seed"] for run in report["runs"]} == {20260821}
-    assert all(
-        "--environment test" in run["generation_command"] for run in report["runs"]
-    )
+    assert all("--environment test" in run["generation_command"] for run in report["runs"])
 
 
 def test_readiness_rejects_reused_seed_and_missing_roles() -> None:
@@ -52,9 +50,7 @@ def test_stress_distribution_is_not_used_for_headline_evaluation() -> None:
     baseline = [run for run in report["runs"] if run["evaluation_role"] == "train"]
 
     assert stress[0]["scenario_mix"] != baseline[0]["scenario_mix"]
-    assert report["evaluation_policy"]["robustness_only_not_headline_metrics"] == [
-        "stress_test"
-    ]
+    assert report["evaluation_policy"]["robustness_only_not_headline_metrics"] == ["stress_test"]
 
 
 def test_structural_shift_profile_cannot_replace_canonical_scenario_stress() -> None:

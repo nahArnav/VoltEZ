@@ -1,36 +1,38 @@
 import time
 import uuid
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
-from app.core.config import settings
-from app.core.logging import setup_logging, get_logger
-from app.core.errors import register_exception_handlers
-from app.api.v1.router import api_router
+from contextlib import asynccontextmanager
+
 from arq import create_pool
 from arq.connections import RedisSettings
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+
+from app.api.v1.router import api_router
+from app.core.config import settings
+from app.core.errors import register_exception_handlers
+from app.core.logging import get_logger, setup_logging
 
 # Initialize structured logging
 setup_logging()
 logger = get_logger("main")
 from pathlib import Path
-from voltez_ml.serving import AvailabilityPredictor, DemandPredictor
+
 from app.db.session import engine
+from voltez_ml.serving import AvailabilityPredictor, DemandPredictor
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Connecting to Redis for background tasks...")
     app.state.redis = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
-    
+
     logger.info("Loading ML models...")
     try:
         repo_root = Path(__file__).resolve().parents[1]
         demand_bundle = repo_root / "models" / "demand" / "voltez-demand-60m-pune-v1"
-        availability_bundle = (
-            repo_root / "models" / "availability" / "voltez-availability-pune-v1"
-        )
+        availability_bundle = repo_root / "models" / "availability" / "voltez-availability-pune-v1"
 
         # Use the published, hash-verifying serving wrappers. The joblib files
         # contain dictionaries, not estimators that can be called directly.
@@ -54,13 +56,14 @@ async def lifespan(app: FastAPI):
     logger.info("Disconnecting from Redis...")
     await app.state.redis.aclose()
 
+
 def create_app() -> FastAPI:
     # 1. Application Factory setup
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
-        lifespan=lifespan  # <-- 🆕 ADD THIS LINE
+        lifespan=lifespan,  # <-- 🆕 ADD THIS LINE
     )
 
     # 2. CORS Middleware (Allows your frontend teammate to make requests without getting blocked)
@@ -95,7 +98,7 @@ def create_app() -> FastAPI:
                 "endpoint": request.url.path,
                 "status_code": response.status_code,
                 "latency": f"{process_time:.4f}s",
-            }
+            },
         )
 
         response.headers["X-Request-ID"] = request_id

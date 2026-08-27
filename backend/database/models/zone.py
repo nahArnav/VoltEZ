@@ -11,19 +11,19 @@ from database.base_class import Base
 class Zone(Base):
     __tablename__ = "zones"
     __table_args__ = (
-    CheckConstraint(
-        "btrim(city) <> ''",
-        name="ck_zone_city_not_blank",
-    ),
-    CheckConstraint(
-        "btrim(name) <> ''",
-        name="ck_zone_name_not_blank",
-    ),
-    CheckConstraint(
-        "h3_index IS NULL OR btrim(h3_index) <> ''",
-        name="ck_zone_h3_index_not_blank",
-    ),
-    {"schema": "app"},
+        CheckConstraint(
+            "btrim(city) <> ''",
+            name="ck_zone_city_not_blank",
+        ),
+        CheckConstraint(
+            "btrim(name) <> ''",
+            name="ck_zone_name_not_blank",
+        ),
+        CheckConstraint(
+            "h3_index IS NULL OR btrim(h3_index) <> ''",
+            name="ck_zone_h3_index_not_blank",
+        ),
+        {"schema": "app"},
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

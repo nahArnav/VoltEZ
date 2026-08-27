@@ -1,19 +1,19 @@
-from app.schemas.enums import UserRole
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List
 
-from app.db.session import get_db
-from database.models.user import User
-from app.schemas.business import BusinessCreate, BusinessUpdate, BusinessResponse
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.deps import get_current_user, require_role
+from app.db.session import get_db
 from app.repositories.business import business_repo
 from app.schemas.booking import BookingResponse
+from app.schemas.business import BusinessCreate, BusinessResponse, BusinessUpdate
+from app.schemas.enums import UserRole
 from database.models.booking import Booking
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
+from database.models.user import User
 
 router = APIRouter(prefix="/businesses", tags=["Businesses"])
 
@@ -29,49 +29,52 @@ async def get_my_business(
         raise HTTPException(status_code=404, detail="Business not found")
     return businesses[0]
 
-@router.get("/", response_model=List[BusinessResponse])
+
+@router.get("/", response_model=list[BusinessResponse])
 async def list_businesses(
     current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """List all businesses for the current owner."""
     # type ignore for Pylance Column[int] false positive
     businesses = await business_repo.get_by_owner_id(db, owner_id=current_user.id)  # type: ignore
     return businesses
 
+
 @router.post("/", response_model=BusinessResponse, status_code=status.HTTP_201_CREATED)
 async def create_business(
     business_in: BusinessCreate,
     current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Register a new business."""
     business_data = business_in.model_dump()
-    
+
     # Extract lat/lng to convert to PostGIS geometry
     lat = business_data.pop("latitude", None)
     lon = business_data.pop("longitude", None)
     if lat is not None and lon is not None:
         business_data["location"] = f"SRID=4326;POINT({lon} {lat})"
-        
+
     business_data["owner_id"] = current_user.id
     business_data["verification_status"] = "pending"
-    
+
     business = await business_repo.create(db, obj_in=business_data)
     await db.commit()
     await db.refresh(business)
-    
+
     # Attach lat/lng for Pydantic serialization
-    setattr(business, "latitude", lat)
-    setattr(business, "longitude", lon)
-    
+    business.latitude = lat
+    business.longitude = lon
+
     return business
+
 
 @router.get("/{business_id}", response_model=BusinessResponse)
 async def get_business(
     business_id: UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     business = await business_repo.get(db, id=business_id)
     if not business:
@@ -80,7 +83,7 @@ async def get_business(
     return business
 
 
-@router.get("/{business_id}/bookings", response_model=List[BookingResponse])
+@router.get("/{business_id}/bookings", response_model=list[BookingResponse])
 async def list_business_bookings(
     business_id: UUID,
     current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
@@ -101,17 +104,18 @@ async def list_business_bookings(
     )
     return list(result.scalars().all())
 
+
 @router.patch("/{business_id}", response_model=BusinessResponse)
 async def update_business(
     business_id: UUID,
     business_in: BusinessUpdate,
     current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     business = await business_repo.get(db, id=business_id)
     if not business or business.owner_id != current_user.id:  # type: ignore
         raise HTTPException(status_code=404, detail="Business not found or unauthorized")
-    
+
     update_data = business_in.model_dump(exclude_unset=True)
     lat = update_data.pop("latitude", None)
     lon = update_data.pop("longitude", None)
@@ -127,20 +131,21 @@ async def update_business(
     await db.commit()
     await db.refresh(business)
     if lat is not None:
-        setattr(business, "latitude", lat)
-        setattr(business, "longitude", lon)
+        business.latitude = lat
+        business.longitude = lon
     return business
+
 
 @router.delete("/{business_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_business(
     business_id: UUID,
     current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     business = await business_repo.get(db, id=business_id)
     if not business or business.owner_id != current_user.id:  # type: ignore
         raise HTTPException(status_code=404, detail="Business not found or unauthorized")
-    
+
     await business_repo.remove(db, id=business_id)
     await db.commit()
     return None

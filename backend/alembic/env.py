@@ -1,11 +1,11 @@
-from logging.config import fileConfig
 import os
+from logging.config import fileConfig
 
-from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, pool
 
-from database.base import Base
+from alembic import context
+from database.base_class import Base
 
 load_dotenv()
 
@@ -19,7 +19,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set")
 
+assert isinstance(DATABASE_URL, str)
+
 target_metadata = Base.metadata
+
 
 def include_name(name, type_, parent_names):
     if type_ == "schema":
@@ -34,13 +37,13 @@ def include_name(name, type_, parent_names):
 
 def run_migrations_offline() -> None:
     context.configure(
-    url=DATABASE_URL,
-    target_metadata=target_metadata,
-    literal_binds=True,
-    dialect_opts={"paramstyle": "named"},
-    include_schemas=True,
-    include_name=include_name,
-)
+        url=DATABASE_URL,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+        include_schemas=True,
+        include_name=include_name,
+    )
 
     with context.begin_transaction():
         context.run_migrations()
@@ -54,11 +57,11 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-    connection=connection,
-    target_metadata=target_metadata,
-    include_schemas=True,
-    include_name=include_name,
-)
+            connection=connection,
+            target_metadata=target_metadata,
+            include_schemas=True,
+            include_name=include_name,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

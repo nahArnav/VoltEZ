@@ -32,8 +32,7 @@ def _source_manifests(source_root: Path) -> list[tuple[Path, dict[str, Any]]]:
     paths = sorted(source_root.glob("sim-*/manifest.json"))
     loaded = [(path.parent, json.loads(path.read_text("utf-8"))) for path in paths]
     roles = Counter(
-        str(manifest.get("experiment", {}).get("evaluation_role"))
-        for _, manifest in loaded
+        str(manifest.get("experiment", {}).get("evaluation_role")) for _, manifest in loaded
     )
     if dict(sorted(roles.items())) != EXPECTED_ROLE_COUNTS:
         raise ValueError(
@@ -45,9 +44,7 @@ def _source_manifests(source_root: Path) -> list[tuple[Path, dict[str, Any]]]:
     commits = {manifest.get("code_commit") for _, manifest in loaded}
     if len(commits) != 1 or None in commits:
         raise ValueError("all final source worlds must come from one clean code commit")
-    structural_namespaces = {
-        manifest.get("structural_namespace") for _, manifest in loaded
-    }
+    structural_namespaces = {manifest.get("structural_namespace") for _, manifest in loaded}
     if len(structural_namespaces) != 1 or None in structural_namespaces:
         raise ValueError("canonical source worlds must share one declared structural namespace")
     dynamic_seeds = {manifest.get("dynamic_seed") for _, manifest in loaded}
@@ -102,9 +99,9 @@ def _readiness(entries: list[dict[str, Any]]) -> dict[str, Any]:
         )
         tables = entry["tables"]
         demand_path = Path(tables["demand_features"])
-        demand_target = pd.read_parquet(
-            demand_path, columns=["target_request_count"]
-        )["target_request_count"]
+        demand_target = pd.read_parquet(demand_path, columns=["target_request_count"])[
+            "target_request_count"
+        ]
         role_values["demand_rows"] += len(demand_target)
         role_values["demand_nonzero_targets"] += int((demand_target > 0).sum())
         role_values["availability_labels"].update(
@@ -134,13 +131,12 @@ def _readiness(entries: list[dict[str, Any]]) -> dict[str, Any]:
     for role, gates in thresholds.items():
         values = by_role[role]
         if values["demand_nonzero_targets"] < gates["demand"]:
-            failures_by_model["demand"].append(
-                f"{role}: insufficient nonzero demand targets"
-            )
+            failures_by_model["demand"].append(f"{role}: insufficient nonzero demand targets")
         availability = values["availability_labels"]
-        if min(availability.get("available", 0), availability.get("unavailable", 0)) < gates[
-            "availability"
-        ]:
+        if (
+            min(availability.get("available", 0), availability.get("unavailable", 0))
+            < gates["availability"]
+        ):
             failures_by_model["availability"].append(
                 f"{role}: insufficient availability minority support"
             )
@@ -149,9 +145,10 @@ def _readiness(entries: list[dict[str, Any]]) -> dict[str, Any]:
                 f"{role}: insufficient positive waiting-time support"
             )
         reliability = values["reliability_labels"]
-        if min(reliability.get("reliable", 0), reliability.get("unreliable", 0)) < gates[
-            "reliability"
-        ]:
+        if (
+            min(reliability.get("reliable", 0), reliability.get("unreliable", 0))
+            < gates["reliability"]
+        ):
             failures_by_model["reliability"].append(
                 f"{role}: insufficient reliability minority support"
             )
@@ -215,9 +212,7 @@ def build_feature_suite(
                 "source_manifest": str(source_dir / "manifest.json"),
                 "feature_snapshot_id": result.feature_snapshot_id,
                 "feature_manifest": str(result.manifest_path),
-                "tables": {
-                    name: str(path) for name, path in sorted(result.table_paths.items())
-                },
+                "tables": {name: str(path) for name, path in sorted(result.table_paths.items())},
                 "row_counts": result.row_counts,
             }
         )
@@ -228,12 +223,12 @@ def build_feature_suite(
     portable_entries = [
         {
             **entry,
-            "source_manifest": os.path.relpath(
-                entry["source_manifest"], output_root
-            ).replace("\\", "/"),
-            "feature_manifest": os.path.relpath(
-                entry["feature_manifest"], output_root
-            ).replace("\\", "/"),
+            "source_manifest": os.path.relpath(entry["source_manifest"], output_root).replace(
+                "\\", "/"
+            ),
+            "feature_manifest": os.path.relpath(entry["feature_manifest"], output_root).replace(
+                "\\", "/"
+            ),
             "tables": {
                 name: os.path.relpath(path, output_root).replace("\\", "/")
                 for name, path in entry["tables"].items()

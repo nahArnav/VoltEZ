@@ -1,7 +1,7 @@
-from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
 from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Shared properties
@@ -11,6 +11,7 @@ class DemandHistoryBase(BaseModel):
     demand_level: float
     active_sessions: int
     queued_vehicles: int
+
 
 # Properties for internal background workers logging demand
 class DemandHistoryCreate(DemandHistoryBase):

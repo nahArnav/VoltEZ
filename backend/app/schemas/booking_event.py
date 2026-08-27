@@ -1,17 +1,21 @@
-from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Shared properties
 class BookingEventBase(BaseModel):
-    old_status: Optional[str] = Field(default=None, description="Previous status; None for creation event")
+    old_status: str | None = Field(
+        default=None, description="Previous status; None for creation event"
+    )
     new_status: str = Field(..., description="Target status transitioned into")
-    actor: str = Field(..., description="Entity triggering transition: 'system', 'user:<id>', 'admin:<id>'")
-    metadata_: Optional[Dict[str, Any]] = Field(
-        default=None, 
-        description="Arbitrary transition context, reasons, or payload diffs"
+    actor: str = Field(
+        ..., description="Entity triggering transition: 'system', 'user:<id>', 'admin:<id>'"
+    )
+    metadata_: dict[str, Any] | None = Field(
+        default=None, description="Arbitrary transition context, reasons, or payload diffs"
     )
 
 

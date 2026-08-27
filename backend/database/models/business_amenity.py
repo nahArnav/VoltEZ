@@ -11,12 +11,12 @@ from database.base_class import Base
 class BusinessAmenity(Base):
     __tablename__ = "business_amenities"
     __table_args__ = (
-    CheckConstraint(
-        "length(trim(source)) > 0",
-        name="ck_business_amenity_source_not_blank",
-    ),
-    {"schema": "app"},
-)
+        CheckConstraint(
+            "length(trim(source)) > 0",
+            name="ck_business_amenity_source_not_blank",
+        ),
+        {"schema": "app"},
+    )
 
     business_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

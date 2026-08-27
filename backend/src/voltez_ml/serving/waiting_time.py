@@ -23,8 +23,10 @@ BINARY_FEATURES = {
     "status_expired",
 }
 
+
 class WaitingTimeInputError(ValueError):
     """Raised when an application request violates the frozen feature contract."""
+
 
 class WaitingTimeFeatureRule(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -65,6 +67,7 @@ class WaitingTimeFeatureContract(BaseModel):
 
 
 FeatureValue = float | int | str | None
+
 
 class WaitingTimeFeatureRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
@@ -131,7 +134,7 @@ def build_waiting_time_feature_contract(
         raise ValueError("feature suite hash does not match the artifact")
     suite, _ = _load_suite(suite_manifest_path)
     train = _load_role(suite, "train")
-    
+
     spec = payload["features"]
     numeric = [str(value) for value in spec["numeric"]]
     categorical = [str(value) for value in spec["categorical"]]
@@ -190,7 +193,7 @@ def build_waiting_time_feature_contract(
             "action": "zero_wait_fallback",
         },
     }
-    
+
     WaitingTimeFeatureContract.model_validate(contract)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     write_manifest(contract, output_path)

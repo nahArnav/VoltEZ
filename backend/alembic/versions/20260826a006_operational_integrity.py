@@ -8,9 +8,9 @@ Create Date: 2026-08-26 18:30:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 revision: str = "20260826a006"
 down_revision: str = "20260826a005"
@@ -24,12 +24,8 @@ def upgrade() -> None:
         sa.Column("issue_flags", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         schema="app",
     )
-    op.create_unique_constraint(
-        "uq_reviews_session_id", "reviews", ["session_id"], schema="app"
-    )
-    op.create_unique_constraint(
-        "uq_payments_booking_id", "payments", ["booking_id"], schema="app"
-    )
+    op.create_unique_constraint("uq_reviews_session_id", "reviews", ["session_id"], schema="app")
+    op.create_unique_constraint("uq_payments_booking_id", "payments", ["booking_id"], schema="app")
     op.create_unique_constraint(
         "uq_payments_provider_order_id",
         "payments",
@@ -69,10 +65,6 @@ def downgrade() -> None:
         schema="app",
         type_="unique",
     )
-    op.drop_constraint(
-        "uq_payments_booking_id", "payments", schema="app", type_="unique"
-    )
-    op.drop_constraint(
-        "uq_reviews_session_id", "reviews", schema="app", type_="unique"
-    )
+    op.drop_constraint("uq_payments_booking_id", "payments", schema="app", type_="unique")
+    op.drop_constraint("uq_reviews_session_id", "reviews", schema="app", type_="unique")
     op.drop_column("reviews", "issue_flags", schema="app")

@@ -7,6 +7,7 @@ Default BASE_URL: http://localhost:8000
 """
 
 import sys
+
 import httpx
 
 
@@ -40,7 +41,7 @@ def main():
             print(f"  ❌ {name:20s} → Error: {e}")
             failed += 1
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Results: {passed} passed, {failed} failed out of {len(endpoints)}")
 
     if failed > 0:

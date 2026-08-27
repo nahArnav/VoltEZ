@@ -1,23 +1,23 @@
-from app.schemas.enums import BookingStatus
-from uuid import UUID
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import cast
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-from database.models.booking_event import BookingEvent
-from database.models.charging_session import ChargingSession
-from app.repositories.session import session_repo
+from app.core.config import settings
+from app.core.errors import BadRequestError, ForbiddenError, NotFoundError
 from app.repositories.booking import booking_repo
 from app.repositories.charger import charger_port_repo
-from app.core.errors import NotFoundError, BadRequestError, ForbiddenError
-from app.services.trust import trust_service
+from app.repositories.session import session_repo
+from app.schemas.enums import BookingStatus
 from app.services.fcm import fcm_service
+from app.services.trust import trust_service
 from app.websockets.manager import manager
-from app.core.config import settings
+from database.models.booking_event import BookingEvent
+from database.models.charging_session import ChargingSession
+
 
 class SessionService:
-
     @staticmethod
     async def check_in(db: AsyncSession, booking_id: UUID, user_id: UUID) -> ChargingSession:
         """Check in at the charger — creates a session record and transitions booking to CHECKED_IN."""
@@ -40,7 +40,7 @@ class SessionService:
 
         # 2. Transition booking to CHECKED_IN
         old_status = booking_status.value
-        setattr(booking, "status", BookingStatus.CHECKED_IN.value)
+        booking.status = BookingStatus.CHECKED_IN.value
         db.add(booking)
 
         # 3. Write audit event (BR-009)
@@ -53,7 +53,7 @@ class SessionService:
         db.add(event)
 
         # 4. Create the session record
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         new_session = ChargingSession(
             charger_port_id=booking.charger_port_id,
             user_id=user_id,
@@ -74,7 +74,7 @@ class SessionService:
                 status="occupied",
                 source="DRIVER_CHECKIN",
                 confidence=0.9,
-                charger_port_id=port_id
+                charger_port_id=port_id,
             )
 
         await db.commit()
@@ -84,7 +84,7 @@ class SessionService:
         payload = {
             "event": "session_checked_in",
             "session_id": new_session.id,
-            "booking_id": booking.id
+            "booking_id": booking.id,
         }
         await manager.send_personal_message(payload, user_id)
         await fcm_service.send_push_notification(
@@ -92,7 +92,7 @@ class SessionService:
             user_id=user_id,
             title="Checked In!",
             body="You have successfully checked in at the charger.",
-            payload=payload
+            payload=payload,
         )
 
         return new_session
@@ -121,15 +121,15 @@ class SessionService:
             raise ForbiddenError(message="Not authorized for this session.")
 
         # 1. Update session
-        now = datetime.now(timezone.utc)
-        setattr(session, "started_at", now)
-        setattr(session, "status", "charging")
+        now = datetime.now(UTC)
+        session.started_at = now
+        session.status = "charging"
         db.add(session)
 
         # 2. Update booking status
         booking_status = BookingStatus(cast(str, booking.status))
         old_status = booking_status.value
-        setattr(booking, "status", BookingStatus.CHARGING.value)
+        booking.status = BookingStatus.CHARGING.value
         db.add(booking)
 
         # 4. Audit event (BR-009)
@@ -148,7 +148,7 @@ class SessionService:
         payload = {
             "event": "charging_started",
             "session_id": session.id,
-            "port_id": booking.charger_port_id
+            "port_id": booking.charger_port_id,
         }
         await manager.send_personal_message(payload, user_id)
         await fcm_service.send_push_notification(
@@ -156,7 +156,7 @@ class SessionService:
             user_id=user_id,
             title="Charging Started \u26a1",
             body="Your vehicle is now charging.",
-            payload=payload
+            payload=payload,
         )
 
         return session
@@ -191,17 +191,17 @@ class SessionService:
         total_cost = round(energy_kwh * rate_per_kwh, 2)
 
         # 2. Finalize session
-        now = datetime.now(timezone.utc)
-        setattr(session, "ended_at", now)
-        setattr(session, "energy_kwh", energy_kwh)
-        setattr(session, "amount", total_cost)
-        setattr(session, "status", "completed")
+        now = datetime.now(UTC)
+        session.ended_at = now
+        session.energy_kwh = energy_kwh
+        session.amount = total_cost
+        session.status = "completed"
         db.add(session)
 
         # 3. Complete the booking
         booking_status = BookingStatus(cast(str, booking.status))
         old_status = booking_status.value
-        setattr(booking, "status", BookingStatus.COMPLETED.value)
+        booking.status = BookingStatus.COMPLETED.value
         db.add(booking)
 
         port = await charger_port_repo.get(db, id=booking.charger_port_id)
@@ -226,7 +226,7 @@ class SessionService:
                 status="available",
                 source="DRIVER_CHECKOUT",
                 confidence=0.9,
-                charger_port_id=port_id
+                charger_port_id=port_id,
             )
 
         await db.commit()
@@ -237,7 +237,7 @@ class SessionService:
             "event": "charging_completed",
             "session_id": session.id,
             "energy_kwh": energy_kwh,
-            "final_amount": total_cost
+            "final_amount": total_cost,
         }
         await manager.send_personal_message(payload, user_id)
         await fcm_service.send_push_notification(
@@ -245,7 +245,7 @@ class SessionService:
             user_id=user_id,
             title="Charging Completed \u2705",
             body=f"Session ended. Total cost: ₹{total_cost}",
-            payload=payload
+            payload=payload,
         )
 
         return session

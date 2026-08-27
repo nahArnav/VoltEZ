@@ -37,12 +37,14 @@ def test_demand_target_is_exact_future_bucket(
 ) -> None:
     generated, features, _ = feature_fixture
     demand_features = pd.read_parquet(features.table_paths["demand_features"])
-    expected = _read_generated(generated, "demand_buckets")[[
-        "simulation_run_id",
-        "zone_id",
-        "bucket_start",
-        "request_count",
-    ]].rename(
+    expected = _read_generated(generated, "demand_buckets")[
+        [
+            "simulation_run_id",
+            "zone_id",
+            "bucket_start",
+            "request_count",
+        ]
+    ].rename(
         columns={
             "bucket_start": "target_time",
             "request_count": "expected_target_request_count",
@@ -56,12 +58,7 @@ def test_demand_target_is_exact_future_bucket(
     )
 
     assert checked["expected_target_request_count"].notna().all()
-    assert bool(
-        (
-            checked["target_request_count"]
-            == checked["expected_target_request_count"]
-        ).all()
-    )
+    assert bool((checked["target_request_count"] == checked["expected_target_request_count"]).all())
 
 
 def test_future_demand_mutation_changes_label_but_not_origin_features(
@@ -138,9 +135,7 @@ def test_target_aligned_demand_lags_reference_the_exact_future_slot() -> None:
     )
 
     features = build_demand_features(config, raw, zones)
-    checked = features[
-        features["request_lag_target_time_yesterday"].notna()
-    ].copy()
+    checked = features[features["request_lag_target_time_yesterday"].notna()].copy()
     checked["expected_time"] = checked["target_time"] - pd.Timedelta(1, unit="D")
     expected = raw[["bucket_start", "request_count"]].rename(
         columns={"bucket_start": "expected_time", "request_count": "expected_request_count"}
@@ -148,10 +143,7 @@ def test_target_aligned_demand_lags_reference_the_exact_future_slot() -> None:
     checked = checked.merge(expected, on="expected_time", validate="many_to_one")
 
     assert bool(
-        (
-            checked["request_lag_target_time_yesterday"]
-            == checked["expected_request_count"]
-        ).all()
+        (checked["request_lag_target_time_yesterday"] == checked["expected_request_count"]).all()
     )
 
 
@@ -280,9 +272,7 @@ def test_unknown_labels_are_retained_but_excluded_from_supervised_table(
     waiting_all = pd.read_parquet(features.table_paths["waiting_time_features_all"])
     waiting_labeled = pd.read_parquet(features.table_paths["waiting_time_features_labeled"])
     reliability_all = pd.read_parquet(features.table_paths["reliability_features_all"])
-    reliability_labeled = pd.read_parquet(
-        features.table_paths["reliability_features_labeled"]
-    )
+    reliability_labeled = pd.read_parquet(features.table_paths["reliability_features_labeled"])
     assert len(waiting_labeled) == int((waiting_all["label_known"] == 1).sum())
     assert not bool(waiting_labeled["label_wait_minutes"].isna().any())
     assert bool((waiting_labeled["label_wait_minutes"] >= 0).all())

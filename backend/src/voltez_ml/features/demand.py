@@ -59,9 +59,7 @@ def _add_context_features(
     """Attach target-time events only when they were known by the prediction origin."""
 
     event_types = tuple(
-        event_type
-        for event_type in config.synthetic.scenario_mix
-        if event_type != "normal_weekday"
+        event_type for event_type in config.synthetic.scenario_mix if event_type != "normal_weekday"
     )
     result = horizon.copy()
     result["context_event_count"] = 0
@@ -310,12 +308,12 @@ def build_demand_features(
         horizon["request_lag_target_time_last_week"] = horizon_group["request_count"].shift(
             buckets_per_week - horizon_buckets
         )
-        horizon["missing_target_lag_yesterday"] = horizon[
-            "request_lag_target_time_yesterday"
-        ].isna().astype("int8")
-        horizon["missing_target_lag_last_week"] = horizon[
-            "request_lag_target_time_last_week"
-        ].isna().astype("int8")
+        horizon["missing_target_lag_yesterday"] = (
+            horizon["request_lag_target_time_yesterday"].isna().astype("int8")
+        )
+        horizon["missing_target_lag_last_week"] = (
+            horizon["request_lag_target_time_last_week"].isna().astype("int8")
+        )
         horizon = horizon.merge(
             target_lookup,
             on=[*keys, "target_time"],

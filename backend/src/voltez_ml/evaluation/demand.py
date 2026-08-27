@@ -60,12 +60,8 @@ def _diagnostic_metrics(
     values.update(
         {
             "bias_prediction_minus_truth": float(residual.mean()),
-            "zero_target_mae": float(np.abs(residual[zero]).mean())
-            if bool(zero.any())
-            else None,
-            "nonzero_underprediction_rate": float(
-                (prediction[nonzero] < truth[nonzero]).mean()
-            )
+            "zero_target_mae": float(np.abs(residual[zero]).mean()) if bool(zero.any()) else None,
+            "nonzero_underprediction_rate": float((prediction[nonzero] < truth[nonzero]).mean())
             if bool(nonzero.any())
             else None,
             "within_half_request_rate": float((np.abs(residual) <= 0.5).mean()),
@@ -100,8 +96,7 @@ def _target_aligned_seasonal_naive(frame: pd.DataFrame) -> NDArray[np.float64]:
     keys = ["simulation_run_id", "zone_id"]
     lookup = (
         frame.sort_values([*keys, "prediction_origin", "horizon_minutes"], kind="mergesort")
-        .drop_duplicates([*keys, "prediction_origin"])
-        [
+        .drop_duplicates([*keys, "prediction_origin"])[
             [
                 *keys,
                 "prediction_origin",
@@ -130,9 +125,7 @@ def _target_aligned_seasonal_naive(frame: pd.DataFrame) -> NDArray[np.float64]:
     safe_yesterday = target - pd.to_timedelta(1, unit="D") < origin
     aligned.loc[~safe_week, "target_aligned_last_week"] = np.nan
     aligned.loc[~safe_yesterday, "target_aligned_yesterday"] = np.nan
-    prediction = aligned["target_aligned_last_week"].fillna(
-        aligned["target_aligned_yesterday"]
-    )
+    prediction = aligned["target_aligned_last_week"].fillna(aligned["target_aligned_yesterday"])
     prediction = prediction.fillna(aligned["request_ewm_prior"]).fillna(0.0)
     return cast(
         NDArray[np.float64],
@@ -199,9 +192,7 @@ def _calibration(frame: pd.DataFrame) -> list[dict[str, Any]]:
             "truth_mean": float(part[TARGET].mean()),
             "nonzero_rate": float((part[TARGET] > 0).mean()),
         }
-        for decile, part in calibration.groupby(
-            "prediction_decile", observed=True, sort=True
-        )
+        for decile, part in calibration.groupby("prediction_decile", observed=True, sort=True)
     ]
 
 
@@ -244,9 +235,7 @@ def _evaluate_role(
         "by_horizon": by_horizon,
         "by_hour": _segment_metrics(evaluated, "target_hour"),
         "by_weekend": _segment_metrics(evaluated, "target_is_weekend"),
-        "worst_zones_by_mae": sorted(
-            zones, key=lambda row: float(row["mae"]), reverse=True
-        )[:8],
+        "worst_zones_by_mae": sorted(zones, key=lambda row: float(row["mae"]), reverse=True)[:8],
         "worst_zones_by_absolute_bias": sorted(
             zones, key=lambda row: abs(float(row["bias"])), reverse=True
         )[:8],
@@ -383,9 +372,7 @@ def evaluate_demand_model(
         "created_at": datetime.now(UTC).isoformat(),
         "model_id": artifact_manifest["model_id"],
         "model_artifact_sha256": artifact_manifest["artifact"]["sha256"],
-        "feature_suite_manifest_sha256": artifact_manifest[
-            "feature_suite_manifest_sha256"
-        ],
+        "feature_suite_manifest_sha256": artifact_manifest["feature_suite_manifest_sha256"],
         "target_spec": target_spec,
         "settings": asdict(settings),
         "integrity": {

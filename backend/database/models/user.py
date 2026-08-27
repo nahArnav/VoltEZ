@@ -11,31 +11,31 @@ from database.base_class import Base
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
-    CheckConstraint(
-        "email IS NOT NULL OR phone IS NOT NULL",
-        name="ck_users_email_or_phone",
-    ),
-    CheckConstraint(
-        "btrim(name) <> ''",
-        name="ck_users_name_not_blank",
-    ),
-    CheckConstraint(
-        "email IS NULL OR btrim(email) <> ''",
-        name="ck_users_email_not_blank",
-    ),
-    CheckConstraint(
-        "phone IS NULL OR btrim(phone) <> ''",
-        name="ck_users_phone_not_blank",
-    ),
-    CheckConstraint(
-        "role IN ('driver', 'owner', 'admin')",
-        name="ck_users_role",
-    ),
-    CheckConstraint(
-        "verification_status IN ('unverified', 'pending', 'verified', 'rejected')",
-        name="ck_users_verification_status",
-    ),
-    {"schema": "app"},
+        CheckConstraint(
+            "email IS NOT NULL OR phone IS NOT NULL",
+            name="ck_users_email_or_phone",
+        ),
+        CheckConstraint(
+            "btrim(name) <> ''",
+            name="ck_users_name_not_blank",
+        ),
+        CheckConstraint(
+            "email IS NULL OR btrim(email) <> ''",
+            name="ck_users_email_not_blank",
+        ),
+        CheckConstraint(
+            "phone IS NULL OR btrim(phone) <> ''",
+            name="ck_users_phone_not_blank",
+        ),
+        CheckConstraint(
+            "role IN ('driver', 'owner', 'admin')",
+            name="ck_users_role",
+        ),
+        CheckConstraint(
+            "verification_status IN ('unverified', 'pending', 'verified', 'rejected')",
+            name="ck_users_verification_status",
+        ),
+        {"schema": "app"},
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

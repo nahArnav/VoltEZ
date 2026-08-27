@@ -1,30 +1,29 @@
-from app.schemas.enums import BookingStatus
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-import razorpay
 
-from app.db.session import get_db
-from database.models.user import User
+import razorpay
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.v1.deps import get_current_user
+from app.core.config import settings
+from app.db.session import get_db
+from app.repositories.booking import booking_repo
+from app.repositories.payment import payment_repo
+from app.schemas.enums import BookingStatus
 from app.schemas.payment import (
     PaymentOrderCreate,
     PaymentResponse,
     PaymentVerifyRequest,
 )
-from app.repositories.payment import payment_repo
-from app.repositories.booking import booking_repo
 from database.models.booking_event import BookingEvent
-
-from app.core.config import settings
+from database.models.user import User
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
 # Initialize Razorpay Client
-razorpay_client = razorpay.Client(
-    auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
-)
+razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+
 
 async def _require_owned_booking(db: AsyncSession, booking_id, current_user: User):
     booking = await booking_repo.get(db, id=booking_id)
@@ -39,7 +38,7 @@ def _require_payable_booking(booking):
             status_code=409,
             detail=f"Booking cannot be paid while it is {booking.status}.",
         )
-    if booking.hold_expires_at and booking.hold_expires_at <= datetime.now(timezone.utc):
+    if booking.hold_expires_at and booking.hold_expires_at <= datetime.now(UTC):
         raise HTTPException(status_code=409, detail="Booking hold has expired")
     return booking
 
@@ -55,7 +54,7 @@ async def _confirm_payment(db: AsyncSession, payment, provider_payment_id: str):
 
     payment.status = "completed"
     payment.provider_payment_id = provider_payment_id
-    payment.verified_at = datetime.now(timezone.utc)
+    payment.verified_at = datetime.now(UTC)
     if booking.status in {BookingStatus.HELD.value, BookingStatus.PENDING.value}:
         old_status = booking.status
         booking.status = BookingStatus.CONFIRMED.value
@@ -78,7 +77,7 @@ async def _confirm_payment(db: AsyncSession, payment, provider_payment_id: str):
 async def create_order(
     payment_in: PaymentOrderCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Create a Razorpay order and save the pending payment to the database.
@@ -94,16 +93,20 @@ async def create_order(
 
     amount = Decimal(str(booking.estimated_amount or settings.BOOKING_HOLD_FEE_INR))
     amount_in_paise = int(amount * 100)
-    
+
     # Try/except block in case Razorpay API is down
     try:
-        rzp_order = razorpay_client.order.create({  # type: ignore
-            "amount": amount_in_paise,
-            "currency": "INR",
-            "receipt": f"booking_{payment_in.booking_id}"
-        })
+        rzp_order = razorpay_client.order.create(
+            {  # type: ignore
+                "amount": amount_in_paise,
+                "currency": "INR",
+                "receipt": f"booking_{payment_in.booking_id}",
+            }
+        )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Payment provider unavailable") from e
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Payment provider unavailable"
+        ) from e
 
     # 2. Save the pending payment to our database
     payment_data = {
@@ -113,7 +116,7 @@ async def create_order(
         "provider_order_id": rzp_order.get("id"),
         "status": "pending",
     }
-    
+
     payment = await payment_repo.create(db, obj_in=payment_data)
     await db.commit()
     await db.refresh(payment)
@@ -156,25 +159,20 @@ async def verify_payment(
 
 
 @router.post("/webhook")
-async def razorpay_webhook(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-):
+async def razorpay_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Handle Razorpay webhook for payment success or failure.
     Cryptographically verifies the HMAC-SHA256 signature to prevent fraud.
     """
     body = await request.body()
     signature = request.headers.get("x-razorpay-signature")
-    
+
     if not signature:
         raise HTTPException(status_code=400, detail="Missing signature")
-        
+
     try:
         razorpay_client.utility.verify_webhook_signature(  # type: ignore
-            body.decode("utf-8"), 
-            signature, 
-            settings.RAZORPAY_WEBHOOK_SECRET
+            body.decode("utf-8"), signature, settings.RAZORPAY_WEBHOOK_SECRET
         )
     except razorpay.errors.SignatureVerificationError:  # type: ignore
         raise HTTPException(status_code=400, detail="Invalid signature")
@@ -182,15 +180,15 @@ async def razorpay_webhook(
     # If signature is valid, process the event
     payload = await request.json()
     event_type = payload.get("event")
-    
+
     if event_type == "payment.captured":
         payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
         provider_order_id = payment_entity.get("order_id")
         provider_payment_id = payment_entity.get("id")
-        
+
         # 1. Update the Payment record to completed
         payment = await payment_repo.get_by_provider_order(db, provider_order_id=provider_order_id)
         if payment:
             await _confirm_payment(db, payment, provider_payment_id)
-            
+
     return {"status": "ok"}

@@ -1,7 +1,8 @@
-from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict, model_validator
-from typing import Optional
 from datetime import datetime, time
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 
 # Shared properties
 class AvailabilityWindowBase(BaseModel):
@@ -16,22 +17,29 @@ class AvailabilityWindowBase(BaseModel):
             raise ValueError("end_local_time must be strictly after start_local_time")
         return self
 
+
 # Properties to receive via API on creation
 class AvailabilityWindowCreate(AvailabilityWindowBase):
     charger_port_id: UUID
 
+
 # Properties to receive via API on update
 class AvailabilityWindowUpdate(BaseModel):
-    day_of_week: Optional[int] = Field(default=None, ge=0, le=6)
-    start_local_time: Optional[time] = None
-    end_local_time: Optional[time] = None
-    is_unavailable: Optional[bool] = None
+    day_of_week: int | None = Field(default=None, ge=0, le=6)
+    start_local_time: time | None = None
+    end_local_time: time | None = None
+    is_unavailable: bool | None = None
 
     @model_validator(mode="after")
     def validate_time_range_update(self):
-        if self.start_local_time and self.end_local_time and self.end_local_time <= self.start_local_time:
+        if (
+            self.start_local_time
+            and self.end_local_time
+            and self.end_local_time <= self.start_local_time
+        ):
             raise ValueError("end_local_time must be strictly after start_local_time")
         return self
+
 
 # Properties to return to client
 class AvailabilityWindowResponse(AvailabilityWindowBase):

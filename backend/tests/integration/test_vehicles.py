@@ -1,5 +1,7 @@
-import pytest
 from uuid import uuid4
+
+import pytest
+
 
 @pytest.mark.asyncio
 async def test_crud_vehicle(client):
@@ -12,13 +14,12 @@ async def test_crud_vehicle(client):
         "email": f"vehicle-{uuid4()}@example.com",
         "password": password,
         "name": "Vehicle Driver",
-        "role": "driver"
+        "role": "driver",
     }
     await client.post("/api/v1/auth/register", json=register_payload)
-    
+
     login_response = await client.post(
-        "/api/v1/auth/login",
-        data={"username": register_payload["email"], "password": password}
+        "/api/v1/auth/login", data={"username": register_payload["email"], "password": password}
     )
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -32,7 +33,7 @@ async def test_crud_vehicle(client):
         "connector_type_ids": [1],
         "max_ac_kw": 7.2,
         "max_dc_kw": 25.0,
-        "estimated_range_km": 312.0
+        "estimated_range_km": 312.0,
     }
     create_response = await client.post("/api/v1/vehicles/", json=vehicle_payload, headers=headers)
     assert create_response.status_code == 201, create_response.text
@@ -48,9 +49,7 @@ async def test_crud_vehicle(client):
 
     # 4. UPDATE the vehicle (e.g. change range)
     update_response = await client.patch(
-        f"/api/v1/vehicles/{vehicle_id}", 
-        json={"estimated_range_km": 250.0}, 
-        headers=headers
+        f"/api/v1/vehicles/{vehicle_id}", json={"estimated_range_km": 250.0}, headers=headers
     )
     assert update_response.status_code == 200, update_response.text
     assert update_response.json()["estimated_range_km"] == 250.0

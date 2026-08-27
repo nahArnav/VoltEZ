@@ -244,9 +244,7 @@ class SyntheticSettings(StrictConfigModel):
     availability: AvailabilitySyntheticSettings
     supply: SupplySyntheticSettings
     behaviour: BehaviourSyntheticSettings
-    route_energy: RouteEnergySyntheticSettings = Field(
-        default_factory=RouteEnergySyntheticSettings
-    )
+    route_energy: RouteEnergySyntheticSettings = Field(default_factory=RouteEnergySyntheticSettings)
     safeguards: SyntheticSafeguards
 
     @model_validator(mode="after")

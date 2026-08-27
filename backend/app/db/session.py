@@ -1,5 +1,7 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
 from app.core.config import settings
 
 
@@ -18,18 +20,12 @@ def _get_async_database_url(url: str) -> str:
 # 1. Create the Async Engine
 # This is the actual connection pool that talks to your PostgreSQL database.
 engine = create_async_engine(
-    _get_async_database_url(settings.DATABASE_URL),
-    echo=False,
-    future=True
+    _get_async_database_url(settings.DATABASE_URL), echo=False, future=True
 )
 
 # 2. Create the Session Factory
 # This generates new database sessions whenever we need them.
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False
-)
+AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 
 # 3. The Request-Scoped Dependency

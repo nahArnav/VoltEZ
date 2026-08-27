@@ -1,10 +1,10 @@
+from datetime import UTC, datetime
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
-from datetime import datetime, timezone
 
-from database.models.charger_status_event import ChargerStatusEvent
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.repositories.charger import charger_repo
+from database.models.charger_status_event import ChargerStatusEvent
 
 
 class TrustService:
@@ -15,7 +15,7 @@ class TrustService:
         status: str,
         source: str,
         confidence: float,
-        charger_port_id: Optional[UUID] = None
+        charger_port_id: UUID | None = None,
     ):
         """
         Record a status event and adjust the charger's reliability score.
@@ -28,10 +28,8 @@ class TrustService:
             source=source,
             confidence=confidence,
             error_code=None,
-            details={
-                "charger_port_id": str(charger_port_id) if charger_port_id else None
-            },
-            observed_at=datetime.now(timezone.utc),
+            details={"charger_port_id": str(charger_port_id) if charger_port_id else None},
+            observed_at=datetime.now(UTC),
         )
         db.add(event)
 
@@ -40,18 +38,19 @@ class TrustService:
         if charger:
             raw_score = getattr(charger, "reliability_score", 100.0)
             current_score = float(raw_score) if raw_score is not None else 100.0
-            
+
             # Simple heuristic for No-IoT trust model (Playbook Phase 3)
             if source == "DRIVER_CHECKIN":
                 # Check-in confirms it works
-                setattr(charger, "reliability_score", min(100.0, current_score + 5.0))
+                charger.reliability_score = min(100.0, current_score + 5.0)
             elif source == "DRIVER_CHECKOUT":
                 # Complete session is strong proof
-                setattr(charger, "reliability_score", min(100.0, current_score + 5.0))
+                charger.reliability_score = min(100.0, current_score + 5.0)
             elif source == "DRIVER_REPORT":
                 # Issue reported = penalize heavily
-                setattr(charger, "reliability_score", max(0.0, current_score - 20.0))
+                charger.reliability_score = max(0.0, current_score - 20.0)
 
             db.add(charger)
+
 
 trust_service = TrustService()

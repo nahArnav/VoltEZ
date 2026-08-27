@@ -1,16 +1,17 @@
 from fastapi import APIRouter
+
+from .analytics import router as analytics_router
 from .auth import router as auth_router
+from .availability import router as availability_router
 from .booking import router as booking_router
+from .businesses import router as businesses_router
 from .charger import router as charger_router
+from .payments import router as payments_router
+from .recommendations import router as recommendations_router
 from .session import router as session_router
 from .users import router as users_router
 from .vehicles import router as vehicles_router
-from .businesses import router as businesses_router
-from .recommendations import router as recommendations_router
-from .availability import router as availability_router
-from .payments import router as payments_router
 from .ws import router as ws_router
-from .analytics import router as analytics_router
 
 # This is the master router for version 1 of your API
 api_router = APIRouter()

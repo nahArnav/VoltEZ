@@ -1,13 +1,13 @@
-from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
 from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Shared properties
 class ReviewBase(BaseModel):
     rating: int = Field(..., ge=1, le=5, description="Rating from 1 to 5")
-    comment: Optional[str] = None
+    comment: str | None = None
     issue_flags: list[str] | None = Field(default=None, max_length=5)
 
 

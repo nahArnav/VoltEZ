@@ -1,14 +1,15 @@
-from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Shared properties
 class ChargerStatusEventBase(BaseModel):
     status: str = Field(..., description="available, occupied, offline, unknown")
-    error_code: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    error_code: str | None = None
+    details: dict[str, Any] | None = None
 
 
 # Properties received from an API call

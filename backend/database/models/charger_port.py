@@ -1,6 +1,6 @@
 from uuid import uuid4
-import sqlalchemy
 
+import sqlalchemy
 from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -11,20 +11,20 @@ from database.base_class import Base
 class ChargerPort(Base):
     __tablename__ = "charger_ports"
     __table_args__ = (
-    UniqueConstraint(
-        "charger_id",
-        "port_number",
-        name="uq_charger_port_number",
-    ),
-    CheckConstraint(
-        "port_number > 0",
-        name="ck_charger_port_number_positive",
-    ),
-    CheckConstraint(
-        "max_power_kw > 0",
-        name="ck_charger_port_power_positive",
-    ),
-    {"schema": "app"},
+        UniqueConstraint(
+            "charger_id",
+            "port_number",
+            name="uq_charger_port_number",
+        ),
+        CheckConstraint(
+            "port_number > 0",
+            name="ck_charger_port_number_positive",
+        ),
+        CheckConstraint(
+            "max_power_kw > 0",
+            name="ck_charger_port_power_positive",
+        ),
+        {"schema": "app"},
     )
 
     id: Mapped[UUID] = mapped_column(

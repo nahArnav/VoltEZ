@@ -179,8 +179,7 @@ def audit_feature_tables(
         )
     if not reliability_split_report["cross_seed"]["available"]:
         warnings.append(
-            "reliability cross-seed holdout is unavailable; explicit independent roles are "
-            "required"
+            "reliability cross-seed holdout is unavailable; explicit independent roles are required"
         )
     label_distribution = availability_labeled["label"].value_counts().to_dict()
     if len(label_distribution) < 2:

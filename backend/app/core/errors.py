@@ -6,15 +6,13 @@ error responses matching the API contract:
   { "code": "...", "message": "...", "request_id": "...", "field_errors": [...] }
 """
 
-from typing import Any, Optional
-
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-
 # --- Error Response Schema ---
+
 
 class FieldError(BaseModel):
     field: str
@@ -24,11 +22,12 @@ class FieldError(BaseModel):
 class ErrorResponse(BaseModel):
     code: str
     message: str
-    request_id: Optional[str] = None
-    field_errors: Optional[list[FieldError]] = None
+    request_id: str | None = None
+    field_errors: list[FieldError] | None = None
 
 
 # --- Custom Exceptions ---
+
 
 class VoltEZError(Exception):
     """Base exception for all VoltEZ application errors."""
@@ -38,7 +37,7 @@ class VoltEZError(Exception):
         code: str = "INTERNAL_ERROR",
         message: str = "An unexpected error occurred.",
         status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
-        field_errors: Optional[list[dict]] = None,
+        field_errors: list[dict] | None = None,
     ):
         self.code = code
         self.message = message
@@ -50,7 +49,7 @@ class VoltEZError(Exception):
 class NotFoundError(VoltEZError):
     """Resource not found."""
 
-    def __init__(self, resource: str = "Resource", message: Optional[str] = None):
+    def __init__(self, resource: str = "Resource", message: str | None = None):
         super().__init__(
             code=f"{resource.upper()}_NOT_FOUND",
             message=message or f"{resource} not found.",
@@ -98,7 +97,7 @@ class BadRequestError(VoltEZError):
         self,
         message: str = "Invalid request.",
         code: str = "BAD_REQUEST",
-        field_errors: Optional[list[dict]] = None,
+        field_errors: list[dict] | None = None,
     ):
         super().__init__(
             code=code,
@@ -120,7 +119,8 @@ class SlotUnavailableError(ConflictError):
 
 # --- Exception Handlers ---
 
-def _get_request_id(request: Request) -> Optional[str]:
+
+def _get_request_id(request: Request) -> str | None:
     """Extract request ID from response headers (set by middleware)."""
     return getattr(request.state, "request_id", None)
 
@@ -136,9 +136,9 @@ def register_exception_handlers(app: FastAPI) -> None:
                 code=exc.code,
                 message=exc.message,
                 request_id=_get_request_id(request),
-                field_errors=[
-                    FieldError(**fe) for fe in exc.field_errors
-                ] if exc.field_errors else None,
+                field_errors=[FieldError(**fe) for fe in exc.field_errors]
+                if exc.field_errors
+                else None,
             ).model_dump(exclude_none=True),
         )
 
@@ -148,7 +148,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         for error in exc.errors():
             loc = error.get("loc", ())
             # Skip the first element which is usually "body"
-            field_path = ".".join(str(l) for l in loc[1:]) if len(loc) > 1 else ".".join(str(l) for l in loc)
+            field_path = (
+                ".".join(str(l) for l in loc[1:]) if len(loc) > 1 else ".".join(str(l) for l in loc)
+            )
             field_errors.append(
                 FieldError(field=field_path, message=error.get("msg", "Invalid value"))
             )

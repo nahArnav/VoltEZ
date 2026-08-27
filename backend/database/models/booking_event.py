@@ -22,21 +22,13 @@ class BookingEvent(Base):
         UUID(as_uuid=True), ForeignKey("app.bookings.id", ondelete="CASCADE"), nullable=False
     )
 
-    old_status: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
-    )
+    old_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
-    new_status: Mapped[str] = mapped_column(
-        String(50), nullable=False
-    )
+    new_status: Mapped[str] = mapped_column(String(50), nullable=False)
 
-    actor: Mapped[str] = mapped_column(
-        String(255), nullable=False
-    )
+    actor: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    metadata_: Mapped[dict | None] = mapped_column(
-        "metadata", JSON, nullable=True
-    )
+    metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

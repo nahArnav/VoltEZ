@@ -7,9 +7,9 @@ Create Date: 2026-08-26 14:40:00.000000
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision: str = "20260826a001"
 down_revision: tuple[str, str] = ("27e2cea710ae", "314159265358")

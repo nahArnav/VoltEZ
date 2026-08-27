@@ -12,15 +12,15 @@ from database.base_class import Base
 class Business(Base):
     __tablename__ = "businesses"
     __table_args__ = (
-    CheckConstraint(
-        "verification_status IN ('unverified', 'pending', 'verified', 'rejected')",
-        name="ck_business_verification_status",
-    ),
-    CheckConstraint(
-        "deleted_at IS NULL OR deleted_at >= created_at",
-        name="ck_business_deleted_at_after_created_at",
-    ),
-    {"schema": "app"},
+        CheckConstraint(
+            "verification_status IN ('unverified', 'pending', 'verified', 'rejected')",
+            name="ck_business_verification_status",
+        ),
+        CheckConstraint(
+            "deleted_at IS NULL OR deleted_at >= created_at",
+            name="ck_business_deleted_at_after_created_at",
+        ),
+        {"schema": "app"},
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -30,15 +30,15 @@ class Business(Base):
     )
 
     owner_id: Mapped[uuid.UUID] = mapped_column(
-    UUID(as_uuid=True),
-    ForeignKey("app.users.id"),
-    nullable=False,
+        UUID(as_uuid=True),
+        ForeignKey("app.users.id"),
+        nullable=False,
     )
 
     zone_id: Mapped[uuid.UUID] = mapped_column(
-    UUID(as_uuid=True),
-    ForeignKey("app.zones.id"),
-    nullable=False,
+        UUID(as_uuid=True),
+        ForeignKey("app.zones.id"),
+        nullable=False,
     )
 
     name: Mapped[str] = mapped_column(

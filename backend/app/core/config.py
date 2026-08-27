@@ -64,7 +64,9 @@ class Settings(BaseSettings):
         return self
 
     # This tells Pydantic to read from .env or backend/.env file
-    model_config = SettingsConfigDict(env_file=(".env", "backend/.env"), env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "backend/.env"), env_file_encoding="utf-8", extra="ignore"
+    )
 
 
 # Create a global instance of the settings to use throughout the app

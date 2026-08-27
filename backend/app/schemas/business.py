@@ -1,13 +1,15 @@
-from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
 from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 # Shared properties
 class BusinessBase(BaseModel):
     name: str
     category: str = Field(description="e.g., mall, office, apartment")
-    address_text: Optional[str] = None
+    address_text: str | None = None
+
 
 # Properties to receive via API on creation
 class BusinessCreate(BusinessBase):
@@ -16,13 +18,15 @@ class BusinessCreate(BusinessBase):
     latitude: float = Field(..., ge=-90.0, le=90.0)
     longitude: float = Field(..., ge=-180.0, le=180.0)
 
+
 # Properties to receive via API on update
 class BusinessUpdate(BaseModel):
-    name: Optional[str] = None
-    category: Optional[str] = None
-    address_text: Optional[str] = None
-    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
+    name: str | None = None
+    category: str | None = None
+    address_text: str | None = None
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+
 
 # Properties to return to client
 class BusinessResponse(BusinessBase):
@@ -31,9 +35,9 @@ class BusinessResponse(BusinessBase):
     verification_status: str
     created_at: datetime
     updated_at: datetime
-    
+
     # We will populate these from the PostGIS location column in the Service layer
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    latitude: float | None = None
+    longitude: float | None = None
 
     model_config = ConfigDict(from_attributes=True)

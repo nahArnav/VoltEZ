@@ -1,5 +1,7 @@
-import pytest
 from uuid import uuid4
+
+import pytest
+
 
 @pytest.mark.asyncio
 async def test_recommendations_endpoint(client):
@@ -12,12 +14,11 @@ async def test_recommendations_endpoint(client):
         "email": f"recommendation-{uuid4()}@example.com",
         "password": password,
         "name": "Rec Driver",
-        "role": "driver"
+        "role": "driver",
     }
     await client.post("/api/v1/auth/register", json=register_payload)
     login_response = await client.post(
-        "/api/v1/auth/login",
-        data={"username": register_payload["email"], "password": password}
+        "/api/v1/auth/login", data={"username": register_payload["email"], "password": password}
     )
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -30,7 +31,7 @@ async def test_recommendations_endpoint(client):
         "connector_type_ids": [1],
         "max_ac_kw": 7.4,
         "max_dc_kw": 50.0,
-        "estimated_range_km": 461.0
+        "estimated_range_km": 461.0,
     }
     veh_resp = await client.post("/api/v1/vehicles/", json=vehicle_payload, headers=headers)
     assert veh_resp.status_code == 201
@@ -45,13 +46,13 @@ async def test_recommendations_endpoint(client):
         "vehicle_id": vehicle_id,
         "current_soc": 0.2,
         "target_soc": 0.8,
-        "reserve_soc": 0.1
+        "reserve_soc": 0.1,
     }
-    
+
     rec_response = await client.post("/api/v1/recommendations/", json=rec_payload, headers=headers)
     assert rec_response.status_code == 200, rec_response.text
     data = rec_response.json()
     assert "recommendations" in data
-    
+
     # We just ensure the endpoint doesn't crash and returns valid schema
     assert isinstance(data["recommendations"], list)

@@ -183,9 +183,7 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
     _require_foreign_keys(
         tables["route_snapshots"], "request_id", tables["charging_requests"], "request_id"
     )
-    _require_foreign_keys(
-        tables["route_snapshots"], "vehicle_id", tables["vehicles"], "vehicle_id"
-    )
+    _require_foreign_keys(tables["route_snapshots"], "vehicle_id", tables["vehicles"], "vehicle_id")
     candidate_snapshots = tables["route_snapshots"][
         tables["route_snapshots"]["candidate_charger_id"].notna()
     ]
@@ -312,9 +310,7 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
             effective_to = pd.to_datetime(ended_profiles["effective_to"], utc=True)
             effective_from = pd.to_datetime(ended_profiles["effective_from"], utc=True)
             if bool((effective_to <= effective_from).any()):
-                raise DatasetValidationError(
-                    "vehicle energy profile validity interval is invalid"
-                )
+                raise DatasetValidationError("vehicle energy profile validity interval is invalid")
         expected_profile_sources = {"catalogue", "owner_declared", "class_default"}
         if not set(profiles["source"].astype(str)).issubset(expected_profile_sources):
             raise DatasetValidationError("vehicle energy profile source is invalid")
@@ -361,10 +357,7 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
             validate="many_to_one",
         )
         if bool(
-            (
-                request_alignment["trip_id_snapshot"]
-                != request_alignment["trip_id_request"]
-            ).any()
+            (request_alignment["trip_id_snapshot"] != request_alignment["trip_id_request"]).any()
         ):
             raise DatasetValidationError("route snapshot request does not match its trip")
         if bool(tables["trips"]["direct_route_snapshot_id"].isna().any()):
@@ -385,9 +378,7 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         )
 
         direct_snapshots = route_snapshots[route_snapshots["leg_type"] == "destination"]
-        candidate_snapshots = route_snapshots[
-            route_snapshots["leg_type"] == "candidate_charger"
-        ]
+        candidate_snapshots = route_snapshots[route_snapshots["leg_type"] == "candidate_charger"]
         if len(direct_snapshots) != len(tables["trips"]):
             raise DatasetValidationError("each trip must have exactly one destination snapshot")
         if len(candidate_snapshots) != len(tables["trip_charger_options"]):
@@ -404,18 +395,13 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
             validate="one_to_one",
         )
         if bool(
-            (
-                candidate_alignment["charger_id"]
-                != candidate_alignment["candidate_charger_id"]
-            ).any()
+            (candidate_alignment["charger_id"] != candidate_alignment["candidate_charger_id"]).any()
         ):
             raise DatasetValidationError(
                 "charger option and route snapshot reference different chargers"
             )
 
-        if bool(
-            (route_snapshots["requested_at"] > route_snapshots["route_snapshot_at"]).any()
-        ):
+        if bool((route_snapshots["requested_at"] > route_snapshots["route_snapshot_at"]).any()):
             raise DatasetValidationError("route snapshot cannot predate its request")
         if bool((route_snapshots["route_snapshot_at"] >= route_snapshots["expires_at"]).any()):
             raise DatasetValidationError("route snapshot expiry must follow generation")
@@ -431,8 +417,7 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         ):
             raise DatasetValidationError("traffic duration cannot be shorter than normal duration")
         reconciled_traffic_duration = (
-            route_snapshots["normal_duration_minutes"]
-            * route_snapshots["traffic_delay_ratio"]
+            route_snapshots["normal_duration_minutes"] * route_snapshots["traffic_delay_ratio"]
         )
         ratio_rounding_tolerance = (
             0.00051 * (route_snapshots["traffic_delay_ratio"] + 1.0)
@@ -446,11 +431,7 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         ):
             raise DatasetValidationError("route traffic delay ratio does not match durations")
         if bool(
-            (
-                route_snapshots["urban_fraction"]
-                + route_snapshots["highway_fraction"]
-                - 1.0
-            )
+            (route_snapshots["urban_fraction"] + route_snapshots["highway_fraction"] - 1.0)
             .abs()
             .gt(0.00001)
             .any()
@@ -626,9 +607,7 @@ def validate_dataset(config: VoltEZConfig, tables: dict[str, pd.DataFrame]) -> N
         raise DatasetValidationError("waiting-time features use future information")
 
     reliability = tables["reliability_observations"]
-    if not set(reliability["label"].astype(str)).issubset(
-        {"reliable", "unreliable", "unknown"}
-    ):
+    if not set(reliability["label"].astype(str)).issubset({"reliable", "unreliable", "unknown"}):
         raise DatasetValidationError("reliability label has an invalid state")
     if bool((reliability["feature_cutoff"] > reliability["prediction_origin"]).any()):
         raise DatasetValidationError("reliability features use future information")

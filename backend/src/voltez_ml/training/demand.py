@@ -140,9 +140,7 @@ def _metrics(
     return {
         "mae": float(mean_absolute_error(truth, prediction)),
         "rmse": float(mean_squared_error(truth, prediction) ** 0.5),
-        "wape": float(np.abs(truth - prediction).sum() / denominator)
-        if denominator > 0
-        else None,
+        "wape": float(np.abs(truth - prediction).sum() / denominator) if denominator > 0 else None,
         "mean_poisson_deviance": float(mean_poisson_deviance(truth, clipped)),
         "nonzero_mae": float(mean_absolute_error(truth[nonzero], prediction[nonzero]))
         if bool(nonzero.any())
@@ -166,9 +164,7 @@ def _portable_artifact_reference(target: Path, artifact_dir: Path) -> str:
     """Describe an input relative to the artifact so copied repositories remain usable."""
 
     try:
-        return Path(
-            os.path.relpath(target.resolve(), start=artifact_dir.resolve())
-        ).as_posix()
+        return Path(os.path.relpath(target.resolve(), start=artifact_dir.resolve())).as_posix()
     except ValueError:
         # Different Windows drives cannot be expressed relatively. The content hash below
         # still identifies the exact input without leaking a machine-specific absolute path.
@@ -222,9 +218,7 @@ def train_demand_model(
         "settings": asdict(settings),
         "validation": {
             "seasonal_naive": _metrics(validation_y, _seasonal_naive(validation)),
-            "poisson_hist_gradient_boosting": _metrics(
-                validation_y, validation_prediction
-            ),
+            "poisson_hist_gradient_boosting": _metrics(validation_y, validation_prediction),
         },
         "locked_test_unlocked": unlock_test,
         "data_readiness": readiness["models"]["demand"],
@@ -263,9 +257,7 @@ def train_demand_model(
         "model_name": "demand_forecasting",
         "model_version": "v1",
         "created_at": datetime.now(UTC).isoformat(),
-        "feature_suite_manifest": _portable_artifact_reference(
-            suite_manifest_path, output_dir
-        ),
+        "feature_suite_manifest": _portable_artifact_reference(suite_manifest_path, output_dir),
         "feature_suite_manifest_sha256": file_sha256(suite_manifest_path),
         "artifact": {"path": model_path.name, "sha256": file_sha256(model_path)},
         "evaluation_report": {
