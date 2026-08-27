@@ -108,12 +108,14 @@ abstract class SessionWebSocket {
 /// - Server → Client: `{"type": "error", "message": "..."}`
 class LiveSessionWebSocket implements SessionWebSocket {
   LiveSessionWebSocket({
-    required this.baseUrl,
+    this.baseUrl = 'ws://127.0.0.1:8001/api/v1',
+    this.baseUrlGetter,
     required this.userIdGetter,
     required this.tokenGetter,
   });
 
   final String baseUrl;
+  final String Function()? baseUrlGetter;
   final String? Function() userIdGetter;
   final String? Function() tokenGetter;
 
@@ -159,7 +161,8 @@ class LiveSessionWebSocket implements SessionWebSocket {
       if (userId == null || userId.isEmpty || token == null || token.isEmpty) {
         throw StateError('Authenticated WebSocket identity is unavailable.');
       }
-      final uri = Uri.parse('$baseUrl/ws/$userId').replace(
+      final effectiveBaseUrl = baseUrlGetter?.call() ?? baseUrl;
+      final uri = Uri.parse('$effectiveBaseUrl/ws/$userId').replace(
         queryParameters: {'token': token},
       );
       _channel = WebSocketChannel.connect(uri);

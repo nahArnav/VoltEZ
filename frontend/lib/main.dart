@@ -9,20 +9,21 @@ import 'core/providers/session_provider.dart';
 import 'core/providers/business_provider.dart';
 import 'core/network/api_service.dart';
 import 'core/network/booking_api.dart';
+import 'core/network/server_config.dart';
 import 'core/network/session_api.dart';
 import 'core/network/session_websocket.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final api = ApiService();
+  final initialBaseUrl = await ServerConfig.loadSavedBaseUrl();
+  final api = ApiService(baseUrl: initialBaseUrl);
+  final serverConfig = ServerConfig(api: api, initialUrl: initialBaseUrl);
   final auth = AuthProvider(api: api)..restoreSession();
-  const wsBaseUrl = String.fromEnvironment(
-    'WS_BASE_URL',
-    defaultValue: 'ws://127.0.0.1:8000/api/v1',
-  );
+
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider<ServerConfig>.value(value: serverConfig),
         Provider<ApiService>.value(value: api),
         ChangeNotifierProvider<AuthProvider>.value(value: auth),
         ChangeNotifierProvider(
@@ -39,7 +40,7 @@ void main() {
           create: (_) => SessionProvider(
             sessionApi: LiveSessionApi(api),
             webSocket: LiveSessionWebSocket(
-              baseUrl: wsBaseUrl,
+              baseUrlGetter: () => serverConfig.wsBaseUrl,
               userIdGetter: () => auth.user?.id,
               tokenGetter: () => api.token,
             ),

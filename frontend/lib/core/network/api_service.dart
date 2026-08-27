@@ -73,6 +73,12 @@ class ApiService {
 
   Dio get dio => _dio;
 
+  String get baseUrl => _dio.options.baseUrl;
+
+  void setBaseUrl(String newUrl) {
+    _dio.options.baseUrl = newUrl;
+  }
+
   // ─── Token Management ───
 
   String? _token;
