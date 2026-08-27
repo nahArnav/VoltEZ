@@ -18,6 +18,7 @@ def main():
         ("/health/live", "Liveness"),
         ("/health/ready", "Readiness"),
         ("/version", "Version"),
+        ("/api/v1/openapi.json", "OpenAPI contract"),
     ]
 
     passed = 0

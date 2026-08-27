@@ -15,6 +15,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+      # PostGIS initializes a temporary server before starting the final one.
+      # Do not let migrate observe that short-lived server as "healthy".
+      start_period: 20s
 
   redis:
     image: redis:7-alpine
@@ -29,6 +32,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+      start_period: 5s
 
   migrate:
     build:
@@ -42,7 +46,9 @@ services:
       SECRET_KEY: ${SECRET_KEY:-local-development-secret-change-before-deploying}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-voltez}
       REDIS_URL: redis://redis:6379/0
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      # Include both loopback spellings for local Flutter web development.
+      # Production/staging must override this with explicit HTTPS origins.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080}
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_placeholder}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-rzp_secret_placeholder}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-rzp_webhook_secret}
