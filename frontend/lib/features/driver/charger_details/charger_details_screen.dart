@@ -248,7 +248,9 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
             children: [
               _infoChip(
                 Icons.power_rounded,
-                charger.connectors.first == ConnectorType.ccs2 ? 'CCS2' : 'Type 2',
+                charger.connectors.isNotEmpty 
+                    ? (charger.connectors.first == ConnectorType.ccs2 ? 'CCS2' : 'Type 2')
+                    : 'Unknown',
                 AppColors.primary,
               ),
               const SizedBox(width: 8),
