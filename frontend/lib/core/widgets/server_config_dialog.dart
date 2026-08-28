@@ -12,9 +12,7 @@ void showServerConfigModal(BuildContext context) {
   showDialog(
     context: context,
     barrierDismissible: true,
-    builder: (dialogCtx) => _ServerConfigDialog(
-      config: serverConfig,
-    ),
+    builder: (dialogCtx) => _ServerConfigDialog(config: serverConfig),
   );
 }
 
@@ -36,7 +34,8 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
   @override
   void initState() {
     super.initState();
-    final initialUrl = widget.config?.activeUrl ?? 'http://127.0.0.1:8000/api/v1';
+    final initialUrl =
+        widget.config?.activeUrl ?? 'http://127.0.0.1:8000/api/v1';
     _controller = TextEditingController(text: initialUrl);
   }
 
@@ -147,7 +146,10 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
 
               // Active URL status
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
@@ -210,15 +212,20 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                 runSpacing: 8,
                 children: [
                   _PresetCard(
-                    title: 'USB Cable (127.0.0.1:8000)',
-                    subtitle: '⚡ Recommended (Instant & 100% Reliable)',
+                    title: 'USB Cable (ADB reverse)',
+                    subtitle: 'Run scripts/run_phone.sh first',
                     isHighlighted: true,
                     onTap: () => _applyPreset('http://127.0.0.1:8000/api/v1'),
                   ),
                   _PresetCard(
-                    title: 'Host Mac Wi-Fi (10.98.69.20:8000)',
-                    subtitle: 'Requires same Wi-Fi & no router isolation',
-                    onTap: () => _applyPreset('http://10.98.69.20:8000/api/v1'),
+                    title: 'Host Mac Wi-Fi (enter IP)',
+                    subtitle: 'Use your Mac IP; both devices must share Wi-Fi',
+                    onTap: () => setState(() {
+                      _controller.text = 'http://<MAC_IP>:8000/api/v1';
+                      _testResult =
+                          'Replace <MAC_IP> with your Mac LAN address.';
+                      _testSuccess = null;
+                    }),
                   ),
                   _PresetCard(
                     title: 'Android Emulator (10.0.2.2:8000)',
@@ -228,7 +235,9 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                   _PresetCard(
                     title: 'Cloud Staging',
                     subtitle: 'https://voltez-backend.onrender.com/api/v1',
-                    onTap: () => _applyPreset('https://voltez-backend.onrender.com/api/v1'),
+                    onTap: () => _applyPreset(
+                      'https://voltez-backend.onrender.com/api/v1',
+                    ),
                   ),
                 ],
               ),
@@ -255,11 +264,22 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: AppColors.surface,
-                    hintText: 'e.g. 192.168.1.5:8000 or http://...',
-                  hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-                  prefixIcon: const Icon(Icons.link_rounded, color: AppColors.primary, size: 18),
+                  hintText: 'e.g. 192.168.1.5:8000 or http://...',
+                  hintStyle: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.link_rounded,
+                    color: AppColors.primary,
+                    size: 18,
+                  ),
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear, color: AppColors.textMuted, size: 16),
+                    icon: const Icon(
+                      Icons.clear,
+                      color: AppColors.textMuted,
+                      size: 16,
+                    ),
                     onPressed: () => _controller.clear(),
                   ),
                   border: OutlineInputBorder(
@@ -272,9 +292,15 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -288,15 +314,15 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                     color: _testSuccess == true
                         ? AppColors.success.withValues(alpha: 0.12)
                         : (_testSuccess == false
-                            ? AppColors.error.withValues(alpha: 0.12)
-                            : AppColors.surface),
+                              ? AppColors.error.withValues(alpha: 0.12)
+                              : AppColors.surface),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: _testSuccess == true
                           ? AppColors.success.withValues(alpha: 0.4)
                           : (_testSuccess == false
-                              ? AppColors.error.withValues(alpha: 0.4)
-                              : AppColors.border),
+                                ? AppColors.error.withValues(alpha: 0.4)
+                                : AppColors.border),
                     ),
                   ),
                   child: Row(
@@ -305,13 +331,13 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                         _testSuccess == true
                             ? Icons.check_circle_rounded
                             : (_testSuccess == false
-                                ? Icons.error_rounded
-                                : Icons.info_outline_rounded),
+                                  ? Icons.error_rounded
+                                  : Icons.info_outline_rounded),
                         color: _testSuccess == true
                             ? AppColors.success
                             : (_testSuccess == false
-                                ? AppColors.error
-                                : AppColors.textSecondary),
+                                  ? AppColors.error
+                                  : AppColors.textSecondary),
                         size: 16,
                       ),
                       const SizedBox(width: 8),
@@ -322,8 +348,8 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                             color: _testSuccess == true
                                 ? AppColors.success
                                 : (_testSuccess == false
-                                    ? AppColors.error
-                                    : AppColors.textSecondary),
+                                      ? AppColors.error
+                                      : AppColors.textSecondary),
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -367,7 +393,9 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         if (widget.config != null) {
-                          await widget.config!.updateServerUrl(_controller.text);
+                          await widget.config!.updateServerUrl(
+                            _controller.text,
+                          );
                         }
                         if (context.mounted) {
                           Navigator.of(context).pop();
@@ -376,12 +404,18 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                               backgroundColor: AppColors.card,
                               content: Row(
                                 children: [
-                                  const Icon(Icons.check_circle, color: AppColors.success, size: 18),
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: AppColors.success,
+                                    size: 18,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       'Server set to: ${_controller.text}',
-                                      style: const TextStyle(color: AppColors.textPrimary),
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -460,7 +494,9 @@ class _PresetCard extends StatelessWidget {
               Text(
                 title,
                 style: TextStyle(
-                  color: isHighlighted ? AppColors.primary : AppColors.textPrimary,
+                  color: isHighlighted
+                      ? AppColors.primary
+                      : AppColors.textPrimary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),

@@ -70,6 +70,13 @@ echo "  • API Base URL     : $API_URL"
 echo "  • WebSocket URL    : $WS_URL"
 echo "========================================================"
 
+# Ensure environment variables for Android SDK/Java if present
+export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
+if [ -d "$ANDROID_HOME/cmdline-tools/latest/bin" ]; then
+  export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+fi
+
 # Auto configure ADB Reverse Port Forwarding for connected devices
 if command -v adb >/dev/null 2>&1; then
   echo "🔍 Checking connected ADB devices..."
@@ -80,13 +87,6 @@ if command -v adb >/dev/null 2>&1; then
       adb -s "$dev" reverse "tcp:${PORT}" "tcp:${PORT}" 2>/dev/null || true
     done
   fi
-fi
-
-# Ensure environment variables for Android SDK/Java if present
-export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
-export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
-if [ -d "$ANDROID_HOME/cmdline-tools/latest/bin" ]; then
-  export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 fi
 
 cd "$FRONTEND_DIR"

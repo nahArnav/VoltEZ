@@ -24,18 +24,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: _role == null
-              ? _RoleSelect(onSelect: (r) => setState(() => _role = r))
-              : _AuthPanel(
-                  role: _role!,
-                  signUp: _signUp,
-                  onBack: () => setState(() => _role = null),
-                  onMode: (v) => setState(() => _signUp = v),
-                ),
-        ),
-      );
+    backgroundColor: AppColors.background,
+    body: SafeArea(
+      child: _role == null
+          ? _RoleSelect(onSelect: (r) => setState(() => _role = r))
+          : _AuthPanel(
+              role: _role!,
+              signUp: _signUp,
+              onBack: () => setState(() => _role = null),
+              onMode: (v) => setState(() => _signUp = v),
+            ),
+    ),
+  );
 }
 
 class _RoleSelect extends StatelessWidget {
@@ -45,122 +45,132 @@ class _RoleSelect extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-        builder: (_, box) {
-          final heroWidth = math.min(math.max(0.0, box.maxWidth - 48), 360.0);
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: box.maxHeight),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    builder: (_, box) {
+      final heroWidth = math.min(math.max(0.0, box.maxWidth - 48), 360.0);
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: box.maxHeight),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'VOLTEZ',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 38,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 3,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Server Configuration',
-                        icon: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: const Icon(
-                            Icons.dns_rounded,
-                            color: AppColors.primary,
-                            size: 18,
-                          ),
-                        ),
-                        onPressed: () => showServerConfigModal(context),
-                      ),
-                    ],
-                  ),
                   const Text(
-                    'INTELLIGENT EV CHARGING NETWORK',
-                    style: _micro,
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: SizedBox(
-                      width: heroWidth,
-                      child: const HolographicEv(progress: .62, compact: true),
+                    'VOLTEZ',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 38,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 3,
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  Text('Choose your access', style: AppTypography.displaySmall),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'A private, connected energy experience.',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 22),
-                  _AccessCard(
-                    icon: Icons.person_outline_rounded,
-                    title: 'Driver access',
-                    detail: 'Find and use intelligent charging.',
-                    color: AppColors.primary,
-                    onTap: () => onSelect(AccountRole.driver),
-                  ),
-                  const SizedBox(height: 12),
-                  _AccessCard(
-                    icon: Icons.business_center_outlined,
-                    title: 'Business owner',
-                    detail: 'Manage chargers, fleet and insights.',
-                    color: AppColors.success,
-                    onTap: () => onSelect(AccountRole.owner),
-                  ),
-                  const SizedBox(height: 24),
-                  Center(
-                    child: InkWell(
-                      onTap: () => showServerConfigModal(context),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.dns_outlined, size: 14, color: AppColors.primary),
-                            const SizedBox(width: 8),
-                            Consumer<ServerConfig>(
-                              builder: (_, cfg, _) => Text(
-                                cfg.activeUrl.replaceFirst('http://', '').replaceFirst('/api/v1', ''),
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.tune_rounded, size: 14, color: AppColors.textMuted),
-                          ],
-                        ),
+                  IconButton(
+                    tooltip: 'Server Configuration',
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Icon(
+                        Icons.dns_rounded,
+                        color: AppColors.primary,
+                        size: 18,
                       ),
                     ),
+                    onPressed: () => showServerConfigModal(context),
                   ),
-                  const SizedBox(height: 12),
                 ],
               ),
-            ),
-          );
-        },
+              const Text('INTELLIGENT EV CHARGING NETWORK', style: _micro),
+              const SizedBox(height: 12),
+              Center(
+                child: SizedBox(
+                  width: heroWidth,
+                  child: const HolographicEv(progress: .62, compact: true),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text('Choose your access', style: AppTypography.displaySmall),
+              const SizedBox(height: 8),
+              const Text(
+                'A private, connected energy experience.',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 22),
+              _AccessCard(
+                icon: Icons.person_outline_rounded,
+                title: 'Driver access',
+                detail: 'Find and use intelligent charging.',
+                color: AppColors.primary,
+                onTap: () => onSelect(AccountRole.driver),
+              ),
+              const SizedBox(height: 12),
+              _AccessCard(
+                icon: Icons.business_center_outlined,
+                title: 'Business owner',
+                detail: 'Manage chargers, fleet and insights.',
+                color: AppColors.success,
+                onTap: () => onSelect(AccountRole.owner),
+              ),
+              const SizedBox(height: 24),
+              Center(
+                child: InkWell(
+                  onTap: () => showServerConfigModal(context),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.dns_outlined,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Consumer<ServerConfig>(
+                          builder: (_, cfg, _) => Text(
+                            cfg.activeUrl
+                                .replaceFirst('http://', '')
+                                .replaceFirst('/api/v1', ''),
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.tune_rounded,
+                          size: 14,
+                          color: AppColors.textMuted,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
       );
+    },
+  );
 }
 
 class _AccessCard extends StatelessWidget {
@@ -179,36 +189,33 @@ class _AccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext c) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: color.withValues(alpha: .38)),
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: .38)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppTypography.headlineSmall),
+                const SizedBox(height: 3),
+                Text(detail, style: AppTypography.bodySmall),
+              ],
+            ),
           ),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: AppTypography.headlineSmall),
-                    const SizedBox(height: 3),
-                    Text(
-                      detail,
-                      style: AppTypography.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.arrow_forward_rounded, color: color),
-            ],
-          ),
-        ),
-      );
+          Icon(Icons.arrow_forward_rounded, color: color),
+        ],
+      ),
+    ),
+  );
 }
 
 class _AuthPanel extends StatefulWidget {
@@ -261,6 +268,13 @@ class _AuthPanelState extends State<_AuthPanel> {
 
     if (!success) {
       final err = auth.error ?? 'Authentication failed';
+      final normalizedError = err.toLowerCase();
+      final isConnectionError =
+          normalizedError.contains('timeout') ||
+          normalizedError.contains('socket') ||
+          normalizedError.contains('connection') ||
+          normalizedError.contains('network') ||
+          normalizedError.contains('connection refused');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.card,
@@ -283,10 +297,13 @@ class _AuthPanelState extends State<_AuthPanel> {
               ),
               const SizedBox(height: 2),
               Text(
-                err.contains('Timeout') || err.contains('Socket') || err.contains('connection')
-                    ? 'Cannot reach server. Tap below to switch to USB Cable (127.0.0.1) or check IP.'
+                isConnectionError
+                    ? 'Cannot reach the API. For USB, launch scripts/run_phone.sh so ADB reverse forwarding is configured; otherwise enter your Mac LAN IP in Server settings.'
                     : err,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -302,7 +319,9 @@ class _AuthPanelState extends State<_AuthPanel> {
 
     if (auth.currentRole != widget.role) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This account belongs to a different role.')),
+        const SnackBar(
+          content: Text('This account belongs to a different role.'),
+        ),
       );
       await auth.logout();
       return;
@@ -318,8 +337,9 @@ class _AuthPanelState extends State<_AuthPanel> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final accent =
-        widget.role == AccountRole.owner ? AppColors.success : AppColors.primary;
+    final accent = widget.role == AccountRole.owner
+        ? AppColors.success
+        : AppColors.primary;
 
     return LayoutBuilder(
       builder: (_, box) => SingleChildScrollView(
@@ -334,8 +354,10 @@ class _AuthPanelState extends State<_AuthPanel> {
                 children: [
                   IconButton(
                     onPressed: widget.onBack,
-                    icon: const Icon(Icons.arrow_back_rounded,
-                        color: AppColors.textPrimary),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   IconButton(
                     tooltip: 'Server Configuration',
@@ -389,8 +411,12 @@ class _AuthPanelState extends State<_AuthPanel> {
                       _field(_name, 'Full Name', Icons.person_outline),
                       const SizedBox(height: 12),
                     ],
-                    _field(_email, 'Email Address', Icons.email_outlined,
-                        email: true),
+                    _field(
+                      _email,
+                      'Email Address',
+                      Icons.email_outlined,
+                      email: true,
+                    ),
                     const SizedBox(height: 12),
                     _field(
                       _password,
@@ -457,7 +483,10 @@ class _AuthPanelState extends State<_AuthPanel> {
                   onTap: () => showServerConfigModal(context),
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(20),
@@ -466,11 +495,17 @@ class _AuthPanelState extends State<_AuthPanel> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.dns_outlined, size: 14, color: AppColors.primary),
+                        const Icon(
+                          Icons.dns_outlined,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 8),
                         Consumer<ServerConfig>(
                           builder: (_, cfg, _) => Text(
-                            cfg.activeUrl.replaceFirst('http://', '').replaceFirst('/api/v1', ''),
+                            cfg.activeUrl
+                                .replaceFirst('http://', '')
+                                .replaceFirst('/api/v1', ''),
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 12,
@@ -479,7 +514,11 @@ class _AuthPanelState extends State<_AuthPanel> {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Icon(Icons.tune_rounded, size: 14, color: AppColors.textMuted),
+                        const Icon(
+                          Icons.tune_rounded,
+                          size: 14,
+                          color: AppColors.textMuted,
+                        ),
                       ],
                     ),
                   ),
@@ -503,20 +542,20 @@ class _AuthPanelState extends State<_AuthPanel> {
   }
 
   Widget _mode(bool signup, Color accent) => OutlinedButton(
-        onPressed: () => widget.onMode(signup),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: widget.signUp == signup
-              ? accent.withValues(alpha: 0.13)
-              : Colors.transparent,
-          foregroundColor: widget.signUp == signup ? accent : AppColors.textMuted,
-          side: BorderSide(
-            color: widget.signUp == signup
-                ? accent
-                : AppColors.textMuted.withValues(alpha: 0.35),
-          ),
-        ),
-        child: Text(signup ? 'SIGN UP' : 'LOG IN'),
-      );
+    onPressed: () => widget.onMode(signup),
+    style: OutlinedButton.styleFrom(
+      backgroundColor: widget.signUp == signup
+          ? accent.withValues(alpha: 0.13)
+          : Colors.transparent,
+      foregroundColor: widget.signUp == signup ? accent : AppColors.textMuted,
+      side: BorderSide(
+        color: widget.signUp == signup
+            ? accent
+            : AppColors.textMuted.withValues(alpha: 0.35),
+      ),
+    ),
+    child: Text(signup ? 'SIGN UP' : 'LOG IN'),
+  );
 
   Widget _field(
     TextEditingController c,
@@ -525,28 +564,25 @@ class _AuthPanelState extends State<_AuthPanel> {
     bool email = false,
     bool secret = false,
     Widget? trail,
-  }) =>
-      TextFormField(
-        controller: c,
-        obscureText: secret,
-        keyboardType: email ? TextInputType.emailAddress : null,
-        style: const TextStyle(color: AppColors.textPrimary),
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: AppColors.primary),
-          suffixIcon: trail,
-          hintText: text,
-          hintStyle: const TextStyle(color: AppColors.textMuted),
-          filled: true,
-          fillColor: AppColors.background,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: AppColors.primary.withValues(alpha: .25),
-            ),
-          ),
-        ),
-        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-      );
+  }) => TextFormField(
+    controller: c,
+    obscureText: secret,
+    keyboardType: email ? TextInputType.emailAddress : null,
+    style: const TextStyle(color: AppColors.textPrimary),
+    decoration: InputDecoration(
+      prefixIcon: Icon(icon, color: AppColors.primary),
+      suffixIcon: trail,
+      hintText: text,
+      hintStyle: const TextStyle(color: AppColors.textMuted),
+      filled: true,
+      fillColor: AppColors.background,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: .25)),
+      ),
+    ),
+    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+  );
 }
 
 const _micro = TextStyle(
