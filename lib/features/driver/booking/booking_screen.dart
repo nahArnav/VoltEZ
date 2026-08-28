@@ -163,14 +163,11 @@ class _BookingScreenState extends State<BookingScreen> {
         ? AppColors.error
         : AppColors.warning;
 
-    return Container(
+    return GlassCard(
+      accentColor: AppColors.primary,
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
+      borderRadius: 14,
       child: Row(
         children: [
           Icon(
@@ -202,10 +199,12 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
           ),
           if (!isHolding)
-            PrimaryButton(
-              text: 'CONTINUE',
-              onPressed: () => booking.proceedToPayment(),
-              height: 44,
+            Flexible(
+              child: PrimaryButton(
+                text: 'CONTINUE',
+                onPressed: () => booking.proceedToPayment(),
+                height: 44,
+              ),
             ),
         ],
       ),
@@ -305,13 +304,10 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _buildChargerInfoBar(Charger charger) {
-    return Container(
+    return GlassCard(
+      accentColor: AppColors.primary,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
+      borderRadius: 14,
       child: Row(
         children: [
           Container(
@@ -332,7 +328,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 Text(charger.name, style: AppTypography.headlineSmall),
                 Text(
                   '${charger.powerKw.round()} kW · '
-                  '${charger.connectors.first == ConnectorType.ccs2 ? "CCS2" : "Type 2"} · '
+                  '${charger.connectorTypes.isNotEmpty ? charger.connectorTypes.first : "CCS2"} · '
                   '₹${charger.pricePerKwh.round()}/kWh',
                   style: AppTypography.bodySmall,
                 ),

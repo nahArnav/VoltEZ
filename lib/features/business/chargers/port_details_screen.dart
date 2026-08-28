@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/colors.dart';
-
-const bg = AppColors.background;
-const panel = AppColors.card;
-const cyan = AppColors.primary;
-const green = AppColors.success;
-const amber = AppColors.warning;
-const red = AppColors.error;
+import '../../../core/theme/typography.dart';
+import '../../../shared/widgets/widgets.dart';
 
 class PortDetailsScreen extends StatefulWidget {
   final String chargerName;
@@ -51,30 +46,38 @@ class _PortDetailsScreenState extends State<PortDetailsScreen> {
   Color getColor(String status) {
     switch (status) {
       case "available":
-        return green;
+        return AppColors.success;
       case "occupied":
-        return cyan;
+        return AppColors.marigold;
       case "offline":
-        return red;
+        return AppColors.error;
       default:
-        return amber;
+        return AppColors.warning;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: AppColors.background,
         elevation: 0,
+        foregroundColor: AppColors.textPrimary,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Port Details"),
+            Text(
+              "Port Details",
+              style: AppTypography.headlineMedium.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
             Text(
               widget.chargerName,
-              style: const TextStyle(fontSize: 12, color: Colors.white70),
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -83,12 +86,9 @@ class _PortDetailsScreenState extends State<PortDetailsScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Container(
+            GlassCard(
               padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: panel,
-                borderRadius: BorderRadius.circular(18),
-              ),
+              borderRadius: 18,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: const [
@@ -105,16 +105,10 @@ class _PortDetailsScreenState extends State<PortDetailsScreen> {
                 itemBuilder: (context, index) {
                   final port = ports[index];
 
-                  return Container(
+                  return GlassCard(
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: panel,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: getColor(port["status"]).withValues(alpha: .35),
-                      ),
-                    ),
+                    borderRadius: 18,
                     child: Column(
                       children: [
                         Row(
@@ -124,11 +118,11 @@ class _PortDetailsScreenState extends State<PortDetailsScreen> {
                               width: 52,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: getColor(port["status"]).withValues(alpha: .15),
+                                color: getColor(port["status"]).withValues(alpha: .12),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.power,
-                                color: getColor(port["status"]),
+                                color: AppColors.onPrimary,
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -138,17 +132,15 @@ class _PortDetailsScreenState extends State<PortDetailsScreen> {
                                 children: [
                                   Text(
                                     "Port ${port["id"]}",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
+                                    style: AppTypography.headlineSmall.copyWith(
+                                      color: AppColors.onPrimary,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     "${port["connector"]} • ${port["power"]} kW",
-                                    style: const TextStyle(
-                                      color: Colors.white60,
+                                    style: AppTypography.bodySmall.copyWith(
+                                      color: AppColors.onPrimary.withValues(alpha: 0.7),
                                     ),
                                   ),
                                 ],
@@ -158,15 +150,13 @@ class _PortDetailsScreenState extends State<PortDetailsScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: getColor(port["status"]).withValues(alpha: .15),
+                                color: AppColors.onPrimary.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(30),
                               ),
                               child: Text(
                                 port["status"].toUpperCase(),
-                                style: TextStyle(
-                                  color: getColor(port["status"]),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
+                                style: AppTypography.labelMedium.copyWith(
+                                  color: AppColors.onPrimary,
                                 ),
                               ),
                             )
@@ -179,11 +169,14 @@ class _PortDetailsScreenState extends State<PortDetailsScreen> {
                               child: OutlinedButton(
                                 onPressed: () {},
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: cyan),
+                                  side: BorderSide(color: AppColors.primary),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   "Schedule",
-                                  style: TextStyle(color: cyan),
+                                  style: TextStyle(color: AppColors.primary),
                                 ),
                               ),
                             ),
@@ -199,8 +192,11 @@ class _PortDetailsScreenState extends State<PortDetailsScreen> {
                                   });
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: cyan,
-                                  foregroundColor: Colors.black,
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: AppColors.onPrimary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
                                 ),
                                 child: Text(
                                   port["status"] == "offline"
@@ -236,16 +232,16 @@ class _TopMetric extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
+          style: AppTypography.displaySmall.copyWith(
+            color: AppColors.onPrimary,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(color: Colors.white60),
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.onPrimary.withValues(alpha: 0.7),
+          ),
         ),
       ],
     );

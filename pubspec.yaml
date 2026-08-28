@@ -28,8 +28,9 @@ dependencies:
   geolocator: ^14.0.3
   geocoding: ^4.0.0
 
-  # Maps
-  google_maps_flutter: ^2.18.0
+  # Maps (OpenStreetMap — no API key required)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
   # Payments
   razorpay_flutter: ^1.4.0
@@ -46,3 +47,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    - family: Outfit
+      fonts:
+        - asset: assets/fonts/Outfit-Regular.ttf
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf

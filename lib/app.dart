@@ -14,18 +14,18 @@ class VoltezApp extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final router = AppRouter(auth).router;
 
-    // Set system UI overlay style for dark theme
+    // Set system UI overlay style for light theme
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
       systemNavigationBarColor: AppColors.card,
-      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarIconBrightness: Brightness.dark,
     ));
 
     return MaterialApp.router(
       title: 'VoltEZ',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
+      theme: AppTheme.light,
       routerConfig: router,
     );
   }

@@ -16,3 +16,4 @@ export 'loading_widget.dart';
 export 'error_display.dart';
 export 'app_bottom_nav_bar.dart';
 export 'volt_app_bar.dart';
+export 'glass_card.dart';

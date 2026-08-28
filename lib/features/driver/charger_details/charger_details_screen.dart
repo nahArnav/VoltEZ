@@ -169,13 +169,10 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
 
   // ─── Status Header ───
   Widget _buildStatusHeader(Charger charger, Color statusColor) {
-    return Container(
+    return GlassCard(
+      accentColor: AppColors.primary,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-      ),
+      borderRadius: 18,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -186,14 +183,14 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
                 height: 12,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: statusColor,
+                  color: AppColors.onPrimary,
                 ),
               ),
               const SizedBox(width: 10),
               Text(
                 _statusLabel(charger.status),
                 style: AppTypography.headlineSmall
-                    .copyWith(color: statusColor),
+                    .copyWith(color: AppColors.onPrimary),
               ),
               const Spacer(),
               _infoChip(
@@ -204,20 +201,22 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _infoChip(
                 Icons.power_rounded,
-                charger.connectors.first == ConnectorType.ccs2 ? 'CCS2' : 'Type 2',
+                charger.connectorTypes.isNotEmpty
+                    ? charger.connectorTypes.first
+                    : 'CCS2',
                 AppColors.primary,
               ),
-              const SizedBox(width: 8),
               _infoChip(
                 Icons.bolt_rounded,
                 '${charger.powerKw.round()} kW',
                 AppColors.secondary,
               ),
-              const SizedBox(width: 8),
               _infoChip(
                 Icons.currency_rupee,
                 '₹${charger.pricePerKwh.round()}/kWh',
@@ -306,13 +305,10 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Connector', style: AppTypography.headlineMedium),
-        const SizedBox(height: 12),
-        Container(
+        const SizedBox(height: 12),          GlassCard(
+          accentColor: AppColors.primary,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(14),
-          ),
+          borderRadius: 14,
           child: Row(
             children: [
               Container(
@@ -395,9 +391,8 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: AppColors.card,
+                color: AppColors.onPrimary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -426,12 +421,10 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
 
   // ─── Rating Card ───
   Widget _buildRatingCard(Charger charger) {
-    return Container(
+    return GlassCard(
+      accentColor: AppColors.primary,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(18),
-      ),
+      borderRadius: 18,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -493,9 +486,10 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
     return Row(
       children: [
         SizedBox(
-          width: 70,
+          width: 60,
           child: Text(label, style: AppTypography.labelSmall),
         ),
+        const SizedBox(width: 8),
         Expanded(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(3),
@@ -508,8 +502,14 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Text('${(value * 100).round()}%',
-            style: AppTypography.labelSmall.copyWith(color: color)),
+        SizedBox(
+          width: 32,
+          child: Text(
+            '${(value * 100).round()}%',
+            style: AppTypography.labelSmall.copyWith(color: color),
+            textAlign: TextAlign.end,
+          ),
+        ),
       ],
     );
   }
@@ -518,12 +518,10 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
   Widget _buildHostInfo(Charger charger) {
     if (charger.businessId == 0) return const SizedBox.shrink();
 
-    return Container(
+    return GlassCard(
+      accentColor: AppColors.primary,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(14),
-      ),
+      borderRadius: 14,
       child: Row(
         children: [
           Container(
@@ -558,14 +556,10 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
 
   // ─── Trust Section ───
   Widget _buildTrustSection() {
-    return Container(
+    return GlassCard(
+      accentColor: AppColors.primary,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border:
-            Border.all(color: AppColors.success.withValues(alpha: 0.2)),
-      ),
+      borderRadius: 18,
       child: Row(
         children: [
           const Icon(Icons.verified_rounded,

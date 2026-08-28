@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../../core/theme/colors.dart';
+import '../../../core/theme/typography.dart';
+import '../../../core/auth/auth_provider.dart';
+import '../../../shared/widgets/glass_card.dart';
 import '../chargers/charger_management_screen.dart';
-
-// Shared Voltez AI-mobility command-centre palette.
-const _ivory = Color(0xFF05090E);
-const _ink = Color(0xFFF1F8FF);
-const _forest = Color(0xFF50F5FF);
-const _rust = Color(0xFFC9FF58);
-const _fadeInk = Color(0xFF7990A1);
-const _panel = Color(0xFF0D1821);
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,7 +20,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _ivory,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
@@ -60,13 +58,13 @@ class _DashboardHome extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(24, 22, 24, 30),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               _buildHeader(),
               const SizedBox(height: 34),
 
-              const _SectionLabel(
+              _SectionLabel(
                 number: '01',
                 title: 'TODAY AT A GLANCE',
               ),
@@ -77,18 +75,18 @@ class _DashboardHome extends StatelessWidget {
 
               const SizedBox(height: 34),
 
-              const _SectionLabel(
+              _SectionLabel(
                 number: '02',
                 title: 'YOUR CHARGERS',
               ),
 
               const SizedBox(height: 16),
 
-              _buildChargers(),
+              _buildChargers(context),
 
               const SizedBox(height: 34),
 
-              const _SectionLabel(
+              _SectionLabel(
                 number: '03',
                 title: "TODAY'S BOOKINGS",
               ),
@@ -99,7 +97,7 @@ class _DashboardHome extends StatelessWidget {
 
               const SizedBox(height: 34),
 
-              const _SectionLabel(
+              _SectionLabel(
                 number: '04',
                 title: 'NETWORK UTILIZATION',
               ),
@@ -128,33 +126,15 @@ class _DashboardHome extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'VOLTEZ / BUSINESS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2.5,
-                  color: _forest,
-                ),
-              ),
+              Text('VOLTEZ / BUSINESS', style: AppTypography.sectionLabel.copyWith(
+                color: AppColors.primary,
+              )),
               const SizedBox(height: 12),
-              const Text(
-                'Good evening,',
-                style: TextStyle(
-                  fontSize: 17,
-                  color: _fadeInk,
-                ),
-              ),
+              Text('Good evening,', style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              )),
               const SizedBox(height: 2),
-              const Text(
-                'ABC Motors.',
-                style: TextStyle(
-                  fontSize: 31,
-                  fontWeight: FontWeight.w800,
-                  color: _ink,
-                  height: 1,
-                ),
-              ),
+              Text('ABC Motors.', style: AppTypography.displaySmall),
             ],
           ),
         ),
@@ -163,14 +143,10 @@ class _DashboardHome extends StatelessWidget {
           width: 46,
           height: 46,
           decoration: BoxDecoration(
-            color: _forest,
+            color: AppColors.primary,
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Icon(
-            Icons.notifications_none_rounded,
-            color: Colors.white,
-            size: 23,
-          ),
+          child: const Icon(Icons.notifications_none_rounded, color: AppColors.onPrimary, size: 23),
         ),
       ],
     );
@@ -185,7 +161,7 @@ class _DashboardHome extends StatelessWidget {
               child: _StatBlock(
                 value: '08',
                 label: 'ACTIVE\nCHARGERS',
-                accent: _forest,
+                accent: AppColors.primary,
               ),
             ),
             const SizedBox(width: 12),
@@ -193,7 +169,7 @@ class _DashboardHome extends StatelessWidget {
               child: _StatBlock(
                 value: '24',
                 label: 'BOOKINGS\nTODAY',
-                accent: _rust,
+                accent: AppColors.marigold,
               ),
             ),
           ],
@@ -205,7 +181,7 @@ class _DashboardHome extends StatelessWidget {
               child: _StatBlock(
                 value: '₹18.4K',
                 label: 'REVENUE\nTODAY',
-                accent: _ink,
+                accent: AppColors.secondary,
               ),
             ),
             const SizedBox(width: 12),
@@ -213,7 +189,7 @@ class _DashboardHome extends StatelessWidget {
               child: _StatBlock(
                 value: '76%',
                 label: 'NETWORK\nUTILIZATION',
-                accent: _forest,
+                accent: AppColors.primary,
               ),
             ),
           ],
@@ -222,64 +198,69 @@ class _DashboardHome extends StatelessWidget {
     );
   }
 
-  Widget _buildChargers() {
-    return Column(
-      children: [
-        const _ChargerRow(
-          name: 'Charger 01',
-          type: 'DC FAST / 60 kW',
-          status: 'AVAILABLE',
-          statusColor: _forest,
-        ),
-        const Divider(height: 1),
-        const _ChargerRow(
-          name: 'Charger 02',
-          type: 'AC / 22 kW',
-          status: 'IN USE',
-          statusColor: _rust,
-        ),
-        const Divider(height: 1),
-        const _ChargerRow(
-          name: 'Charger 03',
-          type: 'DC FAST / 120 kW',
-          status: 'OFFLINE',
-          statusColor: _fadeInk,
-        ),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.add_rounded, size: 19),
-            label: const Text('ADD CHARGER'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _forest,
-              side: const BorderSide(
-                color: _forest,
-                width: 1.3,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
+  Widget _buildChargers(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      borderRadius: 16,
+      child: Column(
+        children: [
+          _ChargerRow(
+            name: 'Charger 01',
+            type: 'DC FAST / 60 kW',
+            status: 'AVAILABLE',
+            statusColor: AppColors.success,
+          ),
+          const Divider(height: 1, color: AppColors.onPrimary),
+          _ChargerRow(
+            name: 'Charger 02',
+            type: 'AC / 22 kW',
+            status: 'IN USE',
+            statusColor: AppColors.marigold,
+          ),
+          const Divider(height: 1, color: AppColors.onPrimary),
+          _ChargerRow(
+            name: 'Charger 03',
+            type: 'DC FAST / 120 kW',
+            status: 'OFFLINE',
+            statusColor: AppColors.onPrimary.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ChargerManagementScreen()),
+                );
+              },
+              icon: const Icon(Icons.add_rounded, size: 19),
+              label: const Text('ADD CHARGER'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(
+                  color: AppColors.primary,
+                  width: 1.3,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: AppTypography.labelLarge.copyWith(
+                  color: AppColors.primary,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildBookings() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      borderRadius: 16,
       child: Column(
         children: const [
           _BookingRow(
@@ -288,14 +269,14 @@ class _DashboardHome extends StatelessWidget {
             charger: 'Charger 01',
             status: 'CONFIRMED',
           ),
-          Divider(height: 1),
+          Divider(height: 1, color: AppColors.onPrimary),
           _BookingRow(
             time: '12:30',
             customer: 'MG ZS EV',
             charger: 'Charger 02',
             status: 'UPCOMING',
           ),
-          Divider(height: 1),
+          Divider(height: 1, color: AppColors.onPrimary),
           _BookingRow(
             time: '15:00',
             customer: 'Hyundai Ioniq 5',
@@ -308,12 +289,10 @@ class _DashboardHome extends StatelessWidget {
   }
 
   Widget _buildUtilization() {
-    return Container(
+    return GlassCard(
+      accentColor: AppColors.primary,
       padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-      decoration: BoxDecoration(
-        color: _forest,
-        borderRadius: BorderRadius.circular(18),
-      ),
+      borderRadius: 18,
       child: Column(
         children: [
           Row(
@@ -363,15 +342,10 @@ class _DashboardHome extends StatelessWidget {
   }
 
   Widget _buildInsight() {
-    return Container(
+    return GlassCard(
+      accentColor: AppColors.primary,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: _forest.withValues(alpha: 0.15),
-        ),
-      ),
+      borderRadius: 18,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -379,45 +353,35 @@ class _DashboardHome extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: _rust,
+              color: AppColors.onPrimary.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.bolt_rounded,
-              color: Colors.white,
-            ),
+            child: Icon(Icons.bolt_rounded, color: AppColors.onPrimary),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'VOLTEZ INSIGHT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
-                    color: _rust,
+                  style: AppTypography.labelMedium.copyWith(
+                    color: AppColors.onPrimary.withValues(alpha: 0.7),
                   ),
                 ),
-                SizedBox(height: 7),
+                const SizedBox(height: 7),
                 Text(
                   'Charger 03 is underutilized between 11 AM – 3 PM.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    height: 1.35,
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.onPrimary,
                     fontWeight: FontWeight.w600,
-                    color: _ink,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   'View recommendation →',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: _forest,
+                  style: AppTypography.labelMedium.copyWith(
+                    color: AppColors.onPrimary.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -446,31 +410,13 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(
-          number,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: _rust,
-          ),
-        ),
+        Text(number, style: AppTypography.sectionNumber),
         const SizedBox(width: 10),
         Expanded(
-          child: Container(
-            height: 1,
-            color: _ink.withValues(alpha: 0.15),
-          ),
+          child: Container(height: 1, color: AppColors.border),
         ),
         const SizedBox(width: 10),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.4,
-            color: _fadeInk,
-          ),
-        ),
+        Text(title, style: AppTypography.sectionLabel),
       ],
     );
   }
@@ -489,44 +435,38 @@ class _StatBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 112,
+    return GlassCard(
+      accentColor: AppColors.primary,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            width: 28,
-            height: 4,
-            decoration: BoxDecoration(
-              color: accent,
-              borderRadius: BorderRadius.circular(2),
+      borderRadius: 16,
+      child: SizedBox(
+        height: 80,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              width: 28,
+              height: 4,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 25,
-              fontWeight: FontWeight.w800,
-              color: _ink,
+            Text(
+              value,
+              style: AppTypography.headlineLarge.copyWith(
+                color: AppColors.onPrimary,
+              ),
             ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 9,
-              height: 1.25,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1,
-              color: _fadeInk,
+            Text(
+              label,
+              style: AppTypography.labelSmall.copyWith(
+                color: AppColors.onPrimary.withValues(alpha: 0.6),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -545,26 +485,20 @@ class _ChargerRow extends StatelessWidget {
   final String status;
   final Color statusColor;
 
-  
-
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       child: Row(
         children: [
           Container(
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: _forest.withValues(alpha: 0.1),
+              color: AppColors.onPrimary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.ev_station_rounded,
-              color: _forest,
-              size: 21,
-            ),
+            child: Icon(Icons.ev_station_rounded, color: AppColors.onPrimary, size: 21),
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -573,19 +507,15 @@ class _ChargerRow extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: _ink,
+                  style: AppTypography.headlineSmall.copyWith(
+                    color: AppColors.onPrimary,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   type,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: _fadeInk,
-                    letterSpacing: 0.5,
+                  style: AppTypography.labelSmall.copyWith(
+                    color: AppColors.onPrimary.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -604,10 +534,7 @@ class _ChargerRow extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 status,
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
+                style: AppTypography.labelMedium.copyWith(
                   color: statusColor,
                 ),
               ),
@@ -642,10 +569,8 @@ class _BookingRow extends StatelessWidget {
             width: 50,
             child: Text(
               time,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: _ink,
+              style: AppTypography.headlineSmall.copyWith(
+                color: AppColors.onPrimary,
               ),
             ),
           ),
@@ -656,18 +581,16 @@ class _BookingRow extends StatelessWidget {
               children: [
                 Text(
                   customer,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: _ink,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.onPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   charger,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: _fadeInk,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.onPrimary.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -675,11 +598,8 @@ class _BookingRow extends StatelessWidget {
           ),
           Text(
             status,
-            style: const TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.7,
-              color: _forest,
+            style: AppTypography.labelMedium.copyWith(
+              color: AppColors.onPrimary.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -689,10 +609,7 @@ class _BookingRow extends StatelessWidget {
 }
 
 class _Bar extends StatelessWidget {
-  const _Bar({
-    required this.value,
-    required this.label,
-  });
+  const _Bar({required this.value, required this.label});
 
   final double value;
   final String label;
@@ -758,11 +675,9 @@ class _BottomNav extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: _panel,
+        color: AppColors.card,
         border: Border(
-          top: BorderSide(
-            color: _ink.withValues(alpha: 0.08),
-          ),
+          top: BorderSide(color: AppColors.border),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
@@ -782,7 +697,7 @@ class _BottomNav extends StatelessWidget {
               ),
               decoration: BoxDecoration(
                 color: selected
-                    ? _forest.withValues(alpha: 0.1)
+                    ? AppColors.primary.withValues(alpha: 0.1)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -792,16 +707,14 @@ class _BottomNav extends StatelessWidget {
                   Icon(
                     items[index].$1,
                     size: 20,
-                    color: selected ? _forest : _fadeInk,
+                    color: selected ? AppColors.primary : AppColors.textMuted,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     items[index].$2,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight:
-                          selected ? FontWeight.w800 : FontWeight.w500,
-                      color: selected ? _forest : _fadeInk,
+                    style: AppTypography.labelMedium.copyWith(
+                      color: selected ? AppColors.primary : AppColors.textMuted,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                     ),
                   ),
                 ],
@@ -831,10 +744,12 @@ class _BookingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
         'Bookings',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
+        style: AppTypography.headlineLarge.copyWith(
+          color: AppColors.textPrimary,
+        ),
       ),
     );
   }
@@ -845,10 +760,12 @@ class _AnalyticsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
         'Analytics',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
+        style: AppTypography.headlineLarge.copyWith(
+          color: AppColors.textPrimary,
+        ),
       ),
     );
   }
@@ -859,10 +776,134 @@ class _ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Profile',
-        style: TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.bold),
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          // Avatar
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.3),
+                  AppColors.secondary.withValues(alpha: 0.2),
+                ],
+              ),
+            ),
+            child: Icon(Icons.business_rounded,
+                color: AppColors.primary, size: 44),
+          ),
+          const SizedBox(height: 16),
+          Text('ABC Motors', style: AppTypography.displaySmall),
+          const SizedBox(height: 4),
+          Text('Business Owner', style: AppTypography.bodyMedium),
+          const SizedBox(height: 32),
+
+          // Profile options
+          _profileOption(
+            Icons.business_rounded,
+            'Business Profile',
+            'Manage your business details',
+            () {},
+          ),
+          _profileOption(
+            Icons.ev_station_rounded,
+            'Charger Fleet',
+            'Manage your chargers and ports',
+            () {},
+          ),
+          _profileOption(
+            Icons.receipt_long_rounded,
+            'Earnings',
+            'View revenue and settlements',
+            () {},
+          ),
+          _profileOption(
+            Icons.notifications_outlined,
+            'Notifications',
+            'Manage alerts',
+            () {},
+          ),
+          _profileOption(
+            Icons.help_outline_rounded,
+            'Help & Support',
+            'FAQs, contact us',
+            () {},
+          ),
+          _profileOption(
+            Icons.info_outline_rounded,
+            'About VoltEZ',
+            'Version 1.0.0',
+            () {},
+          ),
+          const SizedBox(height: 16),
+          _profileOption(
+            Icons.logout_rounded,
+            'Sign Out',
+            'Sign out of your account',
+            () async {
+              final auth = context.read<AuthProvider>();
+              await auth.logout();
+              if (context.mounted) context.go('/login');
+            },
+            isDestructive: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileOption(
+      IconData icon, String title, String subtitle, VoidCallback onTap,
+      {bool isDestructive = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isDestructive
+                      ? AppColors.error.withValues(alpha: 0.1)
+                      : AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: isDestructive ? AppColors.error : AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: AppTypography.headlineSmall),
+                    Text(subtitle, style: AppTypography.bodySmall),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded,
+                  color: AppColors.textMuted, size: 16),
+            ],
+          ),
+        ),
       ),
     );
   }

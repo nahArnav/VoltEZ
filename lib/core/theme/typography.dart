@@ -1,143 +1,145 @@
 import 'package:flutter/material.dart';
 import 'colors.dart';
 
-/// VoltEZ Typography
+/// VoltEZ Typography — "Vibrant Professionalism"
+/// Dual-font strategy: Outfit (headlines) + Inter (body/labels)
 /// Both Person 1 and Person 2 MUST use these text styles.
 abstract final class AppTypography {
-  // ─── Font Family ───
-  static const String _fontFamily = 'Inter';
+  // ─── Font Families ───
+  static const String _fontHeadline = 'Outfit';
+  static const String _fontBody = 'Inter';
 
-  // ─── Display / Hero ───
+  // ─── Display / Hero (Outfit) ───
   static const TextStyle displayLarge = TextStyle(
-    fontFamily: _fontFamily,
+    fontFamily: _fontHeadline,
     fontSize: 40,
-    fontWeight: FontWeight.w900,
-    letterSpacing: -0.5,
-    color: AppColors.textPrimary,
-    height: 1.1,
-  );
-
-  static const TextStyle displayMedium = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 32,
-    fontWeight: FontWeight.w800,
-    letterSpacing: -0.3,
-    color: AppColors.textPrimary,
-    height: 1.15,
-  );
-
-  static const TextStyle displaySmall = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 26,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 0,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.02,
     color: AppColors.textPrimary,
     height: 1.2,
   );
 
-  // ─── Headlines ───
-  static const TextStyle headlineLarge = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 22,
-    fontWeight: FontWeight.w800,
+  static const TextStyle displayMedium = TextStyle(
+    fontFamily: _fontHeadline,
+    fontSize: 32,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.02,
     color: AppColors.textPrimary,
-    height: 1.3,
+    height: 1.25,
+  );
+
+  static const TextStyle displaySmall = TextStyle(
+    fontFamily: _fontHeadline,
+    fontSize: 26,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.01,
+    color: AppColors.textPrimary,
+    height: 1.2,
+  );
+
+  // ─── Headlines (Outfit) ───
+  static const TextStyle headlineLarge = TextStyle(
+    fontFamily: _fontHeadline,
+    fontSize: 24,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textPrimary,
+    height: 1.33,
   );
 
   static const TextStyle headlineMedium = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 18,
-    fontWeight: FontWeight.w700,
+    fontFamily: _fontHeadline,
+    fontSize: 20,
+    fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
-    height: 1.3,
+    height: 1.4,
   );
 
   static const TextStyle headlineSmall = TextStyle(
-    fontFamily: _fontFamily,
+    fontFamily: _fontHeadline,
     fontSize: 16,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w600,
     color: AppColors.textPrimary,
-    height: 1.35,
+    height: 1.375,
   );
 
-  // ─── Body ───
+  // ─── Body (Inter) ───
   static const TextStyle bodyLarge = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 16,
-    fontWeight: FontWeight.w500,
+    fontFamily: _fontBody,
+    fontSize: 18,
+    fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
-    height: 1.5,
+    height: 1.56,
   );
 
   static const TextStyle bodyMedium = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 14,
-    fontWeight: FontWeight.w500,
+    fontFamily: _fontBody,
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
     height: 1.5,
   );
 
   static const TextStyle bodySmall = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 12,
-    fontWeight: FontWeight.w500,
+    fontFamily: _fontBody,
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
-    height: 1.4,
+    height: 1.43,
   );
 
-  // ─── Labels / Tags ───
+  // ─── Labels / Tags (Inter, Bold) ───
   static const TextStyle labelLarge = TextStyle(
-    fontFamily: _fontFamily,
+    fontFamily: _fontBody,
     fontSize: 14,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 0.8,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.05,
     color: AppColors.textPrimary,
   );
 
   static const TextStyle labelMedium = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 11,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 1.0,
+    fontFamily: _fontBody,
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.05,
     color: AppColors.textSecondary,
   );
 
   static const TextStyle labelSmall = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 10,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 1.2,
+    fontFamily: _fontBody,
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.05,
     color: AppColors.textMuted,
   );
 
-  // ─── Button Text ───
+  // ─── Button Text (Inter, Bold) ───
   static const TextStyle buttonText = TextStyle(
-    fontFamily: _fontFamily,
+    fontFamily: _fontBody,
     fontSize: 14,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 0.8,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.05,
   );
 
   static const TextStyle buttonTextSmall = TextStyle(
-    fontFamily: _fontFamily,
+    fontFamily: _fontBody,
     fontSize: 12,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 0.6,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.05,
   );
 
   // ─── Section Header (numbered sections like "01 — TODAY AT A GLANCE") ───
   static const TextStyle sectionLabel = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 10,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 1.4,
-    color: AppColors.textMuted,
+    fontFamily: _fontBody,
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.05,
+    color: AppColors.textSecondary,
   );
 
   static const TextStyle sectionNumber = TextStyle(
-    fontFamily: _fontFamily,
-    fontSize: 11,
-    fontWeight: FontWeight.w800,
+    fontFamily: _fontBody,
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
     color: AppColors.primary,
   );
 }

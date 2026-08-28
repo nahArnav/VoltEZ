@@ -1,12 +1,18 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import '../network/api_service.dart';
 import '../../shared/models/models.dart';
 
 /// Charger discovery state + filtering logic.
 /// Supplies nearby station data, GPS location, connector/power filters,
 /// and selected-marker state for the map screen.
 class ChargerDiscoveryProvider extends ChangeNotifier {
+  ChargerDiscoveryProvider({ApiService? api}) : _api = api ?? ApiService();
+
+  final ApiService _api;
+
   // ─── Location ───
   Position? _currentPosition;
   bool _locationLoading = false;
@@ -19,9 +25,11 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   // ─── Chargers ───
   List<Charger> _allChargers = [];
   bool _chargersLoading = false;
+  String? _chargersError;
 
   List<Charger> get allChargers => _allChargers;
   bool get chargersLoading => _chargersLoading;
+  String? get chargersError => _chargersError;
 
   // ─── Filters ───
   final Set<String> _selectedConnectorStrings = {};
@@ -67,7 +75,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   // ─── Init ───
   Future<void> init() async {
     await _fetchLocation();
-    _loadMockChargers();
+    await fetchNearbyChargers();
   }
 
   // ─── Location ───
@@ -120,32 +128,74 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   Future<void> refreshLocation() async => _fetchLocation();
 
   // ─── Chargers ───
-  void _loadMockChargers() {
+  Future<void> fetchNearbyChargers() async {
+    if (_currentPosition == null) {
+      _chargersError = 'Location not available';
+      notifyListeners();
+      return;
+    }
+
     _chargersLoading = true;
+    _chargersError = null;
     notifyListeners();
 
-    // In production: call ApiService.getNearbyChargers(latitude, longitude)
-    // Mock chargers use backend-aligned field names.
-    _allChargers = [
+    try {
+      final response = await _api.getNearbyChargers(
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        radiusMeters: 10000,
+      );
+
+      final data = response.data;
+      if (data is List) {
+        _allChargers = data
+            .map((json) => Charger.fromJson(json as Map<String, dynamic>))
+            .toList();
+      } else {
+        _allChargers = [];
+      }
+
+      _chargersLoading = false;
+      _chargersError = null;
+    } catch (e) {
+      // If the backend is unreachable, fall back to demo chargers
+      // so the UI is not blank during development.
+      _chargersError = e.toString();
+      _allChargers = _demoChargers();
+      _chargersLoading = false;
+    }
+    notifyListeners();
+  }
+
+  /// Refresh nearby chargers (pull-to-refresh support).
+  Future<void> refreshChargers() async {
+    await _fetchLocation();
+    await fetchNearbyChargers();
+  }
+
+  /// Calculate distance from user to a charger in km.
+  double distanceTo(Charger charger) {
+    if (_currentPosition == null) return 0;
+    // Haversine approximation for short distances
+    const earthRadius = 6371.0;
+    final dLat = _degreesToRad(charger.latitude - _currentPosition!.latitude);
+    final dLon = _degreesToRad(charger.longitude - _currentPosition!.longitude);
+    final a = dLat * dLat +
+        math.cos(_degreesToRad(_currentPosition!.latitude)) *
+            math.cos(_degreesToRad(charger.latitude)) *
+            dLon * dLon;
+    return earthRadius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+
+  double _degreesToRad(double degrees) => degrees * math.pi / 180;
+
+  /// Demo chargers shown when backend is unreachable.
+  List<Charger> _demoChargers() {
+    return [
       const Charger(id: 1, businessId: 1, name: 'Phoenix Mall Charger', address: 'Phoenix Mall, Lower Parel, Mumbai', latitude: 19.0760, longitude: 72.8777, powerKw: 60, accessType: 'public', basePrice: 14, status: 'active', reliabilityScore: 0.92, amenities: 'WiFi,Food Court,Parking'),
       const Charger(id: 2, businessId: 1, name: 'Highway Fast Charge', address: 'Mumbai-Pune Expressway, Khalapur', latitude: 19.0896, longitude: 72.8656, powerKw: 120, accessType: 'public', basePrice: 18, status: 'active', reliabilityScore: 0.84, amenities: 'Restroom,Cafe'),
       const Charger(id: 3, businessId: 1, name: 'Tech Park Station', address: 'Infosys Campus, Airoli', latitude: 19.0596, longitude: 72.8295, powerKw: 30, accessType: 'public', basePrice: 11, status: 'active', reliabilityScore: 0.96, amenities: 'WiFi'),
-      const Charger(id: 4, businessId: 1, name: 'Marine Drive AC Charger', address: 'Marine Drive, Churchgate', latitude: 18.9432, longitude: 72.8234, powerKw: 22, accessType: 'public', basePrice: 10, status: 'active', reliabilityScore: 0.90, amenities: 'Parking,AC Lounge'),
-      const Charger(id: 5, businessId: 1, name: 'Bandra Hub DC Fast', address: 'Bandra Kurla Complex, Bandra East', latitude: 19.0596, longitude: 72.8684, powerKw: 150, accessType: 'public', basePrice: 22, status: 'active', reliabilityScore: 0.98, amenities: 'WiFi,Cafe,Parking,Restroom'),
-      const Charger(id: 6, businessId: 1, name: 'Thane Station AC', address: 'Thane West, near Viviana Mall', latitude: 19.1896, longitude: 72.9596, powerKw: 7, accessType: 'public', basePrice: 8, status: 'active', reliabilityScore: 0.82, amenities: 'Parking'),
-      const Charger(id: 7, businessId: 1, name: 'Navi Mumbai DC', address: 'Vashi, Sector 17', latitude: 19.0736, longitude: 72.9988, powerKw: 60, accessType: 'public', basePrice: 15, status: 'inactive', reliabilityScore: 0.78, amenities: ''),
-      const Charger(id: 8, businessId: 1, name: 'Andheri Express Charger', address: 'Andheri-Kurla Road, Andheri East', latitude: 19.1136, longitude: 72.8697, powerKw: 45, accessType: 'public', basePrice: 13, status: 'active', reliabilityScore: 0.86, amenities: 'WiFi,Food Court'),
-      const Charger(id: 9, businessId: 1, name: 'Powai Lake Charger', address: 'Powai, Hiranandani Gardens', latitude: 19.1187, longitude: 72.9066, powerKw: 22, accessType: 'public', basePrice: 12, status: 'active', reliabilityScore: 0.94, amenities: 'WiFi,Parking'),
-      const Charger(id: 10, businessId: 1, name: 'Chembur Fast DC', address: 'Chembur, near Diamond Garden', latitude: 19.0520, longitude: 72.8904, powerKw: 90, accessType: 'public', basePrice: 16, status: 'active', reliabilityScore: 0.88, amenities: 'Cafe,Restroom'),
-      const Charger(id: 11, businessId: 1, name: 'Dadar TT Circle', address: 'Dadar TT Circle, Dadar West', latitude: 19.0176, longitude: 72.8434, powerKw: 15, accessType: 'public', basePrice: 9, status: 'active', reliabilityScore: 0.76, amenities: ''),
-      const Charger(id: 12, businessId: 1, name: 'Goregaon Film City', address: 'Film City Road, Goregaon East', latitude: 19.1664, longitude: 72.8526, powerKw: 60, accessType: 'public', basePrice: 14, status: 'active', reliabilityScore: 0.92, amenities: 'WiFi,Parking,AC Lounge'),
-      const Charger(id: 13, businessId: 1, name: 'Mulund East Hub', address: 'Mulund East, near Market Garden', latitude: 19.1628, longitude: 72.9522, powerKw: 30, accessType: 'public', basePrice: 11, status: 'inactive', reliabilityScore: 0.80, amenities: 'Parking'),
-      const Charger(id: 14, businessId: 1, name: 'Juhu Beach Charger', address: 'Juhu Tara Road, Juhu', latitude: 19.1330, longitude: 72.8260, powerKw: 22, accessType: 'public', basePrice: 12, status: 'active', reliabilityScore: 0.90, amenities: 'WiFi,Cafe'),
-      const Charger(id: 15, businessId: 1, name: 'Colaba Express DC', address: 'Colaba Causeway, Colaba', latitude: 18.9154, longitude: 72.8264, powerKw: 45, accessType: 'public', basePrice: 14, status: 'active', reliabilityScore: 0.84, amenities: 'Restroom'),
     ];
-
-    _chargersLoading = false;
-    notifyListeners();
   }
 
   // ─── Filter Mutators ───
