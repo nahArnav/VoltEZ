@@ -49,6 +49,7 @@ __all__ = [
     "ChargerSearchEvent",
     "ChargerSearchResult",
     "Notification",
+    "Payment",
     "Review",
     "DemandHistory",
     "MLPrediction",

@@ -2,7 +2,7 @@
 name = "voltez-ml"
 version = "0.1.0"
 description = "VoltEZ demand, availability, route-energy, waiting-time, and reliability ML package"
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "joblib>=1.4,<2",

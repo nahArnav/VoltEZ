@@ -4,9 +4,9 @@ from logging.config import fileConfig
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, pool
 
+import database.models  # noqa: F401
 from alembic import context
 from database.base_class import Base
-import database.models  # noqa: F401
 
 load_dotenv()
 
