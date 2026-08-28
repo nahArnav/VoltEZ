@@ -174,6 +174,26 @@ flutter run -d chrome \
 For native phone setup and LAN/HTTPS configuration, see
 [`docs/DEPLOYMENT_AND_PHONE_TESTING.md`](docs/DEPLOYMENT_AND_PHONE_TESTING.md).
 
+### 5. Run on a physical Android phone (USB)
+
+Start the API stack first, connect the unlocked phone with USB debugging
+enabled, and accept the RSA authorization prompt. Then run the canonical
+phone runner from the repository root:
+
+```bash
+/opt/homebrew/bin/docker-compose up -d --build
+./scripts/run_phone.sh
+```
+
+The script discovers the Android SDK, verifies an authorized `adb` device,
+configures `adb reverse tcp:8000 tcp:8000`, and launches Flutter with the API
+set to `http://127.0.0.1:8000/api/v1`. This reverse tunnel is required because
+`127.0.0.1` on a physical phone means the phone itself. If the phone and Mac
+are on the same Wi-Fi instead, use `./scripts/run_phone.sh --lan`; the script
+passes the Mac LAN address to Flutter. Do not run a plain physical-device
+`flutter run` with the default localhost URL unless the reverse tunnel is
+already active.
+
 ---
 
 ## 📂 Project Structure

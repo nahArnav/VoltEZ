@@ -1,11 +1,13 @@
 # Flutter / Dart
 .dart_tool/
+**/.dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
 build/
+**/build/
 .freebuff/
 .widget_preview/
 
@@ -15,11 +17,15 @@ android/.gradle/
 android/app/build/
 android/captures/
 .gradle/
+**/.gradle/
+**/.kotlin/
 
 # iOS / macOS build & ephemeral files
 ios/Pods/
 macos/Pods/
+**/Pods/
 ios/.symlinks/
+**/.symlinks/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 
@@ -110,6 +116,11 @@ node_modules/
 
 # Logs
 *.log
+*.pid
+*.tmp
+
+# Local Docker Compose overrides may contain machine-specific ports/secrets.
+docker-compose.override.yml
 
 # Local IDE configuration files
 *.iml

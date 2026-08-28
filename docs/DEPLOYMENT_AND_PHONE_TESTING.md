@@ -120,8 +120,21 @@ Google Maps, and payment SDKs are more reliable from an HTTPS staging URL.
    GOOGLE_MAPS_API_KEY=your_android_restricted_key
    ```
 
-4. Run the debug app against the Mac LAN API. Do not use `127.0.0.1`; that is
-   the phone itself:
+4. For USB testing, use the repository runner. It sets up the required reverse
+   tunnel before launching Flutter, so the app's `127.0.0.1` points back to the
+   Mac API:
+
+   ```bash
+   # From the repository root
+   ./scripts/run_phone.sh
+   ```
+
+   The runner verifies an authorized device and configures
+   `adb reverse tcp:8000 tcp:8000`. If you prefer Wi-Fi, keep both devices on
+   the same network and run `./scripts/run_phone.sh --lan`; do not use
+   `127.0.0.1` in LAN mode because that is the phone itself.
+
+5. To launch manually against the Mac LAN API, use:
 
    ```bash
    flutter run -d <ANDROID_DEVICE_ID> \
