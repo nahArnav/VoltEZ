@@ -149,12 +149,16 @@ async def test_full_booking_lifecycle(client):
     booking = await client.get(f"/api/v1/bookings/{held.json()['id']}", headers=driver_headers)
     assert booking.json()["status"] == "confirmed"
 
-    checked_in = await client.post(
-        "/api/v1/sessions/check-in",
-        headers=driver_headers,
-        json={"booking_id": held.json()["id"]},
-    )
-    assert checked_in.status_code == 201, checked_in.text
+    with patch("app.services.session.datetime") as mock_dt:
+        mock_dt.now.return_value = start
+        mock_dt.UTC = UTC
+        checked_in = await client.post(
+            "/api/v1/sessions/check-in",
+            headers=driver_headers,
+            json={"booking_id": held.json()["id"]},
+        )
+        assert checked_in.status_code == 201, checked_in.text
+
     started = await client.post(
         f"/api/v1/sessions/{checked_in.json()['id']}/start",
         headers=driver_headers,

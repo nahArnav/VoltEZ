@@ -1,12 +1,16 @@
 from datetime import UTC, datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user
 from app.db.session import get_db
 from app.repositories.user import user_repo
+from app.schemas.notification import NotificationResponse, NotificationUpdate
 from app.schemas.user import UserKYCResponse, UserKYCSubmit, UserResponse, UserUpdate
+from database.models.notification import Notification
 from database.models.user import User
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -30,6 +34,48 @@ async def update_me(
     await db.commit()
     await db.refresh(updated_user)
     return updated_user
+
+
+@router.get("/me/notifications", response_model=list[NotificationResponse])
+async def list_my_notifications(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Notification)
+        .where(Notification.user_id == current_user.id)
+        .order_by(desc(Notification.created_at))
+        .limit(100)
+    )
+    return list(result.scalars().all())
+
+
+@router.patch("/me/notifications/{notification_id}", response_model=NotificationResponse)
+async def update_my_notification(
+    notification_id: UUID,
+    notification_in: NotificationUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Notification).where(
+            Notification.id == notification_id,
+            Notification.user_id == current_user.id,
+        )
+    )
+    notification = result.scalar_one_or_none()
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if notification_in.status is not None:
+        notification.status = notification_in.status
+    if notification_in.read_at is not None:
+        notification.read_at = notification_in.read_at
+    elif notification_in.status == "read":
+        notification.read_at = datetime.now(UTC)
+    db.add(notification)
+    await db.commit()
+    await db.refresh(notification)
+    return notification
 
 
 @router.get("/me/kyc", response_model=UserKYCResponse)

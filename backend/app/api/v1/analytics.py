@@ -134,7 +134,15 @@ async def get_business_dashboard(
     )
     chargers = list(chargers_result.scalars().all())
     charger_ids = [charger.id for charger in chargers]
-    active_chargers = sum(1 for charger in chargers if charger.status == "available")
+    # A station is active only when the station itself is available and at
+    # least one connector is active. Compare case-insensitively because older
+    # rows/imports used uppercase status values.
+    active_chargers = sum(
+        1
+        for charger in chargers
+        if str(charger.status).lower() == "available"
+        and any(port.is_active for port in charger.ports)
+    )
     if not charger_ids:
         return DashboardResponse(
             chargers=0,

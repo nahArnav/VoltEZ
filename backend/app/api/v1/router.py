@@ -6,6 +6,7 @@ from .availability import router as availability_router
 from .booking import router as booking_router
 from .businesses import router as businesses_router
 from .charger import router as charger_router
+from .locations import router as locations_router
 from .payments import router as payments_router
 from .recommendations import router as recommendations_router
 from .session import router as session_router
@@ -21,6 +22,7 @@ api_router.include_router(auth_router)
 api_router.include_router(booking_router)
 api_router.include_router(charger_router)
 api_router.include_router(session_router)
+api_router.include_router(locations_router)
 api_router.include_router(users_router)
 api_router.include_router(vehicles_router)
 api_router.include_router(businesses_router)

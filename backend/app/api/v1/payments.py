@@ -1,7 +1,13 @@
+import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
 
 import razorpay
+
+try:
+    import stripe
+except ImportError:  # pragma: no cover - dependency is installed in deployment
+    stripe = None
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +21,7 @@ from app.schemas.payment import (
     PaymentOrderCreate,
     PaymentResponse,
     PaymentVerifyRequest,
+    StripeVerifyRequest,
 )
 from database.models.booking_event import BookingEvent
 from database.models.user import User
@@ -139,8 +146,59 @@ async def create_order(
         await db.refresh(payment)
         return payment
 
+    if settings.active_payment_provider == "stripe":
+        if stripe is None or not settings.stripe_is_configured:
+            raise HTTPException(status_code=503, detail="Stripe is not configured")
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        try:
+            session = await asyncio.to_thread(
+                stripe.checkout.Session.create,
+                mode="payment",
+                line_items=[
+                    {
+                        "price_data": {
+                            "currency": "inr",
+                            "product_data": {"name": "VoltEZ charging reservation"},
+                            "unit_amount": amount_in_paise,
+                        },
+                        "quantity": 1,
+                    }
+                ],
+                metadata={"booking_id": str(booking.id)},
+                success_url=settings.STRIPE_SUCCESS_URL,
+                cancel_url=settings.STRIPE_CANCEL_URL,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Stripe checkout is temporarily unavailable",
+            ) from exc
+        payment_data = {
+            "booking_id": booking.id,
+            "amount": amount,
+            "currency": "INR",
+            "method": payment_in.method,
+            "provider_order_id": session.id,
+            "status": "pending",
+        }
+        if existing is None:
+            payment = await payment_repo.create(db, obj_in=payment_data)
+        else:
+            payment = existing
+            for key, value in payment_data.items():
+                setattr(payment, key, value)
+            payment.provider_payment_id = None
+            payment.verified_at = None
+            db.add(payment)
+        await db.commit()
+        await db.refresh(payment)
+        response = PaymentResponse.model_validate(payment)
+        response.provider = "stripe"
+        response.checkout_url = getattr(session, "url", None)
+        return response
+
     if not settings.razorpay_is_configured:
-        raise HTTPException(status_code=503, detail="Razorpay is not configured")
+        raise HTTPException(status_code=503, detail="No payment provider is configured")
 
     # Try/except block in case Razorpay API is down
     try:
@@ -180,7 +238,85 @@ async def create_order(
         db.add(payment)
     await db.commit()
     await db.refresh(payment)
-    return payment
+    response = PaymentResponse.model_validate(payment)
+    response.provider = "razorpay"
+    return response
+
+
+@router.post("/stripe/verify", response_model=PaymentResponse)
+async def verify_stripe_payment(
+    payment_in: StripeVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify a hosted Stripe Checkout session before confirming a booking."""
+    if stripe is None or not settings.stripe_is_configured:
+        raise HTTPException(status_code=503, detail="Stripe is not configured")
+    booking = await _require_owned_booking(db, payment_in.booking_id, current_user)
+    payment = await payment_repo.get_by_provider_order(
+        db, provider_order_id=payment_in.checkout_session_id
+    )
+    if payment is None or payment.booking_id != booking.id:
+        raise HTTPException(status_code=404, detail="Stripe checkout session not found")
+    if payment.status == "completed":
+        response = PaymentResponse.model_validate(payment)
+        response.provider = "stripe"
+        return response
+    _require_payable_booking(booking)
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    try:
+        session = await asyncio.to_thread(
+            stripe.checkout.Session.retrieve,
+            payment_in.checkout_session_id,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Stripe verification unavailable") from exc
+    if (
+        getattr(session, "payment_status", None) != "paid"
+        or (getattr(session, "metadata", {}) or {}).get("booking_id") != str(booking.id)
+    ):
+        raise HTTPException(status_code=400, detail="Stripe payment has not been completed")
+    await _confirm_payment(
+        db,
+        payment,
+        str(getattr(session, "payment_intent", None) or payment_in.checkout_session_id),
+    )
+    response = PaymentResponse.model_validate(payment)
+    response.provider = "stripe"
+    return response
+
+
+@router.post("/stripe/webhook")
+async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+    """Consume Stripe's signed checkout completion event for async truth."""
+    if stripe is None or not settings.stripe_is_configured:
+        raise HTTPException(status_code=503, detail="Stripe is not configured")
+    signature = request.headers.get("stripe-signature")
+    if not signature or settings.STRIPE_WEBHOOK_SECRET == "whsec_test_placeholder":
+        raise HTTPException(status_code=400, detail="Missing Stripe webhook signature")
+    body = await request.body()
+    try:
+        event = stripe.Webhook.construct_event(
+            body,
+            signature,
+            settings.STRIPE_WEBHOOK_SECRET,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature") from exc
+    if event.get("type") == "checkout.session.completed":
+        session = event.get("data", {}).get("object", {})
+        session_id = session.get("id")
+        metadata = session.get("metadata") or {}
+        booking_id = metadata.get("booking_id")
+        if session.get("payment_status") == "paid" and session_id and booking_id:
+            payment = await payment_repo.get_by_provider_order(db, provider_order_id=session_id)
+            if payment and str(payment.booking_id) == str(booking_id):
+                await _confirm_payment(
+                    db,
+                    payment,
+                    str(session.get("payment_intent") or session_id),
+                )
+    return {"status": "ok"}
 
 
 @router.post("/verify", response_model=PaymentResponse)

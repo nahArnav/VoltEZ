@@ -23,6 +23,12 @@ class ChargerCreate(ChargerBase):
     business_id: UUID
     latitude: float = Field(..., ge=-90.0, le=90.0)
     longitude: float = Field(..., ge=-180.0, le=180.0)
+    # Optional first port. Keeping this in the create contract lets the owner
+    # register a bookable charger atomically instead of creating an empty
+    # station that can never appear in slot search.
+    connector_type_id: int | None = Field(default=None, gt=0)
+    port_number: int | None = Field(default=None, gt=0)
+    port_max_power_kw: float | None = Field(default=None, gt=0.0)
 
 
 # Properties to receive via API on update

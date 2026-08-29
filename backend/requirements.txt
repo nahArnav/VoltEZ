@@ -60,6 +60,7 @@ wcwidth==0.8.2
 arq==0.28.0
 python-multipart==0.0.32
 razorpay==1.4.1
+stripe==12.5.0
 joblib>=1.4,<2
 numpy>=2.0,<3
 scikit-learn>=1.6,<2

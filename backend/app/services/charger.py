@@ -9,6 +9,7 @@ from app.core.errors import NotFoundError
 from app.repositories.business import business_repo
 from app.schemas.charger import ChargerCreate
 from database.models.charger import Charger
+from database.models.charger_port import ChargerPort
 
 
 class ChargerService:
@@ -31,11 +32,42 @@ class ChargerService:
         # Important: Maps say "Lat, Long", but PostGIS requires "Long, Lat" (X, Y)
         lon = charger_data.pop("longitude")
         lat = charger_data.pop("latitude")
+        connector_type_id = charger_data.pop("connector_type_id", None)
+        port_number = charger_data.pop("port_number", None)
+        port_max_power_kw = charger_data.pop("port_max_power_kw", None)
         charger_data["location"] = f"SRID=4326;POINT({lon} {lat})"
+
+        if (connector_type_id is None) != (port_number is None):
+            raise ValueError(
+                "connector_type_id and port_number must be provided together"
+            )
+        if connector_type_id is not None:
+            # A port is useful only when the referenced connector is present;
+            # the foreign-key error is converted into a clean validation error.
+            from database.models.connector import ConnectorType
+
+            connector = await db.get(ConnectorType, connector_type_id)
+            if connector is None:
+                raise ValueError("connector_type_id does not exist")
 
         # 4. Save to the database
         db_charger = Charger(**charger_data)
         db.add(db_charger)
+        await db.flush()
+
+        if connector_type_id is not None and port_number is not None:
+            db.add(
+                ChargerPort(
+                    charger_id=db_charger.id,
+                    connector_type_id=connector_type_id,
+                    port_number=port_number,
+                    max_power_kw=port_max_power_kw or charger_data["power_kw"],
+                    is_active=True,
+                )
+            )
+
+        # Commit the station and its first bookable port together. If either
+        # insert fails, no half-registered charger is left behind.
         await db.commit()
         await db.refresh(db_charger, attribute_names=["ports"])
 

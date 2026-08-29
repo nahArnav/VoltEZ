@@ -144,7 +144,13 @@ async def list_business_bookings(
         select(Booking)
         .join(ChargerPort, Booking.charger_port_id == ChargerPort.id)
         .join(Charger, ChargerPort.charger_id == Charger.id)
-        .where(Charger.business_id == business_id)
+        # Owners only need actionable reservations in their operations view.
+        # Cancelled/expired/failed rows remain auditable in booking history,
+        # but must not appear as current work in the dashboard.
+        .where(
+            Charger.business_id == business_id,
+            Booking.status == BookingStatus.CONFIRMED.value,
+        )
         .order_by(Booking.start_at.desc())
     )
     # Keep the owner dashboard free of opaque UUID-only labels.  This is the
