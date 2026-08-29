@@ -11,9 +11,9 @@ from app.repositories.session import review_repo, session_repo
 from app.schemas.charging_session import ChargingSessionResponse
 from app.schemas.review import ReviewCreate, ReviewResponse
 from app.services.session import session_service
-from database.models.charging_session import ChargingSession
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
+from database.models.charging_session import ChargingSession
 from database.models.connector import ConnectorType
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])

@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, require_role
@@ -13,6 +14,7 @@ from app.schemas.enums import UserRole
 from app.services.charger import charger_service
 from database.models.charger_search_event import ChargerSearchEvent
 from database.models.user import User
+from database.models.zone import Zone
 
 router = APIRouter(prefix="/chargers", tags=["Chargers"])
 
@@ -70,9 +72,22 @@ async def get_nearby_chargers(
         db=db, latitude=latitude, longitude=longitude, radius_meters=radius_meters
     )
 
+    # Attribute the search to the active geographic zone so demand forecasting
+    # sees real search intent rather than an unlabelled event. Searches outside
+    # a configured zone remain valid and simply keep zone_id NULL.
+    search_point = func.ST_SetSRID(func.ST_Point(longitude, latitude), 4326)
+    zone_id = (
+        await db.execute(
+            select(Zone.id)
+            .where(Zone.active.is_(True), func.ST_Contains(Zone.boundary, search_point))
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
     # Telemetry
     search_event = ChargerSearchEvent(
         user_id=current_user.id,
+        zone_id=zone_id,
         search_location=f"SRID=4326;POINT({longitude} {latitude})",
         search_radius_km=radius_meters / 1000.0,
         chargers_found=len(chargers),

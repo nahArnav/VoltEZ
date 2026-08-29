@@ -24,6 +24,7 @@ async def _with_charger_context(db: AsyncSession, booking: Booking) -> dict:
             Charger.name,
             Charger.address_text,
             Charger.price_per_kwh,
+            Booking.quoted_price_per_kwh,
             ChargerPort.max_power_kw,
             ConnectorType.display_name,
         )
@@ -36,11 +37,12 @@ async def _with_charger_context(db: AsyncSession, booking: Booking) -> dict:
     row = context.one_or_none()
     payload = BookingResponse.model_validate(booking).model_dump()
     if row is not None:
-        name, address, price, power, connector = row
+        name, address, price, quoted_price, power, connector = row
         payload.update(
             charger_name=name,
             charger_address=address,
-            price_per_kwh=float(price),
+            price_per_kwh=float(quoted_price or price),
+            quoted_price_per_kwh=float(quoted_price) if quoted_price is not None else None,
             power_kw=float(power),
             connector_type=connector,
         )

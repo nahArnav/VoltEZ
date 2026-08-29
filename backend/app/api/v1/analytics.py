@@ -10,12 +10,12 @@ from app.ml.adapters import ml_adapter
 from app.repositories.business import business_repo
 from app.repositories.charger import charger_repo
 from app.schemas.enums import UserRole
-from database.models.user import User
 from database.models.booking import Booking
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
 from database.models.charging_session import ChargingSession
 from database.models.review import Review
+from database.models.user import User
 
 router = APIRouter(prefix="/analytics", tags=["Analytics & Intelligence"])
 
@@ -106,6 +106,11 @@ async def get_business_recommendations(
                 )
             )
 
+    # MLAdapter records each forecast for auditability and drift monitoring.
+    # The repository flushes those rows but does not commit them; persist the
+    # batch once after all chargers have been evaluated so a read-only
+    # dashboard request does not silently roll the audit trail back.
+    await db.commit()
     return recommendations
 
 

@@ -83,10 +83,18 @@ async def create_order(
     Create a Razorpay order and save the pending payment to the database.
     """
     booking = await _require_owned_booking(db, payment_in.booking_id, current_user)
-    existing = await payment_repo.get_by_booking(db, booking_id=booking.id)
-    if existing and existing.status in {"pending", "completed"}:
-        return existing
     _require_payable_booking(booking)
+    existing = await payment_repo.get_by_booking(db, booking_id=booking.id)
+    if existing and existing.status == "completed":
+        return existing
+
+    # A booking has one auditable payment row. If the driver changes method
+    # before completing checkout, reuse that row instead of violating the
+    # one-payment-per-booking constraint. Gateway orders are disposable, so a
+    # new card/UPI order can safely replace an abandoned pending order.
+    if existing and existing.status == "pending" and existing.method == payment_in.method:
+        if payment_in.method == "cash" or existing.provider_order_id:
+            return existing
 
     amount = Decimal(str(booking.estimated_amount or settings.BOOKING_HOLD_FEE_INR))
     amount_in_paise = int(amount * 100)
@@ -96,16 +104,26 @@ async def create_order(
     # charging session completes (or an owner verifies cash collection).
     if payment_in.method == "cash":
         old_status = booking.status
-        payment = await payment_repo.create(
-            db,
-            obj_in={
-                "booking_id": booking.id,
-                "amount": amount,
-                "currency": "INR",
-                "method": "cash",
-                "status": "pending",
-            },
-        )
+        if existing is None:
+            payment = await payment_repo.create(
+                db,
+                obj_in={
+                    "booking_id": booking.id,
+                    "amount": amount,
+                    "currency": "INR",
+                    "method": "cash",
+                    "status": "pending",
+                },
+            )
+        else:
+            payment = existing
+            payment.amount = amount
+            payment.currency = "INR"
+            payment.method = "cash"
+            payment.status = "pending"
+            payment.provider_order_id = None
+            payment.provider_payment_id = None
+            payment.verified_at = None
         booking.status = BookingStatus.CONFIRMED.value
         db.add(
             BookingEvent(
@@ -148,7 +166,18 @@ async def create_order(
         "status": "pending",
     }
 
-    payment = await payment_repo.create(db, obj_in=payment_data)
+    if existing is None:
+        payment = await payment_repo.create(db, obj_in=payment_data)
+    else:
+        payment = existing
+        payment.amount = amount
+        payment.currency = "INR"
+        payment.method = payment_in.method
+        payment.provider_order_id = rzp_order.get("id")
+        payment.provider_payment_id = None
+        payment.status = "pending"
+        payment.verified_at = None
+        db.add(payment)
     await db.commit()
     await db.refresh(payment)
     return payment

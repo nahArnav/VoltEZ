@@ -1,14 +1,12 @@
 from datetime import UTC, datetime
-from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user
 from app.db.session import get_db
 from app.repositories.user import user_repo
 from app.schemas.user import UserKYCResponse, UserKYCSubmit, UserResponse, UserUpdate
-from database.models.booking import Booking
-from database.models.booking_event import BookingEvent
 from database.models.user import User
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -40,27 +38,16 @@ async def get_user_kyc(
     db: AsyncSession = Depends(get_db),
 ):
     """Retrieve current user's KYC verification status and penalty strike metrics."""
-    # Count cancellation strikes (bookings cancelled within 15 min or late)
-    strikes_res = await db.execute(
-        select(func.count(BookingEvent.id))
-        .join(Booking, BookingEvent.booking_id == Booking.id)
-        .where(
-            Booking.user_id == current_user.id,
-            BookingEvent.new_status == "cancelled",
-            BookingEvent.actor.like("user:%"),
-        )
-    )
-    strikes_count = strikes_res.scalar() or 0
-
     return UserKYCResponse(
         user_id=current_user.id,
         verification_status=current_user.verification_status,
-        document_type="driving_license" if current_user.verification_status != "unverified" else "none",
-        document_number_masked="DL-••••••" if current_user.verification_status != "unverified" else "Not provided",
-        vehicle_rc_number="MH-12-••-••••" if current_user.verification_status != "unverified" else None,
-        submitted_at=current_user.updated_at,
-        cancellation_strikes=strikes_count,
-        penalty_points=strikes_count * 10,
+        document_type=current_user.kyc_document_type or "none",
+        document_number_masked=current_user.kyc_document_masked or "Not provided",
+        vehicle_rc_number=current_user.kyc_vehicle_rc_masked,
+        submitted_at=current_user.kyc_submitted_at or current_user.updated_at,
+        cancellation_strikes=current_user.cancellation_strikes,
+        penalty_points=current_user.penalty_points,
+        suspended_until=current_user.suspended_until,
     )
 
 
@@ -71,23 +58,35 @@ async def submit_user_kyc(
     db: AsyncSession = Depends(get_db),
 ):
     """Submit driver KYC documents and verify identity."""
-    current_user.verification_status = "verified"
-    current_user.updated_at = datetime.now(UTC)
+    doc_num = kyc_in.document_number.strip()
+    rc_num = kyc_in.vehicle_rc_number.strip() if kyc_in.vehicle_rc_number else None
+    if len(doc_num) < 5:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="KYC document number is too short")
+
+    now = datetime.now(UTC)
+    # Submission is not verification. A provider or admin review must approve it.
+    current_user.verification_status = "pending"
+    current_user.kyc_document_type = kyc_in.document_type
+    current_user.kyc_document_masked = doc_num[:3] + "•" * (len(doc_num) - 5) + doc_num[-2:]
+    current_user.kyc_vehicle_rc_masked = (
+        rc_num[:3] + "•" * (len(rc_num) - 5) + rc_num[-2:]
+        if rc_num and len(rc_num) >= 5
+        else None
+    )
+    current_user.kyc_submitted_at = now
+    current_user.updated_at = now
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
-
-    doc_num = kyc_in.document_number.strip()
-    masked = doc_num[:3] + "•" * (max(0, len(doc_num) - 5)) + doc_num[-2:] if len(doc_num) >= 5 else "••••••"
 
     return UserKYCResponse(
         user_id=current_user.id,
         verification_status=current_user.verification_status,
         document_type=kyc_in.document_type,
-        document_number_masked=masked,
-        vehicle_rc_number=kyc_in.vehicle_rc_number,
-        submitted_at=current_user.updated_at,
-        cancellation_strikes=0,
-        penalty_points=0,
+        document_number_masked=current_user.kyc_document_masked or "Not provided",
+        vehicle_rc_number=current_user.kyc_vehicle_rc_masked,
+        submitted_at=current_user.kyc_submitted_at,
+        cancellation_strikes=current_user.cancellation_strikes,
+        penalty_points=current_user.penalty_points,
+        suspended_until=current_user.suspended_until,
     )
-

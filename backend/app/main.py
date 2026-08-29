@@ -1,15 +1,21 @@
+import asyncio
 import time
 import uuid
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from app.core.config import settings
-from app.core.logging import setup_logging, get_logger
-from app.core.errors import register_exception_handlers
-from app.api.v1.router import api_router
-from arq import create_pool
-from arq.connections import RedisSettings
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+from arq import create_pool
+from arq.connections import RedisSettings
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+
+from app.api.v1.router import api_router
+from app.core.config import settings
+from app.core.errors import register_exception_handlers
+from app.core.logging import get_logger, setup_logging
+from app.db.session import engine
 
 # Initialize structured logging
 setup_logging()
@@ -69,12 +75,16 @@ async def lifespan(app: FastAPI):
     # Store bundles on app.state for access by health endpoints
     app.state.demand_bundle = demand_bundle
     app.state.availability_bundle = availability_bundle
-    app.state.ml_ready = demand_bundle is not None or availability_bundle is not None
+    # Both core models are required for a production-ready instance. Individual
+    # predictors still retain their documented heuristic fallback when a model
+    # is unavailable in development, but readiness must fail closed so a
+    # deployment cannot silently serve degraded ML results.
+    app.state.ml_ready = demand_bundle is not None and availability_bundle is not None
 
     if app.state.ml_ready:
-        logger.info("[ML] At least one model loaded. ml_ready=true.")
+        logger.info("[ML] Demand and availability models loaded. ml_ready=true.")
     else:
-        logger.warning("[ML] No models loaded. Falling back to heuristics.")
+        logger.warning("[ML] One or more core models missing. Heuristic fallback remains enabled.")
 
     yield
 
@@ -138,10 +148,35 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready", tags=["System"])
     async def readiness(request: Request):
+        async def probe_database() -> None:
+            async with engine.connect() as connection:
+                await connection.execute(text("SELECT 1"))
+
+        async def probe_redis() -> None:
+            redis = getattr(request.app.state, "redis", None)
+            if redis is None:
+                raise RuntimeError("Redis pool is not initialized")
+            await redis.ping()
+
+        # Keep the probe bounded: a failed dependency must produce a quick,
+        # actionable 503 rather than tying up health-check workers.
+        checks: dict[str, bool] = {}
+        for name, probe in (("database", probe_database), ("redis", probe_redis)):
+            try:
+                await asyncio.wait_for(probe(), timeout=2.0)
+            except Exception as exc:
+                checks[name] = False
+                logger.warning("Readiness check failed for %s: %s", name, exc)
+            else:
+                checks[name] = True
+
         demand_bundle = getattr(request.app.state, "demand_bundle", None)
         avail_bundle = getattr(request.app.state, "availability_bundle", None)
-        return {
-            "status": "ready",
+        checks["ml"] = bool(getattr(request.app.state, "ml_ready", False))
+        is_ready = all(checks.values())
+        payload = {
+            "status": "ready" if is_ready else "not_ready",
+            "checks": checks,
             "ml_ready": getattr(request.app.state, "ml_ready", False),
             "models": {
                 "demand": {
@@ -160,6 +195,7 @@ def create_app() -> FastAPI:
                 },
             },
         }
+        return JSONResponse(status_code=200 if is_ready else 503, content=payload)
 
     @app.get("/version", tags=["System"])
     async def version():

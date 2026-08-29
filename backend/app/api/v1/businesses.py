@@ -17,16 +17,14 @@ from app.schemas.business import (
     BusinessResponse,
     BusinessUpdate,
 )
-from app.schemas.enums import UserRole
-
+from app.schemas.enums import BookingStatus, UserRole
 from database.models.booking import Booking
+from database.models.booking_event import BookingEvent
 from database.models.business import Business
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
 from database.models.user import User
 from database.models.zone import Zone
-from app.schemas.enums import BookingStatus
-from database.models.booking_event import BookingEvent
 
 router = APIRouter(prefix="/businesses", tags=["Businesses"])
 
@@ -271,11 +269,11 @@ async def get_business_kyc(
     return BusinessKYCResponse(
         business_id=business.id,
         verification_status=business.verification_status,
-        gstin_masked="27AAAAA0000A1Z5" if business.verification_status != "unverified" else None,
-        pan_masked="AAAAA0000A" if business.verification_status != "unverified" else None,
-        electricity_meter_id="LT-1029384" if business.verification_status != "unverified" else None,
-        payout_upi_id="voltez.host@upi" if business.verification_status != "unverified" else None,
-        submitted_at=business.updated_at,
+        gstin_masked=business.kyc_gstin_masked,
+        pan_masked=business.kyc_pan_masked,
+        electricity_meter_id=business.kyc_electricity_meter_masked,
+        payout_upi_id=business.kyc_payout_upi_masked,
+        submitted_at=business.kyc_submitted_at or business.updated_at,
     )
 
 
@@ -291,22 +289,39 @@ async def submit_business_kyc(
     if not business or (current_user.role != UserRole.ADMIN and business.owner_id != current_user.id):
         raise HTTPException(status_code=404, detail="Business not found")
 
-    business.verification_status = "verified"
-    business.updated_at = datetime.now(UTC)
+    gst = kyc_in.gstin.strip() if kyc_in.gstin else None
+    pan = kyc_in.pan_number.strip() if kyc_in.pan_number else None
+    meter = kyc_in.electricity_meter_id.strip() if kyc_in.electricity_meter_id else None
+    payout = kyc_in.payout_upi_id.strip() if kyc_in.payout_upi_id else None
+    if not gst and not pan:
+        raise HTTPException(status_code=422, detail="GSTIN or PAN is required")
+
+    def mask(value: str | None, prefix: int = 3, suffix: int = 2) -> str | None:
+        if not value:
+            return None
+        if len(value) <= prefix + suffix:
+            return "•" * len(value)
+        return value[:prefix] + "•" * (len(value) - prefix - suffix) + value[-suffix:]
+
+    now = datetime.now(UTC)
+    # Submission is not verification. A provider or admin review must approve it.
+    business.verification_status = "pending"
+    business.kyc_gstin_masked = mask(gst, prefix=4, suffix=3)
+    business.kyc_pan_masked = mask(pan, prefix=3, suffix=2)
+    business.kyc_electricity_meter_masked = mask(meter)
+    business.kyc_payout_upi_masked = mask(payout, prefix=2, suffix=4)
+    business.kyc_submitted_at = now
+    business.updated_at = now
     db.add(business)
     await db.commit()
     await db.refresh(business)
 
-    gst = kyc_in.gstin.strip() if kyc_in.gstin else None
-    pan = kyc_in.pan_number.strip() if kyc_in.pan_number else None
-
     return BusinessKYCResponse(
         business_id=business.id,
         verification_status=business.verification_status,
-        gstin_masked=gst[:4] + "••••••" + gst[-3:] if gst and len(gst) >= 7 else gst,
-        pan_masked=pan[:3] + "••••" + pan[-2:] if pan and len(pan) >= 5 else pan,
-        electricity_meter_id=kyc_in.electricity_meter_id,
-        payout_upi_id=kyc_in.payout_upi_id,
-        submitted_at=business.updated_at,
+        gstin_masked=business.kyc_gstin_masked,
+        pan_masked=business.kyc_pan_masked,
+        electricity_meter_id=business.kyc_electricity_meter_masked,
+        payout_upi_id=business.kyc_payout_upi_masked,
+        submitted_at=business.kyc_submitted_at,
     )
-
