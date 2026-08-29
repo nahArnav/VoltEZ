@@ -160,62 +160,89 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
   // ─── Route Section (Origin + Destination + Visual) ───
   Widget _buildRouteSection(RoutePlannerProvider planner) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
       ),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Origin
-          _buildRouteField(
-            controller: _originController,
-            label: 'From',
-            hint: planner.usingCurrentLocation
-                ? 'Current Location'
-                : 'Enter origin',
-            icon: Icons.my_location_rounded,
-            iconColor: AppColors.success,
-            planner: planner,
-            isFilled: planner.usingCurrentLocation,
-            trailing: planner.usingCurrentLocation
-                ? null
-                : _buildLocationButton(planner),
-          ),
-
-          // Visual connector
+          // Left: dots + connector line
           Padding(
-            padding: const EdgeInsets.only(left: 22),
-            child: Row(
+            padding: const EdgeInsets.only(top: 22, right: 16),
+            child: Column(
               children: [
                 Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.success,
+                  ),
+                ),
+                Container(
                   width: 2,
-                  height: 28,
+                  height: 36,
+                  margin: const EdgeInsets.symmetric(vertical: 4),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        AppColors.success.withValues(alpha: 0.6),
-                        AppColors.primary.withValues(alpha: 0.6),
+                        AppColors.success.withValues(alpha: 0.5),
+                        AppColors.primary.withValues(alpha: 0.5),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary,
                   ),
                 ),
               ],
             ),
           ),
 
-          // Destination
-          _buildRouteField(
-            controller: _destinationController,
-            label: 'To',
-            hint: 'Enter destination',
-            icon: Icons.location_on_outlined,
-            iconColor: AppColors.primary,
-            planner: planner,
+          // Right: fields
+          Expanded(
+            child: Column(
+              children: [
+                // Origin field
+                _buildRouteField(
+                  controller: _originController,
+                  label: 'From',
+                  hint: planner.usingCurrentLocation
+                      ? 'Current Location'
+                      : 'Enter origin',
+                  icon: Icons.my_location_rounded,
+                  iconColor: AppColors.success,
+                  planner: planner,
+                  isFilled: planner.usingCurrentLocation,
+                  trailing: planner.usingCurrentLocation
+                      ? null
+                      : _buildLocationButton(planner),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Destination field
+                _buildRouteField(
+                  controller: _destinationController,
+                  label: 'To',
+                  hint: 'Enter destination',
+                  icon: Icons.location_on_outlined,
+                  iconColor: AppColors.primary,
+                  planner: planner,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -232,52 +259,48 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
     bool isFilled = false,
     Widget? trailing,
   }) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Icon dot
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
+        Text(label, style: AppTypography.labelSmall.copyWith(
+          color: AppColors.textMuted,
+          fontSize: 11,
+        )),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          style: AppTypography.bodyLarge.copyWith(
+            color: AppColors.textPrimary,
           ),
-          child: Icon(icon, color: iconColor, size: 22),
-        ),
-        const SizedBox(width: 12),
-
-        // Text field
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: AppTypography.labelSmall),
-              const SizedBox(height: 2),
-              TextField(
-                controller: controller,
-                style: AppTypography.bodyLarge.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-                decoration: InputDecoration(
-                  hintText: hint,
-                  hintStyle: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.textMuted,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                  isDense: true,
-                  suffixIcon: trailing,
-                ),
-                onChanged: (v) {
-                  if (label == 'From') {
-                    planner.setOrigin(v);
-                  } else {
-                    planner.setDestination(v);
-                  }
-                },
-              ),
-            ],
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: AppTypography.bodyMedium.copyWith(
+              color: AppColors.textMuted,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            isDense: true,
+            prefixIcon: Icon(icon, color: iconColor, size: 20),
+            suffixIcon: trailing,
           ),
+          onChanged: (v) {
+            if (label == 'From') {
+              planner.setOrigin(v);
+            } else {
+              planner.setDestination(v);
+            }
+          },
         ),
       ],
     );

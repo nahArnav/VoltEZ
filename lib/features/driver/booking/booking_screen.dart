@@ -304,10 +304,13 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _buildChargerInfoBar(Charger charger) {
-    return GlassCard(
-      accentColor: AppColors.primary,
+    return Container(
       padding: const EdgeInsets.all(14),
-      borderRadius: 14,
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Row(
         children: [
           Container(
@@ -357,9 +360,9 @@ class _BookingScreenState extends State<BookingScreen> {
       textColor = AppColors.textMuted;
       statusText = _slotStatusLabel(slot.status);
     } else if (selected) {
-      bgColor = AppColors.primary.withValues(alpha: 0.15);
-      borderColor = AppColors.primary;
-      textColor = AppColors.primary;
+      bgColor = AppColors.warning.withValues(alpha: 0.18);
+      borderColor = AppColors.warning;
+      textColor = AppColors.textPrimary;
       statusText = 'HELD';
     } else {
       bgColor = AppColors.card;

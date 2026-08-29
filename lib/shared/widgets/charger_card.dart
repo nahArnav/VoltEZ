@@ -50,11 +50,10 @@ class ChargerCard extends StatelessWidget {
     return _buildSolidCard();
   }
 
-  // ─── Gradient variant (matches View Details button) ───
+  // ─── Gradient variant (matches reference card design) ───
   Widget _buildGlassCard() {
-    // Build a gradient from _accent to a lighter shade of the same hue
     final hsl = HSLColor.fromColor(_accent);
-    final lighter = hsl.withLightness((hsl.lightness + 0.22).clamp(0.0, 1.0)).toColor();
+    final lighter = hsl.withLightness((hsl.lightness + 0.08).clamp(0.0, 1.0)).toColor();
 
     return GestureDetector(
       onTap: onTap,
@@ -63,11 +62,15 @@ class ChargerCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [_accent, lighter],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            colors: [lighter, _accent],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: AppColors.cardBorder,
+            width: 1.0,
+          ),
         ),
         child: _buildContent(),
       ),

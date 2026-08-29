@@ -18,11 +18,12 @@ abstract final class AppColors {
   static const Color surfaceContainerHigh = Color(0xFFE7E8E9); // Surface Container High
   static const Color surfaceLight = Color(0xFFF3F4F5); // For hover / pressed states
 
-  // ─── Primary: Forest Green ───
-  static const Color primary = Color(0xFF14532D); // Deep Forest Green
-  static const Color primaryDim = Color(0xFF40916C); // Lighter Green
+  // ─── Primary: Sage Green ───
+  static const Color primary = Color(0xFF3A6B4F); // Rich Sage Green
+  static const Color primaryDim = Color(0xFF4A7C5C); // Lighter Sage
   static const Color primaryContainer = Color(0xFFA8E7C5); // Mint Container
   static const Color onPrimary = Color(0xFFFFFFFF); // White on green
+  static const Color cardBorder = Color(0xFF5A8F6E); // Subtle lighter green border on cards
 
   // ─── Secondary: Ocean Blue ───
   static const Color secondary = Color(0xFF1D3557); // Ocean Blue
@@ -60,9 +61,9 @@ abstract final class AppColors {
 
   // ─── Gradient Presets ───
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [primary, primaryDim],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    colors: [primaryDim, primary],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
   );
 
   static const LinearGradient successGradient = LinearGradient(

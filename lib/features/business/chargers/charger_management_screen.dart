@@ -218,15 +218,16 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                               charger["amenities"].length,
                               (i) => Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
+                                    horizontal: 12, vertical: 7),
                                 decoration: BoxDecoration(
-                                  color: AppColors.onPrimary.withValues(alpha: 0.15),
+                                  color: AppColors.card,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
                                   charger["amenities"][i],
                                   style: AppTypography.bodySmall.copyWith(
-                                    color: AppColors.onPrimary.withValues(alpha: 0.8),
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
@@ -239,9 +240,11 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: AppColors.primary),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.card,
+                                  foregroundColor: AppColors.primary,
+                                  side: BorderSide(color: AppColors.border),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
@@ -258,7 +261,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                                 },
                                 child: Text(
                                   "Details",
-                                  style: TextStyle(color: AppColors.primary),
+                                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
                                 ),
                               ),
                             ),
@@ -266,7 +269,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                             Expanded(
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
+                                  backgroundColor: const Color(0xFF16A34A),
                                   foregroundColor: AppColors.onPrimary,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
@@ -284,6 +287,7 @@ class _ChargerManagementScreenState extends State<ChargerManagementScreen> {
                                   charger["status"] == "active"
                                       ? "Pause"
                                       : "Resume",
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
                                 ),
                               ),
                             ),

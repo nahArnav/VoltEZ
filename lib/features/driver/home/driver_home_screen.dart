@@ -27,6 +27,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   final double _rangeKm = 245;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final discovery = context.read<ChargerDiscoveryProvider>();
+      if (discovery.allChargers.isEmpty && !discovery.chargersLoading) {
+        discovery.init();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -322,11 +333,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           child: Column(
             children: [
               GlassCard(
-                accentColor: AppColors.primary,
+                accentColor: a.$3,
                 padding: const EdgeInsets.all(0),
                 borderRadius: 18,
-                blur: 12,
-                opacity: 0.55,
                 child: SizedBox(
                   width: 62,
                   height: 62,

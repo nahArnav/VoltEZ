@@ -305,7 +305,8 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Connector', style: AppTypography.headlineMedium),
-        const SizedBox(height: 12),          GlassCard(
+        const SizedBox(height: 12),
+        GlassCard(
           accentColor: AppColors.primary,
           padding: const EdgeInsets.all(16),
           borderRadius: 14,
@@ -315,11 +316,11 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
+                  color: AppColors.onPrimary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.power_rounded,
-                    color: AppColors.primary),
+                child: Icon(Icons.power_rounded,
+                    color: AppColors.onPrimary.withValues(alpha: 0.9)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -327,10 +328,14 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(connectorNames,
-                        style: AppTypography.headlineSmall),
+                        style: AppTypography.headlineSmall.copyWith(
+                          color: AppColors.onPrimary,
+                        )),
                     Text(
                       '${charger.powerKw.round()} kW · ${charger.powerKw >= 50 ? "DC Fast Charging" : "AC Charging"}',
-                      style: AppTypography.bodySmall,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.onPrimary.withValues(alpha: 0.7),
+                      ),
                     ),
                   ],
                 ),
@@ -339,9 +344,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: _connectorCompatible
-                      ? AppColors.success.withValues(alpha: 0.12)
-                      : AppColors.warning.withValues(alpha: 0.12),
+                  color: AppColors.onPrimary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -349,9 +352,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
                       ? 'COMPATIBLE'
                       : 'CHECK ADAPTER',
                   style: TextStyle(
-                    color: _connectorCompatible
-                        ? AppColors.success
-                        : AppColors.warning,
+                    color: AppColors.onPrimary,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                   ),
@@ -399,14 +400,14 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
                 children: [
                   Icon(
                     icons[a] ?? Icons.check_circle_rounded,
-                    color: AppColors.primary,
+                    color: AppColors.onPrimary.withValues(alpha: 0.8),
                     size: 18,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     a,
                     style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.textPrimary,
+                      color: AppColors.onPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -435,7 +436,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               Column(
                 children: [
                   Text(
-                    charger.rating.toString(),
+                    charger.rating.toStringAsFixed(1),
                     style: const TextStyle(
                       color: AppColors.warning,
                       fontSize: 40,
@@ -487,7 +488,9 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       children: [
         SizedBox(
           width: 60,
-          child: Text(label, style: AppTypography.labelSmall),
+          child: Text(label, style: AppTypography.labelSmall.copyWith(
+            color: AppColors.onPrimary.withValues(alpha: 0.7),
+          )),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -495,8 +498,8 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
             borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
               value: value,
-              color: color,
-              backgroundColor: AppColors.surface,
+              color: AppColors.onPrimary,
+              backgroundColor: AppColors.onPrimary.withValues(alpha: 0.15),
               minHeight: 6,
             ),
           ),
@@ -506,7 +509,9 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
           width: 32,
           child: Text(
             '${(value * 100).round()}%',
-            style: AppTypography.labelSmall.copyWith(color: color),
+            style: AppTypography.labelSmall.copyWith(
+              color: AppColors.onPrimary,
+            ),
             textAlign: TextAlign.end,
           ),
         ),
@@ -528,27 +533,31 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.secondary.withValues(alpha: 0.12),
+              color: AppColors.onPrimary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.business_rounded,
-                color: AppColors.secondary, size: 22),
+            child: Icon(Icons.business_rounded,
+                color: AppColors.onPrimary.withValues(alpha: 0.9), size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Hosted by', style: AppTypography.labelSmall),
+                Text('Hosted by', style: AppTypography.labelSmall.copyWith(
+                  color: AppColors.onPrimary.withValues(alpha: 0.6),
+                )),
                 Text(
                   'VoltEZ Partner',
-                  style: AppTypography.headlineSmall,
+                  style: AppTypography.headlineSmall.copyWith(
+                    color: AppColors.onPrimary,
+                  ),
                 ),
               ],
             ),
           ),
           Icon(Icons.verified_rounded,
-              color: AppColors.success, size: 20),
+              color: AppColors.onPrimary, size: 20),
         ],
       ),
     );
@@ -562,8 +571,8 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       borderRadius: 18,
       child: Row(
         children: [
-          const Icon(Icons.verified_rounded,
-              color: AppColors.success, size: 32),
+          Icon(Icons.verified_rounded,
+              color: AppColors.onPrimary, size: 32),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -571,11 +580,13 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               children: [
                 Text('Verified Charger',
                     style: AppTypography.headlineSmall
-                        .copyWith(color: AppColors.success)),
+                        .copyWith(color: AppColors.onPrimary)),
                 const SizedBox(height: 4),
                 Text(
                   'Verified by VoltEZ. Regularly inspected for safety and performance.',
-                  style: AppTypography.bodySmall,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.onPrimary.withValues(alpha: 0.7),
+                  ),
                 ),
               ],
             ),
@@ -658,18 +669,18 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: AppColors.onPrimary.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 14),
+          Icon(icon, color: AppColors.onPrimary.withValues(alpha: 0.9), size: 14),
           const SizedBox(width: 6),
           Text(
             text,
             style: TextStyle(
-              color: color,
+              color: AppColors.onPrimary,
               fontWeight: FontWeight.w700,
               fontSize: 12,
             ),

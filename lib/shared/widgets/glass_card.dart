@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/colors.dart';
 
-/// Card with gradient background matching the View Details button style.
-/// Uses [AppColors.primaryGradient] by default (deep forest → lighter green).
-/// Pass [gradient] to override, or [accentColor] for a solid fallback.
+/// Card matching the reference design: rich sage green gradient with subtle
+/// lighter-green border, white text. Top slightly lighter, bottom slightly darker.
 class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
@@ -43,6 +42,10 @@ class GlassCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: bg,
         borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: AppColors.cardBorder,
+          width: 1.0,
+        ),
       ),
       child: child,
     );
