@@ -352,6 +352,7 @@ class RoutePlannerProvider extends ChangeNotifier {
               charger: r.charger,
               reason: r.reason,
               estimatedCost: r.estimatedCost,
+              estimatedPricePerKwh: r.estimatedPricePerKwh,
               estimatedTimeMinutes: r.estimatedTimeMinutes,
               confidenceScore: r.confidenceScore,
               detourMinutes: r.detourMinutes,

@@ -163,19 +163,27 @@ enum ConnectorType { ccs2, type2, chademo, gbT, type1, bharatAc, bharatDc }
 enum ChargerStatus { available, busy, offline, maintenance }
 
 String connectorTypeLabel(String type) {
-  switch (type) {
-    case 'CCS2':
+  switch (type.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_')) {
+    case 'ccs2':
       return 'CCS2';
-    case 'Type2':
+    case 'type2':
+    case 'type_2':
       return 'Type 2';
-    case 'Type 2':
-      return 'Type 2';
-    case 'CHAdeMO':
+    case 'chademo':
       return 'CHAdeMO';
-    case 'GB_T':
+    case 'gb_t':
+    case 'gb/t':
+    case 'gbt':
       return 'GB/T';
-    case 'Type1':
+    case 'type1':
+    case 'type_1':
       return 'Type 1';
+    case 'bharat_ac':
+    case 'bharat_ac_001':
+      return 'Bharat AC-001';
+    case 'bharat_dc':
+    case 'bharat_dc_001':
+      return 'Bharat DC-001';
     default:
       return type;
   }
@@ -327,8 +335,10 @@ class Charger {
       case 'CHAdeMO':
         return ConnectorType.chademo;
       case 'GB_T':
+      case 'GB/T':
         return ConnectorType.gbT;
       case 'Type1':
+      case 'Type 1':
         return ConnectorType.type1;
       case 'Bharat AC':
       case 'Bharat AC-001':
@@ -420,10 +430,7 @@ class Charger {
           (json['power_kw'] as num?)?.toDouble() ??
           (json['powerKw'] as num?)?.toDouble() ??
           0,
-      accessType:
-          json['access_type'] as String? ??
-          json['charger_type'] as String? ??
-          'public',
+      accessType: json['access_type'] as String? ?? 'public',
       basePrice:
           (json['base_price'] as num?)?.toDouble() ??
           (json['price_per_kwh'] as num?)?.toDouble() ??
@@ -630,6 +637,8 @@ String _connectorNameFromId(int id) {
     3: 'CHAdeMO',
     4: 'Bharat AC',
     5: 'Bharat DC',
+    6: 'Type 1',
+    7: 'GB/T',
   };
   return names[id] ?? 'Unknown';
 }
@@ -640,6 +649,12 @@ int _connectorIdFromName(String name) {
       return 2;
     case 'chademo':
       return 3;
+    case 'type1':
+      return 6;
+    case 'gb/t':
+    case 'gb_t':
+    case 'gbt':
+      return 7;
     case 'bharatac':
       return 4;
     case 'bharatdc':
@@ -861,6 +876,7 @@ class ChargerRecommendation {
   final Charger charger;
   final String reason;
   final double estimatedCost;
+  final double? estimatedPricePerKwh;
   final int estimatedTimeMinutes;
   final double confidenceScore;
   final int detourMinutes;
@@ -874,6 +890,7 @@ class ChargerRecommendation {
     required this.charger,
     required this.reason,
     required this.estimatedCost,
+    this.estimatedPricePerKwh,
     required this.estimatedTimeMinutes,
     required this.confidenceScore,
     this.detourMinutes = 0,

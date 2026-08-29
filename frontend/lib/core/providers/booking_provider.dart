@@ -41,7 +41,7 @@ enum BookingPhase {
 /// a purpose-built [BookingApi] implementation explicitly.
 class BookingProvider extends ChangeNotifier {
   BookingProvider({BookingApi? bookingApi})
-      : _api = bookingApi ?? LiveBookingApi(ApiService());
+    : _api = bookingApi ?? LiveBookingApi(ApiService());
 
   final BookingApi _api;
 
@@ -76,6 +76,7 @@ class BookingProvider extends ChangeNotifier {
   // ─── Payment ───
   PaymentOrder? _paymentOrder;
   PaymentOrder? get paymentOrder => _paymentOrder;
+  String? _paymentOrderMethod;
   String _paymentMethod = 'upi';
   String get paymentMethod => _paymentMethod;
 
@@ -169,27 +170,51 @@ class BookingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Proceed to payment after hold is confirmed.
-  Future<void> proceedToPayment({String method = 'upi'}) async {
+  /// Open the payment step after a hold is confirmed.
+  ///
+  /// The gateway order is intentionally created only when the user taps Pay.
+  /// This lets the user choose UPI, card, or cash before an irreversible
+  /// provider order is created (Razorpay orders cannot be changed from UPI to
+  /// card after creation).
+  void proceedToPayment({String method = 'upi'}) {
     if (_holdResult == null) return;
 
     _paymentMethod = method;
+    _paymentOrder = null;
+    _paymentOrderMethod = null;
     _phase = BookingPhase.paymentPending;
     _errorMessage = null;
     notifyListeners();
+  }
 
+  /// Create the server-side payment order for the selected method.
+  /// Returns false when the backend/provider cannot prepare payment.
+  Future<bool> preparePayment({String? method}) async {
+    if (_holdResult == null) return false;
+    final selectedMethod = method ?? _paymentMethod;
+    _paymentMethod = selectedMethod;
+    if (_paymentOrder != null && _paymentOrderMethod == selectedMethod) {
+      return true;
+    }
+
+    _phase = BookingPhase.paymentPending;
+    _errorMessage = null;
+    notifyListeners();
     try {
       _paymentOrder = await _api.createPaymentOrder(
         bookingId: _holdResult!.bookingId,
         amount: _holdResult!.estimatedCost,
-        method: method,
+        method: selectedMethod,
       );
+      _paymentOrderMethod = selectedMethod;
+      notifyListeners();
+      return true;
     } catch (e) {
       _errorMessage = 'Failed to create payment order.';
       _phase = BookingPhase.held;
+      notifyListeners();
+      return false;
     }
-
-    notifyListeners();
   }
 
   /// Cash is confirmed as a reservation immediately and settled at the
@@ -197,6 +222,7 @@ class BookingProvider extends ChangeNotifier {
   /// from the backend after the cash method is accepted.
   Future<void> processCashPayment() async {
     if (_holdResult == null) return;
+    if (!await preparePayment(method: 'cash')) return;
     _phase = BookingPhase.paymentProcessing;
     _errorMessage = null;
     notifyListeners();
@@ -255,6 +281,7 @@ class BookingProvider extends ChangeNotifier {
   void retryPayment() {
     _errorMessage = null;
     _paymentOrder = null;
+    _paymentOrderMethod = null;
     _paymentMethod = 'upi';
     _phase = BookingPhase.held;
     notifyListeners();
@@ -276,6 +303,7 @@ class BookingProvider extends ChangeNotifier {
     _stopCountdown();
     _errorMessage = null;
     _paymentOrder = null;
+    _paymentOrderMethod = null;
     _holdResult = null;
     _selectedSlot = null;
     _phase = BookingPhase.paymentCancelled;
@@ -295,6 +323,7 @@ class BookingProvider extends ChangeNotifier {
     _selectedSlot = null;
     _holdResult = null;
     _paymentOrder = null;
+    _paymentOrderMethod = null;
     _confirmedBooking = null;
     _errorMessage = null;
     _phase = BookingPhase.idle;
@@ -333,6 +362,7 @@ class BookingProvider extends ChangeNotifier {
         _selectedSlot = null;
         _holdResult = null;
         _paymentOrder = null;
+        _paymentOrderMethod = null;
         _errorMessage = 'Your hold has expired. Please select another slot.';
         notifyListeners();
       }

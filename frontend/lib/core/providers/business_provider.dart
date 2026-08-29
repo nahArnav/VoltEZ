@@ -48,16 +48,40 @@ class BusinessProvider extends ChangeNotifier {
   Future<void> _loadBusinessData() async {
     final id = businessId;
     if (id == null) return;
-    final responses = await Future.wait([
-      _api.getBusinessChargers(id),
-      _api.getBusinessBookings(id),
-      _api.getAnalytics(id),
-      _api.getBusinessDashboard(id),
+    String? firstError;
+    await Future.wait<void>([
+      () async {
+        try {
+          chargers = _maps((await _api.getBusinessChargers(id)).data);
+        } catch (error) {
+          firstError ??= _message(error);
+        }
+      }(),
+      () async {
+        try {
+          bookings = _maps((await _api.getBusinessBookings(id)).data);
+        } catch (error) {
+          firstError ??= _message(error);
+        }
+      }(),
+      () async {
+        try {
+          recommendations = _maps((await _api.getAnalytics(id)).data);
+        } catch (error) {
+          firstError ??= _message(error);
+        }
+      }(),
+      () async {
+        try {
+          dashboard = Map<String, dynamic>.from(
+            (await _api.getBusinessDashboard(id)).data as Map,
+          );
+        } catch (error) {
+          firstError ??= _message(error);
+        }
+      }(),
     ]);
-    chargers = _maps(responses[0].data);
-    bookings = _maps(responses[1].data);
-    recommendations = _maps(responses[2].data);
-    dashboard = Map<String, dynamic>.from(responses[3].data as Map);
+    errorMessage = firstError;
   }
 
   Future<bool> createBusiness({
@@ -87,6 +111,7 @@ class BusinessProvider extends ChangeNotifier {
     required double pricePerKwh,
     required double latitude,
     required double longitude,
+    String? addressText,
   }) async {
     final id = businessId;
     if (id == null) return false;
@@ -100,6 +125,8 @@ class BusinessProvider extends ChangeNotifier {
         'status': 'available',
         'latitude': latitude,
         'longitude': longitude,
+        if (addressText != null && addressText.trim().isNotEmpty)
+          'address_text': addressText.trim(),
       });
       await _loadBusinessData();
     });
@@ -129,6 +156,16 @@ class BusinessProvider extends ChangeNotifier {
     });
   }
 
+  Future<bool> updateChargerTariff({
+    required String chargerId,
+    required double pricePerKwh,
+  }) async {
+    return _mutate(() async {
+      await _api.updateCharger(chargerId, {'price_per_kwh': pricePerKwh});
+      await _loadBusinessData();
+    });
+  }
+
   Future<bool> cancelBooking(String bookingId) async {
     final id = businessId;
     if (id == null) return false;
@@ -149,14 +186,14 @@ class BusinessProvider extends ChangeNotifier {
       final payload = <String, dynamic>{};
       if (gstin != null) payload['gstin'] = gstin;
       if (panNumber != null) payload['pan_number'] = panNumber;
-      if (electricityMeterId != null) payload['electricity_meter_id'] = electricityMeterId;
+      if (electricityMeterId != null) {
+        payload['electricity_meter_id'] = electricityMeterId;
+      }
       if (payoutUpiId != null) payload['payout_upi_id'] = payoutUpiId;
       await _api.submitBusinessKyc(businessId, payload);
       await _loadBusinessData();
     });
   }
-
-
 
   Future<bool> createAvailability({
     required String portId,
@@ -216,9 +253,12 @@ class BusinessProvider extends ChangeNotifier {
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
 
-  static String _message(DioException error) {
+  static String _message(Object error) {
+    if (error is! DioException) return error.toString();
     final data = error.response?.data;
-    if (data is Map && data['detail'] is String) return data['detail'] as String;
+    if (data is Map && data['detail'] is String) {
+      return data['detail'] as String;
+    }
     return error.error?.toString() ?? error.message ?? 'Request failed';
   }
 }

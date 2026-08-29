@@ -11,7 +11,7 @@ class StationSpecs {
 
   factory StationSpecs.fromJson(Map<String, dynamic> json) {
     return StationSpecs(
-      location: json['location'] as String? ?? 'Shivajinagar, Pune',
+      location: json['location'] as String? ?? '',
       activeChargers: (json['activeChargers'] as num?)?.toInt() ?? 0,
       totalPowerKw: (json['totalPowerKw'] as num?)?.toInt() ?? 0,
     );
@@ -39,7 +39,7 @@ class StationStats {
     return StationStats(
       totalRevenue: (json['totalRevenue'] as num?)?.toDouble() ?? 0.0,
       kwhDispensed: (json['kwhDispensed'] as num?)?.toDouble() ?? 0.0,
-      reliabilityPercent: (json['reliabilityPercent'] as num?)?.toInt() ?? 98,
+      reliabilityPercent: (json['reliabilityPercent'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -106,7 +106,7 @@ class UserProfile {
       email: json['email'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
       businessName: json['businessName'] as String? ?? '',
-      isVerifiedHost: json['isVerifiedHost'] as bool? ?? true,
+      isVerifiedHost: json['isVerifiedHost'] as bool? ?? false,
       stationSpecs: StationSpecs.fromJson(
         json['stationSpecs'] as Map<String, dynamic>? ?? {},
       ),

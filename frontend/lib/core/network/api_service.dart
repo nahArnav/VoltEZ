@@ -158,7 +158,7 @@ class ApiService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /// POST /vehicles
-  /// Body: { make, model, battery_kwh, connector_types: ["CCS2"], max_ac_kw?, max_dc_kw?, estimated_range_km? }
+  /// Body: { make, model, vehicle_class, battery_kwh, connector_type_ids: [1], max_ac_kw?, max_dc_kw?, estimated_range_km? }
   Future<Response> createVehicle(Map<String, dynamic> data) =>
       _dio.post('/vehicles/', data: data);
 

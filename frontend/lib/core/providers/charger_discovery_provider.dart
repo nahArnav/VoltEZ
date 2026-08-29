@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../network/api_service.dart';
@@ -49,8 +48,9 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
     return _allChargers.where((c) {
       // Connector filter
       if (_selectedConnectorStrings.isNotEmpty) {
-        final hasMatchingConnector = c.connectorTypes
-            .any(_selectedConnectorStrings.contains);
+        final hasMatchingConnector = c.connectorTypes.any(
+          _selectedConnectorStrings.contains,
+        );
         if (!hasMatchingConnector) return false;
       }
 
@@ -151,10 +151,11 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
 
       final data = response.data;
       if (data is List) {
-        _allChargers = data
-            .map((json) => Charger.fromJson(json as Map<String, dynamic>))
-            .toList()
-          ..sort((a, b) => distanceTo(a).compareTo(distanceTo(b)));
+        _allChargers =
+            data
+                .map((json) => Charger.fromJson(json as Map<String, dynamic>))
+                .toList()
+              ..sort((a, b) => distanceTo(a).compareTo(distanceTo(b)));
       } else {
         _allChargers = [];
       }
@@ -181,18 +182,14 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   /// Calculate distance from user to a charger in km.
   double distanceTo(Charger charger) {
     if (_currentPosition == null) return 0;
-    // Haversine approximation for short distances
-    const earthRadius = 6371.0;
-    final dLat = _degreesToRad(charger.latitude - _currentPosition!.latitude);
-    final dLon = _degreesToRad(charger.longitude - _currentPosition!.longitude);
-    final a = dLat * dLat +
-        math.cos(_degreesToRad(_currentPosition!.latitude)) *
-            math.cos(_degreesToRad(charger.latitude)) *
-            dLon * dLon;
-    return earthRadius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return Geolocator.distanceBetween(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          charger.latitude,
+          charger.longitude,
+        ) /
+        1000;
   }
-
-  double _degreesToRad(double degrees) => degrees * math.pi / 180;
 
   // ─── Filter Mutators ───
   void toggleConnector(String connectorType) {

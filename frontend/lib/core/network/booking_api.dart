@@ -49,6 +49,18 @@ class SlotInfo {
         return 'Type 2';
       case 'chademo':
         return 'CHAdeMO';
+      case 'bharat_ac':
+      case 'bharat_ac_001':
+        return 'Bharat AC';
+      case 'bharat_dc':
+      case 'bharat_dc_001':
+        return 'Bharat DC';
+      case 'type_1':
+      case 'type1':
+        return 'Type 1';
+      case 'gb_t':
+      case 'gbt':
+        return 'GB/T';
       default:
         return connectorType;
     }
@@ -359,6 +371,8 @@ class LiveBookingApi implements BookingApi {
           3: 'CHAdeMO',
           4: 'Bharat AC',
           5: 'Bharat DC',
+          6: 'Type 1',
+          7: 'GB/T',
         }[id] ??
         'Unknown';
   }
