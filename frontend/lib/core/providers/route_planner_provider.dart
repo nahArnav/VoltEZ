@@ -1,9 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../shared/models/models.dart';
 import '../network/api_service.dart';
 import '../network/route_recommendation_api.dart';
+
+class LocationSuggestion {
+  const LocationSuggestion({required this.label, required this.latitude, required this.longitude});
+  final String label;
+  final double latitude;
+  final double longitude;
+}
 
 /// Manages the full route-planner flow:
 /// origin → destination → vehicle/SOC → find → top-3 recommendations.
@@ -44,6 +53,13 @@ class RoutePlannerProvider extends ChangeNotifier {
   bool _hasSearched = false;
   String? _analysisError;
 
+  Timer? _originSearchTimer;
+  Timer? _destinationSearchTimer;
+  int _originSearchToken = 0;
+  int _destinationSearchToken = 0;
+  List<LocationSuggestion> _originSuggestions = const [];
+  List<LocationSuggestion> _destinationSuggestions = const [];
+
   // ─── Getters ───
   String get originName => _originName;
   double? get originLat => _originLat;
@@ -63,6 +79,8 @@ class RoutePlannerProvider extends ChangeNotifier {
   bool get isAnalyzing => _isAnalyzing;
   bool get hasSearched => _hasSearched;
   String? get analysisError => _analysisError;
+  List<LocationSuggestion> get originSuggestions => _originSuggestions;
+  List<LocationSuggestion> get destinationSuggestions => _destinationSuggestions;
 
   bool get isRouteValid =>
       _originName.isNotEmpty &&
@@ -118,6 +136,7 @@ class RoutePlannerProvider extends ChangeNotifier {
     _originLat = lat;
     _originLng = lng;
     _usingCurrentLocation = false;
+    if (lat == null || lng == null) _originSuggestions = const [];
     notifyListeners();
   }
 
@@ -154,7 +173,81 @@ class RoutePlannerProvider extends ChangeNotifier {
     _destinationName = name;
     _destinationLat = lat;
     _destinationLng = lng;
+    if (lat == null || lng == null) _destinationSuggestions = const [];
     notifyListeners();
+  }
+
+  /// Debounced platform address search used by the route form.  Suggestions
+  /// carry the coordinates returned by the OS geocoder, so selecting one
+  /// removes ambiguity before the backend receives a route request.
+  void searchOrigin(String query) {
+    _originSearchTimer?.cancel();
+    final token = ++_originSearchToken;
+    if (query.trim().length < 3 || _usingCurrentLocation) {
+      _originSuggestions = const [];
+      notifyListeners();
+      return;
+    }
+    _originSearchTimer = Timer(const Duration(milliseconds: 350), () async {
+      final results = await _searchAddress(query.trim());
+      if (token != _originSearchToken) return;
+      _originSuggestions = results;
+      notifyListeners();
+    });
+  }
+
+  void searchDestination(String query) {
+    _destinationSearchTimer?.cancel();
+    final token = ++_destinationSearchToken;
+    if (query.trim().length < 3) {
+      _destinationSuggestions = const [];
+      notifyListeners();
+      return;
+    }
+    _destinationSearchTimer = Timer(const Duration(milliseconds: 350), () async {
+      final results = await _searchAddress(query.trim());
+      if (token != _destinationSearchToken) return;
+      _destinationSuggestions = results;
+      notifyListeners();
+    });
+  }
+
+  Future<List<LocationSuggestion>> _searchAddress(String query) async {
+    try {
+      final locations = await locationFromAddress(query);
+      final suggestions = <LocationSuggestion>[];
+      for (final location in locations.take(5)) {
+        var label = query;
+        try {
+          final placemarks = await placemarkFromCoordinates(location.latitude, location.longitude);
+          if (placemarks.isNotEmpty) {
+            final p = placemarks.first;
+            label = [p.name, p.street, p.locality, p.administrativeArea]
+                .whereType<String>()
+                .map((value) => value.trim())
+                .where((value) => value.isNotEmpty)
+                .toSet()
+                .join(', ');
+          }
+        } catch (_) {
+          // Coordinate results are still valid even if reverse labelling fails.
+        }
+        suggestions.add(LocationSuggestion(label: label, latitude: location.latitude, longitude: location.longitude));
+      }
+      return suggestions;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  void selectOriginSuggestion(LocationSuggestion suggestion) {
+    _originSuggestions = const [];
+    setOrigin(suggestion.label, lat: suggestion.latitude, lng: suggestion.longitude);
+  }
+
+  void selectDestinationSuggestion(LocationSuggestion suggestion) {
+    _destinationSuggestions = const [];
+    setDestination(suggestion.label, lat: suggestion.latitude, lng: suggestion.longitude);
   }
 
   /// Resolve typed origin/destination names with the platform geocoder.
@@ -281,6 +374,8 @@ class RoutePlannerProvider extends ChangeNotifier {
 
   // ─── Reset ───
   void reset() {
+    _originSearchTimer?.cancel();
+    _destinationSearchTimer?.cancel();
     _originName = '';
     _originLat = null;
     _originLng = null;
@@ -295,6 +390,15 @@ class RoutePlannerProvider extends ChangeNotifier {
     _isAnalyzing = false;
     _hasSearched = false;
     _analysisError = null;
+    _originSuggestions = const [];
+    _destinationSuggestions = const [];
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _originSearchTimer?.cancel();
+    _destinationSearchTimer?.cancel();
+    super.dispose();
   }
 }

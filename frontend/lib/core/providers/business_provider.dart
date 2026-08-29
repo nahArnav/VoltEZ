@@ -14,6 +14,7 @@ class BusinessProvider extends ChangeNotifier {
   List<Map<String, dynamic>> chargers = const [];
   List<Map<String, dynamic>> bookings = const [];
   List<Map<String, dynamic>> recommendations = const [];
+  Map<String, dynamic> dashboard = const {};
 
   bool get needsOnboarding => !isLoading && business == null;
   String? get businessId => business?['id']?.toString();
@@ -32,6 +33,7 @@ class BusinessProvider extends ChangeNotifier {
         chargers = const [];
         bookings = const [];
         recommendations = const [];
+        dashboard = const {};
       } else {
         errorMessage = _message(error);
       }
@@ -50,10 +52,12 @@ class BusinessProvider extends ChangeNotifier {
       _api.getBusinessChargers(id),
       _api.getBusinessBookings(id),
       _api.getAnalytics(id),
+      _api.getBusinessDashboard(id),
     ]);
     chargers = _maps(responses[0].data);
     bookings = _maps(responses[1].data);
     recommendations = _maps(responses[2].data);
+    dashboard = Map<String, dynamic>.from(responses[3].data as Map);
   }
 
   Future<bool> createBusiness({
@@ -68,7 +72,6 @@ class BusinessProvider extends ChangeNotifier {
         'name': name,
         'category': category,
         'address_text': address,
-        'zone_id': '11111111-1111-4111-8111-111111111111',
         'latitude': latitude,
         'longitude': longitude,
       });
@@ -81,6 +84,7 @@ class BusinessProvider extends ChangeNotifier {
     required String name,
     required String chargerType,
     required double powerKw,
+    required double pricePerKwh,
     required double latitude,
     required double longitude,
   }) async {
@@ -92,6 +96,7 @@ class BusinessProvider extends ChangeNotifier {
         'name': name,
         'charger_type': chargerType,
         'power_kw': powerKw,
+        'price_per_kwh': pricePerKwh,
         'status': 'available',
         'latitude': latitude,
         'longitude': longitude,
@@ -123,6 +128,35 @@ class BusinessProvider extends ChangeNotifier {
       await _loadBusinessData();
     });
   }
+
+  Future<bool> cancelBooking(String bookingId) async {
+    final id = businessId;
+    if (id == null) return false;
+    return _mutate(() async {
+      await _api.cancelBusinessBooking(id, bookingId);
+      await _loadBusinessData();
+    });
+  }
+
+  Future<bool> submitKyc({
+    required String businessId,
+    String? gstin,
+    String? panNumber,
+    String? electricityMeterId,
+    String? payoutUpiId,
+  }) async {
+    return _mutate(() async {
+      final payload = <String, dynamic>{};
+      if (gstin != null) payload['gstin'] = gstin;
+      if (panNumber != null) payload['pan_number'] = panNumber;
+      if (electricityMeterId != null) payload['electricity_meter_id'] = electricityMeterId;
+      if (payoutUpiId != null) payload['payout_upi_id'] = payoutUpiId;
+      await _api.submitBusinessKyc(businessId, payload);
+      await _loadBusinessData();
+    });
+  }
+
+
 
   Future<bool> createAvailability({
     required String portId,

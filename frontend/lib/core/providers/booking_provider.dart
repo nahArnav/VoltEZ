@@ -76,6 +76,8 @@ class BookingProvider extends ChangeNotifier {
   // ─── Payment ───
   PaymentOrder? _paymentOrder;
   PaymentOrder? get paymentOrder => _paymentOrder;
+  String _paymentMethod = 'upi';
+  String get paymentMethod => _paymentMethod;
 
   // ─── Confirmation ───
   ConfirmedBooking? _confirmedBooking;
@@ -168,9 +170,10 @@ class BookingProvider extends ChangeNotifier {
   }
 
   /// Proceed to payment after hold is confirmed.
-  Future<void> proceedToPayment() async {
+  Future<void> proceedToPayment({String method = 'upi'}) async {
     if (_holdResult == null) return;
 
+    _paymentMethod = method;
     _phase = BookingPhase.paymentPending;
     _errorMessage = null;
     notifyListeners();
@@ -179,12 +182,32 @@ class BookingProvider extends ChangeNotifier {
       _paymentOrder = await _api.createPaymentOrder(
         bookingId: _holdResult!.bookingId,
         amount: _holdResult!.estimatedCost,
+        method: method,
       );
     } catch (e) {
       _errorMessage = 'Failed to create payment order.';
       _phase = BookingPhase.held;
     }
 
+    notifyListeners();
+  }
+
+  /// Cash is confirmed as a reservation immediately and settled at the
+  /// station. No client-side success is fabricated; the booking is re-read
+  /// from the backend after the cash method is accepted.
+  Future<void> processCashPayment() async {
+    if (_holdResult == null) return;
+    _phase = BookingPhase.paymentProcessing;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      _confirmedBooking = await _api.confirmCashPayment(_holdResult!.bookingId);
+      _stopCountdown();
+      _phase = BookingPhase.confirmed;
+    } catch (_) {
+      _errorMessage = 'Could not confirm the pay-at-charger reservation.';
+      _phase = BookingPhase.paymentFailed;
+    }
     notifyListeners();
   }
 
@@ -232,6 +255,7 @@ class BookingProvider extends ChangeNotifier {
   void retryPayment() {
     _errorMessage = null;
     _paymentOrder = null;
+    _paymentMethod = 'upi';
     _phase = BookingPhase.held;
     notifyListeners();
   }

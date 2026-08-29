@@ -372,7 +372,29 @@ class ApiService {
 
   Future<Response> getBusinessBookings(String businessId) =>
       _dio.get('/businesses/$businessId/bookings');
+
+  Future<Response> cancelBusinessBooking(String businessId, String bookingId) =>
+      _dio.post('/businesses/$businessId/bookings/$bookingId/cancel');
+
+  Future<Response> getBusinessDashboard(String businessId) =>
+      _dio.get('/analytics/businesses/$businessId/dashboard');
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // KYC APIs
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Future<Response> getUserKyc() => _dio.get('/users/me/kyc');
+
+  Future<Response> submitUserKyc(Map<String, dynamic> data) =>
+      _dio.post('/users/me/kyc', data: data);
+
+  Future<Response> getBusinessKyc(String businessId) =>
+      _dio.get('/businesses/$businessId/kyc');
+
+  Future<Response> submitBusinessKyc(String businessId, Map<String, dynamic> data) =>
+      _dio.post('/businesses/$businessId/kyc', data: data);
 }
+
 
 /// Adds Bearer token to every request.
 class _AuthInterceptor extends Interceptor {

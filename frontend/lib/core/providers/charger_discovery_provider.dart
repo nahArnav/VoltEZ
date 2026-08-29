@@ -125,7 +125,10 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> refreshLocation() async => _fetchLocation();
+  Future<void> refreshLocation() async {
+    await _fetchLocation();
+    await fetchNearbyChargers();
+  }
 
   // ─── Chargers ───
   Future<void> fetchNearbyChargers() async {
@@ -150,7 +153,8 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
       if (data is List) {
         _allChargers = data
             .map((json) => Charger.fromJson(json as Map<String, dynamic>))
-            .toList();
+            .toList()
+          ..sort((a, b) => distanceTo(a).compareTo(distanceTo(b)));
       } else {
         _allChargers = [];
       }
@@ -158,10 +162,11 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
       _chargersLoading = false;
       _chargersError = null;
     } catch (e) {
-      // If the backend is unreachable, fall back to demo chargers
-      // so the UI is not blank during development.
+      // Never fabricate stations when the API is unavailable. Showing a
+      // fixture here can cause a driver to navigate to a charger that does
+      // not exist and is especially dangerous when booking is enabled.
       _chargersError = e.toString();
-      _allChargers = _demoChargers();
+      _allChargers = [];
       _chargersLoading = false;
     }
     notifyListeners();
@@ -188,15 +193,6 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   }
 
   double _degreesToRad(double degrees) => degrees * math.pi / 180;
-
-  /// Demo chargers shown when backend is unreachable.
-  List<Charger> _demoChargers() {
-    return [
-      const Charger(id: '1', businessId: '1', name: 'Phoenix Mall Charger', address: 'Phoenix Mall, Lower Parel, Mumbai', latitude: 19.0760, longitude: 72.8777, powerKw: 60, accessType: 'public', basePrice: 14, status: 'active', reliabilityScore: 0.92, amenities: 'WiFi,Food Court,Parking'),
-      const Charger(id: '2', businessId: '1', name: 'Highway Fast Charge', address: 'Mumbai-Pune Expressway, Khalapur', latitude: 19.0896, longitude: 72.8656, powerKw: 120, accessType: 'public', basePrice: 18, status: 'active', reliabilityScore: 0.84, amenities: 'Restroom,Cafe'),
-      const Charger(id: '3', businessId: '1', name: 'Tech Park Station', address: 'Infosys Campus, Airoli', latitude: 19.0596, longitude: 72.8295, powerKw: 30, accessType: 'public', basePrice: 11, status: 'active', reliabilityScore: 0.96, amenities: 'WiFi'),
-    ];
-  }
 
   // ─── Filter Mutators ───
   void toggleConnector(String connectorType) {

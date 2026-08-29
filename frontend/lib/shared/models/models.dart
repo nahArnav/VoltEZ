@@ -155,7 +155,7 @@ enum PortStatus { available, occupied, offline, unknown }
 
 /// Backward-compatible connector type enum (legacy screens reference this).
 /// Backend uses plain strings: "CCS2", "Type2", "CHAdeMO", etc.
-enum ConnectorType { ccs2, type2, chademo, gbT, type1 }
+enum ConnectorType { ccs2, type2, chademo, gbT, type1, bharatAc, bharatDc }
 
 /// Backward-compatible charger status enum (legacy screens reference this).
 /// Backend uses: "active"/"paused"/"inactive" for charger status,
@@ -330,6 +330,12 @@ class Charger {
         return ConnectorType.gbT;
       case 'Type1':
         return ConnectorType.type1;
+      case 'Bharat AC':
+      case 'Bharat AC-001':
+        return ConnectorType.bharatAc;
+      case 'Bharat DC':
+      case 'Bharat DC-001':
+        return ConnectorType.bharatDc;
       default:
         return ConnectorType.ccs2;
     }
@@ -351,6 +357,12 @@ class Charger {
               return ConnectorType.gbT;
             case 'type1':
               return ConnectorType.type1;
+            case 'bharat_ac_001':
+            case 'bharat ac':
+              return ConnectorType.bharatAc;
+            case 'bharat_dc_001':
+            case 'bharat dc':
+              return ConnectorType.bharatDc;
             default:
               return ConnectorType.ccs2;
           }
@@ -414,6 +426,7 @@ class Charger {
           'public',
       basePrice:
           (json['base_price'] as num?)?.toDouble() ??
+          (json['price_per_kwh'] as num?)?.toDouble() ??
           (json['pricePerKwh'] as num?)?.toDouble() ??
           0,
       status: statusStr,
