@@ -9,10 +9,12 @@ from app.db.session import get_db  # Using the correct path we found earlier!
 # Import your FastAPI app and database dependency
 from app.main import app
 
-TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/voltez",
-)
+_default_db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@127.0.0.1:5433/voltez")
+if "psycopg" in _default_db_url and "asyncpg" not in _default_db_url:
+    _default_db_url = _default_db_url.replace("postgresql+psycopg://", "postgresql+asyncpg://")
+
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", _default_db_url)
+
 
 
 @pytest_asyncio.fixture(scope="function")

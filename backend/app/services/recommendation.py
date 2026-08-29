@@ -147,14 +147,17 @@ class RecommendationService:
             )
             estimated_charge_min = ideal_time_hr * 60.0 * 1.2  # 1.2 is a taper factor
 
-            # Cost remains a configured fallback until tariff tables are added.
-            charger_base_price = settings.DEFAULT_PRICE_PER_KWH_INR
+            # Use the station tariff. The process setting remains only for
+            # legacy rows created before the tariff migration.
+            charger_base_price = get_float(
+                charger, "price_per_kwh", settings.DEFAULT_PRICE_PER_KWH_INR
+            )
             estimated_cost = required_energy_kwh * charger_base_price
 
             # Wait time (ML Model 2)
             rel_score = max(0.0, min(1.0, get_float(charger, "reliability_score", 50.0) / 100.0))
             wait_prediction = await ml_adapter.predict_wait_time(
-                db, charger_id=charger.id, port_id=best_port_id, model=availability_model
+                db, charger_id=charger.id, port_id=best_port_id
             )
             predicted_wait_min = wait_prediction["wait_minutes"]
 

@@ -125,3 +125,25 @@ docker-compose.override.yml
 # Local IDE configuration files
 *.iml
 *.local
+
+# System & crash dumps
+*.dSYM/
+*.core
+*.dump
+*.stackdump
+
+# Test and benchmark caches
+.tox/
+.nox/
+.hypothesis/
+.cache/
+**/.cache/
+
+# Bundles & artifacts
+*.tar
+*.iso
+*.dmg
+*.bin
+*.out
+*.trace
+

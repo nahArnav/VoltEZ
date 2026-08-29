@@ -42,5 +42,10 @@ class BookingResponse(BookingBase):
     hold_expires_at: datetime | None = None
     cancelled_at: datetime | None = None
     created_at: datetime
+    charger_name: str | None = None
+    charger_address: str | None = None
+    connector_type: str | None = None
+    power_kw: float | None = None
+    price_per_kwh: float | None = None
 
     model_config = ConfigDict(from_attributes=True)

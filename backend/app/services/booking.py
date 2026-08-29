@@ -129,8 +129,14 @@ class BookingService:
             )
 
         old_status = booking_status.value
+        now = datetime.now(UTC)
         booking.status = BookingStatus.CANCELLED.value
+        booking.cancelled_at = now
         db.add(booking)
+
+        # Cancellation policy: Free cancellation >= 15 min before start; late penalty if < 15 min
+        is_late = (booking.start_at - now) < timedelta(minutes=15)
+        penalty_fee = 50.0 if is_late else 0.0
 
         # Write audit event (BR-009)
         event = BookingEvent(
@@ -138,13 +144,19 @@ class BookingService:
             old_status=old_status,
             new_status=BookingStatus.CANCELLED.value,
             actor=f"user:{user_id}",
-            metadata_={"reason": "user_cancelled"},
+            metadata_={
+                "reason": "user_cancelled",
+                "late_cancellation": is_late,
+                "penalty_fee_inr": penalty_fee,
+                "cancelled_at": now.isoformat(),
+            },
         )
         db.add(event)
 
         await db.commit()
         await db.refresh(booking)
         return booking
+
 
 
 booking_service = BookingService()

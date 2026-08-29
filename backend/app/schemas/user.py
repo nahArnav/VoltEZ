@@ -55,3 +55,21 @@ class UserResponse(UserBase):
 
     # This tells Pydantic to read data directly from the SQLAlchemy model
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserKYCSubmit(BaseModel):
+    document_type: Literal["driving_license", "aadhaar", "voter_id", "passport"] = "driving_license"
+    document_number: str
+    vehicle_rc_number: str | None = None
+
+
+class UserKYCResponse(BaseModel):
+    user_id: UUID
+    verification_status: str
+    document_type: str
+    document_number_masked: str
+    vehicle_rc_number: str | None = None
+    submitted_at: datetime
+    cancellation_strikes: int = 0
+    penalty_points: int = 0
+

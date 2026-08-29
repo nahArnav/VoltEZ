@@ -77,6 +77,15 @@ class Charger(Base):
         nullable=False,
     )
 
+    # Public tariff used for estimates and final session billing. Keeping the
+    # rate on the station (rather than in the client or a process constant)
+    # means owners can price each location and every estimate is auditable.
+    price_per_kwh: Mapped[float] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+        default=15.0,
+    )
+
     status: Mapped[str] = mapped_column(
         String(30),
         nullable=False,

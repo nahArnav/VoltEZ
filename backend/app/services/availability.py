@@ -76,6 +76,16 @@ class AvailabilityService:
         now = datetime.now(UTC)
         bookings = await booking_repo.get_active_by_port(db, port_id=port_id, current_time=now)
 
+        price_result = await db.execute(
+            select(Charger.price_per_kwh)
+            .select_from(ChargerPort)
+            .join(Charger, Charger.id == ChargerPort.charger_id)
+            .where(ChargerPort.id == port_id)
+        )
+        price_per_kwh = float(
+            price_result.scalar_one_or_none() or settings.DEFAULT_PRICE_PER_KWH_INR
+        )
+
         slots: dict[tuple[datetime, datetime], dict] = {}
         for window in positive:
             cursor = datetime.combine(local_date, window.start_local_time, tzinfo=local_zone)
@@ -97,7 +107,7 @@ class AvailabilityService:
                         "charger_port_id": port_id,
                         "start_at": start_utc,
                         "end_at": end_utc,
-                        "price_per_kwh": settings.DEFAULT_PRICE_PER_KWH_INR,
+                        "price_per_kwh": price_per_kwh,
                     }
                 cursor = slot_end
 

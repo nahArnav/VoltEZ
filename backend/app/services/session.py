@@ -3,6 +3,7 @@ from typing import cast
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.errors import BadRequestError, ForbiddenError, NotFoundError
@@ -15,6 +16,7 @@ from app.services.trust import trust_service
 from app.websockets.manager import manager
 from database.models.booking_event import BookingEvent
 from database.models.charging_session import ChargingSession
+from database.models.charger import Charger
 
 
 class SessionService:
@@ -186,8 +188,18 @@ class SessionService:
         if energy_kwh < 0:
             raise BadRequestError(message="Energy delivered cannot be negative.")
 
-        # 1. Calculate cost (pricing should come from another domain)
+        # 1. Calculate cost from the station's persisted tariff.  The global
+        # setting is only a safe fallback for legacy chargers created before
+        # the tariff column existed; it must never override a station price.
+        port = await charger_port_repo.get(db, id=booking.charger_port_id)
         rate_per_kwh = settings.DEFAULT_PRICE_PER_KWH_INR
+        if port is not None:
+            charger_result = await db.execute(
+                select(Charger.price_per_kwh).where(Charger.id == port.charger_id)
+            )
+            charger_rate = charger_result.scalar_one_or_none()
+            if charger_rate is not None:
+                rate_per_kwh = float(charger_rate)
         total_cost = round(energy_kwh * rate_per_kwh, 2)
 
         # 2. Finalize session
@@ -203,8 +215,6 @@ class SessionService:
         old_status = booking_status.value
         booking.status = BookingStatus.COMPLETED.value
         db.add(booking)
-
-        port = await charger_port_repo.get(db, id=booking.charger_port_id)
 
         # 5. Audit event (BR-009)
         event = BookingEvent(

@@ -13,7 +13,9 @@ class BusinessBase(BaseModel):
 
 # Properties to receive via API on creation
 class BusinessCreate(BusinessBase):
-    zone_id: UUID
+    # Optional for clients: the API resolves the nearest active zone from the
+    # supplied coordinates so mobile onboarding never ships a fixture UUID.
+    zone_id: UUID | None = None
     # The API receives lat/lng, the backend converts this to PostGIS POINT
     latitude: float = Field(..., ge=-90.0, le=90.0)
     longitude: float = Field(..., ge=-180.0, le=180.0)
@@ -41,3 +43,23 @@ class BusinessResponse(BusinessBase):
     longitude: float | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BusinessKYCSubmit(BaseModel):
+    gstin: str | None = None
+    pan_number: str | None = None
+    electricity_meter_id: str | None = None
+    bank_account_number: str | None = None
+    bank_ifsc: str | None = None
+    payout_upi_id: str | None = None
+
+
+class BusinessKYCResponse(BaseModel):
+    business_id: UUID
+    verification_status: str
+    gstin_masked: str | None = None
+    pan_masked: str | None = None
+    electricity_meter_id: str | None = None
+    payout_upi_id: str | None = None
+    submitted_at: datetime
+

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class PaymentBase(BaseModel):
     amount: float = Field(..., gt=0.0)
     currency: str = Field(default="INR")
+    method: Literal["cash", "card", "upi"] = "upi"
     # Enforce strict status values
     status: Literal["pending", "completed", "failed", "refunded"] = "pending"
     provider_order_id: str | None = Field(
@@ -29,6 +30,7 @@ class PaymentOrderCreate(BaseModel):
     """Public create-order contract; amount is always calculated server-side."""
 
     booking_id: UUID
+    method: Literal["cash", "card", "upi"] = "upi"
 
     model_config = ConfigDict(extra="forbid")
 

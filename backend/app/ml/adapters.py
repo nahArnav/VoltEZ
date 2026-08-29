@@ -239,11 +239,19 @@ class MLAdapter:
         }
 
     # Keep the old method signature for backward compatibility
-    async def predict_wait_time(self, db: AsyncSession, charger_id: UUID, port_id: UUID) -> dict:
+    async def predict_wait_time(
+        self,
+        db: AsyncSession,
+        charger_id: UUID,
+        port_id: UUID,
+        model: Any | None = None,
+    ) -> dict:
         """
         Legacy method: translates availability prediction into estimated wait minutes.
         Prefer predict_availability() for new code.
         """
+        # ``model`` is accepted for compatibility with older callers; the
+        # adapter's verified bundle is the single source of truth.
         result = await self.predict_availability(db, charger_id, port_id)
         prob_unavailable = result["probability_unavailable"]
         # Convert probability to estimated wait minutes
