@@ -33,8 +33,13 @@ class Charger(Base):
             "verification_status IN ('pending', 'verified', 'rejected')",
             name="ck_charger_verification_status",
         ),
+        CheckConstraint(
+            "price_per_kwh > 0",
+            name="ck_chargers_price_per_kwh_positive",
+        ),
         {"schema": "app"},
     )
+
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

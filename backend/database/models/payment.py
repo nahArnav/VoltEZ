@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,8 +14,10 @@ class Payment(Base):
         UniqueConstraint("booking_id", name="uq_payments_booking_id"),
         UniqueConstraint("provider_order_id", name="uq_payments_provider_order_id"),
         UniqueConstraint("provider_payment_id", name="uq_payments_provider_payment_id"),
+        CheckConstraint("method IN ('cash', 'card', 'upi')", name="ck_payments_method"),
         {"schema": "app"},
     )
+
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     booking_id: Mapped[uuid.UUID] = mapped_column(
