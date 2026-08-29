@@ -57,6 +57,9 @@ class RecommendationResult(BaseModel):
         ..., description="Estimated time required to reach target SOC"
     )
     estimated_cost: float = Field(..., description="Estimated cost for the charging session")
+    estimated_price_per_kwh: float | None = Field(
+        None, description="Bounded dynamic tariff used for the estimate"
+    )
     ranking_score: float = Field(
         ..., description="Computed score used to sort recommendations (higher is better)"
     )

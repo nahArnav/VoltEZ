@@ -11,9 +11,11 @@ from app.schemas.charger_port import ChargerPortResponse
 class ChargerBase(BaseModel):
     name: str
     charger_type: str
+    address_text: str | None = None
     power_kw: float = Field(..., gt=0.0, description="Total station power capacity in kW")
     price_per_kwh: float = Field(15.0, gt=0.0, description="INR charged per delivered kWh")
     status: Literal["available", "unavailable", "maintenance", "offline"] = "available"
+    access_type: Literal["public", "controlled", "customer_only"] = "public"
 
 
 # Properties to receive via API on creation
@@ -30,6 +32,7 @@ class ChargerUpdate(BaseModel):
     power_kw: float | None = Field(default=None, gt=0.0)
     price_per_kwh: float | None = Field(default=None, gt=0.0)
     status: str | None = None
+    access_type: Literal["public", "controlled", "customer_only"] | None = None
     latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
     longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
 

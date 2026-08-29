@@ -72,4 +72,4 @@ class UserKYCResponse(BaseModel):
     submitted_at: datetime
     cancellation_strikes: int = 0
     penalty_points: int = 0
-
+    suspended_until: datetime | None = None

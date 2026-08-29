@@ -39,6 +39,7 @@ class BookingResponse(BookingBase):
     charger_port_id: UUID
     status: BookingStatus
     estimated_amount: float | None = None
+    quoted_price_per_kwh: float | None = None
     hold_expires_at: datetime | None = None
     cancelled_at: datetime | None = None
     created_at: datetime

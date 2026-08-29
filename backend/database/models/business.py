@@ -77,6 +77,14 @@ class Business(Base):
         default="unverified",
     )
 
+    # KYC is deliberately stored in masked form; raw tax/bank identifiers are
+    # accepted only for the submission request and are never persisted.
+    kyc_gstin_masked: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    kyc_pan_masked: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    kyc_electricity_meter_masked: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    kyc_payout_upi_masked: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    kyc_submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     access_notes: Mapped[str | None] = mapped_column(
         String(1000),
         nullable=True,

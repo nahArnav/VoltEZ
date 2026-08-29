@@ -70,6 +70,13 @@ class Booking(Base):
         nullable=True,
     )
 
+    # Server-calculated tariff locked at hold time.  This prevents a later
+    # dynamic-price change from altering the driver's agreed session rate.
+    quoted_price_per_kwh: Mapped[float | None] = mapped_column(
+        Numeric(10, 2),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

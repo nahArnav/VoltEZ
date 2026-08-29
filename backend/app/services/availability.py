@@ -2,12 +2,13 @@ from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.repositories.availability_window import availability_window_repo
 from app.repositories.booking import booking_repo
+from app.services.pricing import dynamic_rate_from_signals
 from database.models.business import Business
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
@@ -76,6 +77,22 @@ class AvailabilityService:
         now = datetime.now(UTC)
         bookings = await booking_repo.get_active_by_port(db, port_id=port_id, current_time=now)
 
+        active_port_count = await db.scalar(
+            select(func.count(ChargerPort.id)).where(
+                ChargerPort.charger_id
+                == (
+                    select(ChargerPort.charger_id)
+                    .where(ChargerPort.id == port_id)
+                    .scalar_subquery()
+                ),
+                ChargerPort.is_active.is_(True),
+            )
+        )
+        occupancy_pressure = min(
+            len(bookings) / max(int(active_port_count or 1), 1),
+            1.0,
+        )
+
         price_result = await db.execute(
             select(Charger.price_per_kwh)
             .select_from(ChargerPort)
@@ -103,11 +120,18 @@ class AvailabilityService:
                     for booking in bookings
                 )
                 if start_utc > now and not blocked_by_owner and not overlaps_booking:
+                    quote = dynamic_rate_from_signals(
+                        base_rate=price_per_kwh,
+                        expected_demand=float(len(bookings)),
+                        probability_unavailable=occupancy_pressure,
+                        active_ports=max(int(active_port_count or 1), 1),
+                        target_time=start_utc,
+                    )
                     slots[(start_utc, end_utc)] = {
                         "charger_port_id": port_id,
                         "start_at": start_utc,
                         "end_at": end_utc,
-                        "price_per_kwh": price_per_kwh,
+                        "price_per_kwh": quote.effective_rate,
                     }
                 cursor = slot_end
 

@@ -1,4 +1,5 @@
 import math
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from app.schemas.recommendation import (
     RecommendationResult,
 )
 from app.services.charger import charger_service
+from app.services.pricing import dynamic_rate_from_signals
 
 
 def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -152,14 +154,26 @@ class RecommendationService:
             charger_base_price = get_float(
                 charger, "price_per_kwh", settings.DEFAULT_PRICE_PER_KWH_INR
             )
-            estimated_cost = required_energy_kwh * charger_base_price
-
             # Wait time (ML Model 2)
             rel_score = max(0.0, min(1.0, get_float(charger, "reliability_score", 50.0) / 100.0))
             wait_prediction = await ml_adapter.predict_wait_time(
                 db, charger_id=charger.id, port_id=best_port_id
             )
             predicted_wait_min = wait_prediction["wait_minutes"]
+
+            # Demand Forecast (ML Model 1) and calibrated availability are
+            # both fed into the bounded tariff used for this estimate.  The
+            # explicit rate is returned so the driver can see why the cost
+            # differs from the owner's base tariff.
+            demand_prediction = await ml_adapter.predict_demand(db, charger_id=charger.id)
+            dynamic_quote = dynamic_rate_from_signals(
+                base_rate=charger_base_price,
+                expected_demand=demand_prediction["expected_demand"],
+                probability_unavailable=min(max(predicted_wait_min / 60.0, 0.0), 1.0),
+                active_ports=sum(1 for candidate in charger.ports if candidate.is_active),
+                target_time=datetime.now(UTC),
+            )
+            estimated_cost = required_energy_kwh * dynamic_quote.effective_rate
 
             # Ranking Formula
             score = (
@@ -185,6 +199,7 @@ class RecommendationService:
                     distance_to_charger_km=float(round(dist_km, 2)),
                     estimated_charge_minutes=float(round(estimated_charge_min, 1)),
                     estimated_cost=float(round(estimated_cost, 2)),
+                    estimated_price_per_kwh=dynamic_quote.effective_rate,
                     ranking_score=float(round(score, 2)),
                     estimated_detour_km=float(round(detour_km, 2)),
                 )

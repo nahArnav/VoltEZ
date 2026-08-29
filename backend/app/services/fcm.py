@@ -17,8 +17,12 @@ class FCMService:
         db: AsyncSession, user_id: UUID, title: str, body: str, payload: dict | None = None
     ):
         """
-        Sends a push notification via Firebase Cloud Messaging (FCM) and saves it to the DB.
-        Currently mocked for development/hackathon purposes.
+        Persist a notification and deliver it to any connected client.
+
+        Firebase credentials are intentionally not bundled with the app. Until
+        they are configured, the database row and WebSocket delivery are the
+        authoritative channels; this method must not claim that an FCM push was
+        sent when no provider is configured.
         """
         # Notification payloads are stored in PostgreSQL JSONB.  Domain events
         # commonly contain UUID/datetime values, so normalise them at this
@@ -37,9 +41,14 @@ class FCMService:
         await notification_repo.create(db, obj_in=notification_in)
         await db.commit()
 
-        # 2. Mock FCM API Call
+        # FCM delivery is optional and requires deployment credentials. Keep
+        # this path honest while still providing an observable server-side
+        # notification and a real-time delivery for connected clients.
         logger.info(
-            f"[MOCK FCM] Sending push to user {user_id}: {title} - {body} | payload={payload}"
+            "Push notification persisted; FCM provider is not configured "
+            "(user_id=%s, title=%s)",
+            user_id,
+            title,
         )
 
         # 3. Fallback: Push to WebSocket if the user is currently connected to the app

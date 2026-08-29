@@ -1,9 +1,9 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.errors import BadRequestError, ForbiddenError, NotFoundError
@@ -15,8 +15,8 @@ from app.services.fcm import fcm_service
 from app.services.trust import trust_service
 from app.websockets.manager import manager
 from database.models.booking_event import BookingEvent
-from database.models.charging_session import ChargingSession
 from database.models.charger import Charger
+from database.models.charging_session import ChargingSession
 
 
 class SessionService:
@@ -40,6 +40,18 @@ class SessionService:
                 code="INVALID_STATE_TRANSITION",
             )
 
+        now = datetime.now(UTC)
+        if now < booking.start_at - timedelta(minutes=30):
+            raise BadRequestError(
+                message="Check-in opens 30 minutes before your reserved start time.",
+                code="CHECKIN_TOO_EARLY",
+            )
+        if now > booking.end_at + timedelta(minutes=30):
+            raise BadRequestError(
+                message="This reservation's check-in window has expired.",
+                code="CHECKIN_WINDOW_EXPIRED",
+            )
+
         # 2. Transition booking to CHECKED_IN
         old_status = booking_status.value
         booking.status = BookingStatus.CHECKED_IN.value
@@ -55,7 +67,6 @@ class SessionService:
         db.add(event)
 
         # 4. Create the session record
-        now = datetime.now(UTC)
         new_session = ChargingSession(
             charger_port_id=booking.charger_port_id,
             user_id=user_id,
@@ -192,8 +203,8 @@ class SessionService:
         # setting is only a safe fallback for legacy chargers created before
         # the tariff column existed; it must never override a station price.
         port = await charger_port_repo.get(db, id=booking.charger_port_id)
-        rate_per_kwh = settings.DEFAULT_PRICE_PER_KWH_INR
-        if port is not None:
+        rate_per_kwh = float(booking.quoted_price_per_kwh or settings.DEFAULT_PRICE_PER_KWH_INR)
+        if port is not None and booking.quoted_price_per_kwh is None:
             charger_result = await db.execute(
                 select(Charger.price_per_kwh).where(Charger.id == port.charger_id)
             )

@@ -146,4 +146,26 @@ docker-compose.override.yml
 *.bin
 *.out
 *.trace
+*.so
+*.dylib
+*.dll
+*.parquet
+*.feather
+*.arrow
+*.hdf5
+*.pt
+*.pth
+*.onnx
+*.npy
+*.npz
+
+# Python virtual environments & build artifacts
+**/.venv/
+**/venv/
+**/ENV/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+
 

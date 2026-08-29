@@ -1,21 +1,18 @@
-from datetime import datetime, timezone
 import logging
 import warnings
-from uuid import UUID
 from typing import Any
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-import numpy as np
-import pandas as pd
-import joblib
+from uuid import UUID
 
-from database.models.ml_prediction import MLPrediction
-from app.schemas.enums import BookingStatus
-from database.models.booking import Booking
-from database.models.charging_session import ChargingSession
+import numpy as np
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.repositories.operations import ml_prediction_repo
+from app.schemas.enums import BookingStatus
 from app.schemas.ml_prediction import MLPredictionCreate
-from app.services.ml_features import build_demand_features, build_availability_features
+from app.services.ml_features import build_availability_features, build_demand_features
+from database.models.booking import Booking
+from database.models.ml_prediction import MLPrediction
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +28,12 @@ class MLAdapter:
     def __init__(self):
         self._demand_bundle = None
         self._availability_bundle = None
+        self._demand_model = None
+        self._demand_features = []
+        self._availability_base_model = None
+        self._availability_calibrator = None
+        self._availability_thresholds = {}
+        self._availability_features = []
 
     def load_demand_model(self, bundle):
         """Load the demand model from a verified ModelBundle."""
@@ -77,6 +80,24 @@ class MLAdapter:
             self._availability_features = []
 
     @staticmethod
+    def _align_features(features_df, expected_features: list[str]):
+        """Return a frame in the exact order frozen by the model contract.
+
+        The live builders deliberately expose the complete feature set so they
+        can evolve independently.  Estimators, however, require the same
+        column count and ordering used during training.  Selecting the bundle's
+        contract here prevents silent column drift and produces a clear error
+        (which the caller can safely fall back from) when a new required
+        feature has not yet been wired into serving.
+        """
+        if not expected_features:
+            return features_df
+        missing = [name for name in expected_features if name not in features_df.columns]
+        if missing:
+            raise ValueError(f"serving feature builder is missing model features: {missing}")
+        return features_df.loc[:, expected_features]
+
+    @staticmethod
     async def log_prediction(
         db: AsyncSession,
         entity_id: UUID,
@@ -99,23 +120,33 @@ class MLAdapter:
         logger.info(f"[ML] v{model_version} predicted {prediction_type}={value:.4f} for {entity_id}")
         return prediction
 
-    async def predict_demand(self, db: AsyncSession, charger_id: UUID) -> dict:
+    async def predict_demand(
+        self,
+        db: AsyncSession,
+        charger_id: UUID,
+        model: Any | None = None,
+    ) -> dict:
         """
         Model 1: Demand Forecasting
         Uses the loaded and hash-verified joblib model to predict expected
         charging requests in a 60-minute window.
         """
-        features_df = build_demand_features(charger_id)
+        features_df = await build_demand_features(db, charger_id)
 
-        if self._demand_model is not None:
+        # ``model`` is accepted for compatibility with older analytics
+        # callers. Prefer the hash-verified bundle loaded at startup; only
+        # use an explicitly supplied estimator when no bundle is available.
+        predictor = self._demand_model if self._demand_model is not None else model
+        if predictor is not None:
             try:
+                model_features = self._align_features(features_df, self._demand_features)
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
                         "ignore",
                         message="Setting the shape on a NumPy array has been deprecated.*",
                         category=DeprecationWarning,
                     )
-                    prediction = self._demand_model.predict(features_df)
+                    prediction = predictor.predict(model_features)
                     expected_demand = float(max(prediction[0], 0.0))  # Demand cannot be negative
                     confidence = 0.90
                     model_version = self._demand_bundle.model_id if self._demand_bundle else "unknown"
@@ -152,10 +183,11 @@ class MLAdapter:
         Uses the calibrated availability model to estimate the probability
         that a charger port will be unavailable at the driver's ETA.
         """
-        features_df = build_availability_features(charger_id, port_id)
+        features_df = await build_availability_features(db, charger_id, port_id)
 
         if self._availability_base_model is not None:
             try:
+                model_features = self._align_features(features_df, self._availability_features)
                 # Predict raw probability of unavailability
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
@@ -163,7 +195,7 @@ class MLAdapter:
                         message="Could not find the number of physical cores.*",
                         category=UserWarning,
                     )
-                    raw_proba = self._availability_base_model.predict_proba(features_df)
+                    raw_proba = self._availability_base_model.predict_proba(model_features)
                     if raw_proba.shape[1] > 1:
                         prob_unavailable = float(raw_proba[0, 1])
                     else:

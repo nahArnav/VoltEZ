@@ -30,6 +30,10 @@ class Charger(Base):
             name="ck_charger_status",
         ),
         CheckConstraint(
+            "access_type IN ('public', 'controlled', 'customer_only')",
+            name="ck_charger_access_type",
+        ),
+        CheckConstraint(
             "verification_status IN ('pending', 'verified', 'rejected')",
             name="ck_charger_verification_status",
         ),
@@ -95,6 +99,12 @@ class Charger(Base):
         String(30),
         nullable=False,
         default="available",
+    )
+
+    access_type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="public",
     )
 
     verification_status: Mapped[str] = mapped_column(

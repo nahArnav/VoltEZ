@@ -21,24 +21,30 @@ from datetime import UTC, datetime, timedelta
 # Add the backend directory to the path so we can import app modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.models import (
-    AvailabilityWindow,
-    Booking,
-    BookingStatus,
-    Business,
-    Charger,
-    ChargerPort,
-    ChargerStatusEvent,
-    ChargingSession,
-    DemandHistory,
-    User,
-    UserRole,
-    Vehicle,
-)
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
+from app.schemas.enums import BookingStatus, UserRole
+from database.models import (
+    Booking,
+    Business,
+    BusinessHours,
+    Charger,
+    ChargerAvailability,
+    ChargerPort,
+    ChargerStatusEvent,
+    ChargingSession,
+    ConnectorType,
+    DemandHistory,
+    User,
+    Vehicle,
+    Zone,
+)
+
+# Seed-time randomness is intentionally fixed so screenshots, ML fixtures, and
+# demo rehearsals are reproducible across machines.
+random.seed(42)
 
 # --- Pune Coordinates for Demo ---
 # Approximate center: 18.5204° N, 73.8567° E
@@ -296,6 +302,15 @@ VEHICLES = [
 ]
 
 
+def connector_lookup_for_seed(display_name: str, normalized_connectors: dict[str, ConnectorType]) -> int:
+    """Resolve a human-friendly connector label to the catalog primary key."""
+    key = display_name.lower().replace(" ", "").replace("_", "")
+    connector = normalized_connectors.get(key)
+    if connector is None:
+        raise RuntimeError(f"Connector catalogue has no entry for {display_name!r}")
+    return connector.id
+
+
 async def seed():
     """Create all demo data in a clean database."""
     async with AsyncSessionLocal() as session:
@@ -353,7 +368,43 @@ async def seed():
             await session.flush()  # Get IDs
             print(f"    ✓ Created {len(drivers)} drivers, 1 owner, 1 admin")
 
-            # --- 2. Create Vehicles ---
+            # --- 2. Load reference data and create vehicles ---
+            print("  → Loading connector catalogue and Pune zone...")
+            connector_rows = await session.execute(select(ConnectorType))
+            connectors = {connector.code: connector for connector in connector_rows.scalars().all()}
+            normalized_connectors = {
+                code.lower().replace("_", ""): connector for code, connector in connectors.items()
+            }
+            required_connectors = {connector for vehicle in VEHICLES for connector in vehicle["connectors"]}
+            connector_lookup = {
+                code: normalized_connectors.get(code.lower().replace(" ", "").replace("_", ""))
+                for code in required_connectors
+            }
+            missing_connectors = [code for code, connector in connector_lookup.items() if connector is None]
+            if missing_connectors:
+                raise RuntimeError(
+                    "Connector catalogue is incomplete; run Alembic migrations first. "
+                    f"Missing: {', '.join(sorted(missing_connectors))}"
+                )
+
+            zone_result = await session.execute(
+                select(Zone).where(Zone.city == "Pune", Zone.active.is_(True)).limit(1)
+            )
+            pune_zone = zone_result.scalar_one_or_none()
+            if pune_zone is None:
+                pune_zone = Zone(
+                    city="Pune",
+                    name="Pune Central",
+                    h3_index="voltez-pune-central-seed",
+                    centroid="SRID=4326;POINT(73.8567 18.5204)",
+                    timezone="Asia/Kolkata",
+                    active=True,
+                    zone_type="commercial",
+                )
+                session.add(pune_zone)
+                await session.flush()
+
+            # --- 3. Create Vehicles ---
             print("  → Creating vehicles...")
             vehicles = []
             for _i, (driver, v) in enumerate(zip(drivers, VEHICLES)):
@@ -361,37 +412,32 @@ async def seed():
                     user_id=driver.id,
                     make=v["make"],
                     model=v["model"],
+                    vehicle_class="car",
                     battery_kwh=v["battery_kwh"],
-                    connector_types=v["connectors"],
                     max_ac_kw=v["max_ac_kw"],
                     max_dc_kw=v["max_dc_kw"],
                     estimated_range_km=v["range_km"],
+                    efficiency_wh_per_km=round(v["battery_kwh"] * 1000 / v["range_km"], 2),
                 )
+                vehicle.connector_types = [connector_lookup[code] for code in v["connectors"]]
                 session.add(vehicle)
                 vehicles.append(vehicle)
 
             await session.flush()
             print(f"    ✓ Created {len(vehicles)} vehicles")
 
-            # --- 3. Create Businesses ---
+            # --- 4. Create Businesses ---
             print("  → Creating businesses...")
             businesses = {}
             for key, loc in PUNE_LOCATIONS.items():
                 biz = Business(
                     owner_id=owner.id,
+                    zone_id=pune_zone.id,
                     name=loc["name"],
                     category=loc["category"],
-                    address="Pune, Maharashtra, India",
+                    address_text=f"{loc['name']}, Pune, Maharashtra, India",
                     location=f"SRID=4326;POINT({loc['lng']} {loc['lat']})",
-                    opening_hours={
-                        "mon": {"open": "08:00", "close": "22:00"},
-                        "tue": {"open": "08:00", "close": "22:00"},
-                        "wed": {"open": "08:00", "close": "22:00"},
-                        "thu": {"open": "08:00", "close": "22:00"},
-                        "fri": {"open": "08:00", "close": "22:00"},
-                        "sat": {"open": "09:00", "close": "23:00"},
-                        "sun": {"open": "09:00", "close": "23:00"},
-                    },
+                    timezone="Asia/Kolkata",
                     verification_status="verified",
                 )
                 session.add(biz)
@@ -400,7 +446,22 @@ async def seed():
             await session.flush()
             print(f"    ✓ Created {len(businesses)} businesses")
 
-            # --- 4. Create Chargers and Ports ---
+            # Store recurring opening hours in the normalized table rather
+            # than the removed JSON `opening_hours` column.
+            for business in businesses.values():
+                for day_of_week in range(7):
+                    session.add(
+                        BusinessHours(
+                            business_id=business.id,
+                            day_of_week=day_of_week,
+                            open_local_time=datetime.strptime("08:00", "%H:%M").time(),
+                            close_local_time=datetime.strptime("22:00", "%H:%M").time(),
+                            is_closed=False,
+                        )
+                    )
+            await session.flush()
+
+            # --- 5. Create Chargers and Ports ---
             print("  → Creating chargers and ports...")
             all_ports = []
             charger_count = 0
@@ -416,21 +477,27 @@ async def seed():
                     business_id=biz.id,
                     name=cfg["name"],
                     location=f"SRID=4326;POINT({loc['lng'] + offset_lng} {loc['lat'] + offset_lat})",
+                    charger_type="DC" if cfg["power_kw"] > 22 else "AC",
                     power_kw=cfg["power_kw"],
                     access_type="public",
-                    base_price=cfg["base_price"],
-                    status="active",
-                    reliability_score=cfg["reliability"],
+                    price_per_kwh=cfg["base_price"],
+                    status="available",
+                    verification_status="verified",
+                    reliability_score=round(cfg["reliability"] * 100, 2),
+                    address_text=f"{loc['name']}, Pune, Maharashtra, India",
                 )
                 session.add(charger)
                 await session.flush()
 
-                for connector_type, max_power in cfg["ports"]:
+                for port_number, (connector_type, max_power) in enumerate(cfg["ports"], start=1):
                     port = ChargerPort(
                         charger_id=charger.id,
-                        connector_type=connector_type,
+                        connector_type_id=connector_lookup_for_seed(
+                            connector_type, normalized_connectors
+                        ),
+                        port_number=port_number,
                         max_power_kw=max_power,
-                        status="available",
+                        is_active=True,
                     )
                     session.add(port)
                     all_ports.append(port)
@@ -440,36 +507,24 @@ async def seed():
             await session.flush()
             print(f"    ✓ Created {charger_count} chargers with {len(all_ports)} ports")
 
-            # --- 5. Create Availability Windows ---
-            print("  → Creating availability windows...")
+            # --- 6. Create recurring availability schedules ---
+            print("  → Creating charger availability schedules...")
             now = datetime.now(UTC)
             window_count = 0
             for port in all_ports:
-                # Create availability windows for the next 7 days
-                for day_offset in range(7):
-                    day_start = (now + timedelta(days=day_offset)).replace(
-                        hour=8, minute=0, second=0, microsecond=0
+                # The current schema stores weekly local-time availability.
+                # One row per day is enough to cover the next seven days.
+                for day_of_week in range(7):
+                    session.add(
+                        ChargerAvailability(
+                            charger_port_id=port.id,
+                            day_of_week=day_of_week,
+                            start_local_time=datetime.strptime("08:00", "%H:%M").time(),
+                            end_local_time=datetime.strptime("22:00", "%H:%M").time(),
+                            is_unavailable=False,
+                        )
                     )
-                    # Morning window: 8 AM - 2 PM
-                    window1 = AvailabilityWindow(
-                        port_id=port.id,
-                        start_at=day_start,
-                        end_at=day_start + timedelta(hours=6),
-                        source="owner",
-                        status="active",
-                    )
-                    session.add(window1)
-
-                    # Afternoon/evening window: 2 PM - 10 PM
-                    window2 = AvailabilityWindow(
-                        port_id=port.id,
-                        start_at=day_start + timedelta(hours=6),
-                        end_at=day_start + timedelta(hours=14),
-                        source="owner",
-                        status="active",
-                    )
-                    session.add(window2)
-                    window_count += 2
+                    window_count += 1
 
             await session.flush()
             print(f"    ✓ Created {window_count} availability windows")
@@ -492,7 +547,7 @@ async def seed():
             await session.flush()
             print(f"    ✓ Created {status_count} status events")
 
-            # --- 6.5 Create Synthetic Historical Bookings ---
+            # --- 7. Create Synthetic Historical Bookings ---
             print("  → Creating historical bookings and sessions...")
             historical_booking_count = 0
             for _i in range(50):
@@ -508,10 +563,12 @@ async def seed():
 
                 b = Booking(
                     user_id=driver.id,
-                    port_id=port.id,
+                    charger_port_id=port.id,
                     start_at=start_time,
                     end_at=end_time,
-                    status=BookingStatus.COMPLETED,
+                    status=BookingStatus.COMPLETED.value,
+                    estimated_amount=round(random.uniform(150.0, 700.0), 2),
+                    quoted_price_per_kwh=round(random.uniform(8.0, 20.0), 2),
                     created_at=book_time,
                 )
                 session.add(b)
@@ -519,12 +576,14 @@ async def seed():
 
                 # Associated charging session
                 cs = ChargingSession(
+                    charger_port_id=port.id,
+                    user_id=driver.id,
                     booking_id=b.id,
-                    check_in_at=start_time - timedelta(minutes=2),
-                    start_at=start_time,
-                    end_at=end_time,
+                    reserved_at=book_time,
+                    started_at=start_time,
+                    ended_at=end_time,
                     energy_kwh=round(random.uniform(10.0, 45.0), 2),
-                    final_amount=round(random.uniform(150.0, 700.0), 2),
+                    amount=round(random.uniform(150.0, 700.0), 2),
                     status="completed",
                 )
                 session.add(cs)
@@ -533,45 +592,40 @@ async def seed():
             await session.flush()
             print(f"    ✓ Created {historical_booking_count} historical bookings")
 
-            # --- 7. Create 30 Days of Synthetic Demand History ---
+            # --- 8. Create 30 Days of Synthetic Demand History ---
             print("  → Creating 30 days of demand history...")
             demand_count = 0
-            zones = ["pune_central", "pune_east", "pune_north"]
-            for zone in zones:
-                for day_offset in range(30):
-                    day = now - timedelta(days=day_offset)
-                    for hour in range(6, 24):  # 6 AM to midnight
-                        # Simulate realistic demand patterns
-                        is_weekend = day.weekday() >= 5
-                        base_demand = 3 if is_weekend else 5
+            for day_offset in range(30):
+                day = now - timedelta(days=day_offset)
+                for hour in range(6, 24):  # 6 AM to midnight
+                    # Simulate realistic demand patterns
+                    is_weekend = day.weekday() >= 5
+                    base_demand = 3 if is_weekend else 5
 
-                        # Peak hours: 9-11 AM, 5-8 PM
-                        if hour in (9, 10, 11):
-                            base_demand += 4
-                        elif hour in (17, 18, 19, 20):
-                            base_demand += 6
-                        # Off-peak: 2-4 PM (this is where the business opportunity is!)
-                        elif hour in (14, 15, 16):
-                            base_demand += 1
+                    # Peak hours: 9-11 AM, 5-8 PM
+                    if hour in (9, 10, 11):
+                        base_demand += 4
+                    elif hour in (17, 18, 19, 20):
+                        base_demand += 6
+                    # Off-peak: 2-4 PM (this is where the business opportunity is!)
+                    elif hour in (14, 15, 16):
+                        base_demand += 1
 
-                        demand = max(0, base_demand + random.randint(-2, 3))
-                        occupancy = min(1.0, demand / 12.0)
+                    demand = max(0, base_demand + random.randint(-2, 3))
+                    active_sessions = min(demand, max(0, len(all_ports) // 4 + random.randint(-2, 2)))
+                    queued_vehicles = max(0, demand - active_sessions)
 
-                        bucket_time = day.replace(hour=hour, minute=0, second=0, microsecond=0)
+                    bucket_time = day.replace(hour=hour, minute=0, second=0, microsecond=0)
 
-                        dh = DemandHistory(
-                            zone_id=zone,
-                            time_bucket=bucket_time,
-                            demand_count=demand,
-                            occupancy=round(occupancy, 2),
-                            contextual_features={
-                                "is_weekend": is_weekend,
-                                "hour": hour,
-                                "day_of_week": day.weekday(),
-                            },
-                        )
-                        session.add(dh)
-                        demand_count += 1
+                    dh = DemandHistory(
+                        zone_id=pune_zone.id,
+                        timestamp=bucket_time,
+                        demand_level=float(demand),
+                        active_sessions=active_sessions,
+                        queued_vehicles=queued_vehicles,
+                    )
+                    session.add(dh)
+                    demand_count += 1
 
             await session.flush()
             print(f"    ✓ Created {demand_count} demand history records")
