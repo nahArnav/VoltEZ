@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:provider/provider.dart';
@@ -31,6 +32,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
   bool _sheetExpanded = false;
+  String? _lastCenteredPosition;
 
   // Base-map center only; no charger data is fabricated when GPS/API access
   // is unavailable.
@@ -43,11 +45,25 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     'Type 2': 'Type 2',
     'CHAdeMO': 'CHAdeMO',
     'GB_T': 'GB/T',
+    'GB/T': 'GB/T',
     'Type1': 'Type 1',
+    'Type 1': 'Type 1',
+    'Bharat AC': 'Bharat AC-001',
+    'Bharat AC-001': 'Bharat AC-001',
+    'Bharat DC': 'Bharat DC-001',
+    'Bharat DC-001': 'Bharat DC-001',
   };
 
   // Connector types available for filter chips
-  static const List<String> _filterConnectorTypes = ['CCS2', 'Type2', 'CHAdeMO'];
+  static const List<String> _filterConnectorTypes = [
+    'CCS2',
+    'Type2',
+    'CHAdeMO',
+    'Bharat AC',
+    'Bharat DC',
+    'Type1',
+    'GB_T',
+  ];
 
   @override
   void initState() {
@@ -112,6 +128,9 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   discovery.currentPosition!.longitude,
                 )
               : _defaultCenter;
+          if (discovery.currentPosition != null) {
+            _centerOnPosition(discovery.currentPosition!);
+          }
 
           return Stack(
             children: [
@@ -155,6 +174,26 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
         },
       ),
     );
+  }
+
+  void _centerOnPosition(Position position) {
+    final key =
+        '${position.latitude.toStringAsFixed(5)},${position.longitude.toStringAsFixed(5)}';
+    if (key == _lastCenteredPosition) return;
+    _lastCenteredPosition = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        _mapController.move(
+          latlong.LatLng(position.latitude, position.longitude),
+          13,
+        );
+      } catch (_) {
+        // The map controller may not be attached on the first frame; the next
+        // location refresh will retry without affecting charger data.
+        _lastCenteredPosition = null;
+      }
+    });
   }
 
   // ─── OpenStreetMap ───
@@ -231,10 +270,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
         // Attribution
         RichAttributionWidget(
           attributions: [
-            TextSourceAttribution(
-              'OpenStreetMap contributors',
-              onTap: () {},
-            ),
+            TextSourceAttribution('OpenStreetMap contributors', onTap: () {}),
           ],
         ),
       ],
@@ -248,9 +284,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.25),
-        ),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.4),
@@ -293,8 +327,11 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.close_rounded,
-                    color: AppColors.textMuted, size: 16),
+                child: Icon(
+                  Icons.close_rounded,
+                  color: AppColors.textMuted,
+                  size: 16,
+                ),
               ),
             ),
         ],
@@ -312,25 +349,22 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
         children: [
           // Connector type chips
           ..._filterConnectorTypes.map((type) {
-            final selected =
-                discovery.selectedConnectors.contains(type);
+            final selected = discovery.selectedConnectors.contains(type);
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: GestureDetector(
                 onTap: () => discovery.toggleConnector(type),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: selected
-                        ? AppColors.primary
-                        : AppColors.card,
+                    color: selected ? AppColors.primary : AppColors.card,
                     borderRadius: BorderRadius.circular(21),
                     border: Border.all(
-                      color: selected
-                          ? AppColors.primary
-                          : AppColors.border,
+                      color: selected ? AppColors.primary : AppColors.border,
                     ),
                   ),
                   child: Row(
@@ -372,8 +406,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           GestureDetector(
             onTap: () => _showPowerRangeSheet(discovery),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: _isPowerRangeActive(discovery)
                     ? AppColors.secondary.withValues(alpha: 0.2)
@@ -388,11 +421,13 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.speed_rounded,
-                      size: 14,
-                      color: _isPowerRangeActive(discovery)
-                          ? AppColors.secondary
-                          : AppColors.textSecondary),
+                  Icon(
+                    Icons.speed_rounded,
+                    size: 14,
+                    color: _isPowerRangeActive(discovery)
+                        ? AppColors.secondary
+                        : AppColors.textSecondary,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     '${discovery.powerRange.start.round()}\u2013${discovery.powerRange.end.round()} kW',
@@ -416,12 +451,13 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
               child: GestureDetector(
                 onTap: () {
                   discovery.clearConnectorFilter();
-                  discovery.setPowerRange(
-                      const RangeValues(7, 150));
+                  discovery.setPowerRange(const RangeValues(7, 150));
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.error.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(21),
@@ -432,8 +468,11 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.filter_alt_off_rounded,
-                          size: 14, color: AppColors.error),
+                      Icon(
+                        Icons.filter_alt_off_rounded,
+                        size: 14,
+                        color: AppColors.error,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Clear',
@@ -454,8 +493,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   }
 
   bool _isPowerRangeActive(ChargerDiscoveryProvider discovery) {
-    return discovery.powerRange.start > 7 ||
-        discovery.powerRange.end < 150;
+    return discovery.powerRange.start > 7 || discovery.powerRange.end < 150;
   }
 
   bool _hasActiveFilters(ChargerDiscoveryProvider discovery) {
@@ -662,25 +700,29 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   Row(
                     children: [
                       // Connector badges
-                      ...charger.connectorTypes.map((ct) => Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                _connectorLabels[ct] ?? ct,
-                                style: AppTypography.labelMedium.copyWith(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
+                      ...charger.connectorTypes.map(
+                        (ct) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _connectorLabels[ct] ?? ct,
+                              style: AppTypography.labelMedium.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
                               ),
                             ),
-                          )),
+                          ),
+                        ),
+                      ),
 
                       const Spacer(),
 
@@ -691,7 +733,9 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 10),
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             gradient: AppColors.primaryGradient,
                             borderRadius: BorderRadius.circular(12),
@@ -701,8 +745,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                             children: [
                               Text(
                                 'View Details',
-                                style: AppTypography.buttonTextSmall
-                                    .copyWith(
+                                style: AppTypography.buttonTextSmall.copyWith(
                                   color: AppColors.textOnPrimary,
                                 ),
                               ),
@@ -728,8 +771,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     );
   }
 
-  Widget _sheetMetric(
-      IconData icon, String value, String label, Color color) {
+  Widget _sheetMetric(IconData icon, String value, String label, Color color) {
     return Column(
       children: [
         Icon(icon, color: color, size: 20),
@@ -790,8 +832,11 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.search_off_rounded,
-                            color: AppColors.textMuted, size: 32),
+                        Icon(
+                          Icons.search_off_rounded,
+                          color: AppColors.textMuted,
+                          size: 32,
+                        ),
                         const SizedBox(height: 8),
                         Text(
                           'No chargers match filters',
@@ -804,24 +849,22 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 4),
+                      horizontal: 20,
+                      vertical: 4,
+                    ),
                     scrollDirection: Axis.horizontal,
                     itemCount: discovery.filteredChargers.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(width: 12),
+                    separatorBuilder: (_, _) => const SizedBox(width: 12),
                     itemBuilder: (context, index) {
-                      final charger =
-                          discovery.filteredChargers[index];
-                      final statusCol =
-                          _statusColor(charger.status);
+                      final charger = discovery.filteredChargers[index];
+                      final statusCol = _statusColor(charger.status);
 
                       return GestureDetector(
                         onTap: () {
                           discovery.selectCharger(charger);
                           _animateSheet(true);
                           _mapController.move(
-                            latlong.LatLng(charger.latitude,
-                                charger.longitude),
+                            latlong.LatLng(charger.latitude, charger.longitude),
                             _mapController.camera.zoom,
                           );
                         },
@@ -831,24 +874,19 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.surface,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: AppColors.border,
-                            ),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
                                   Expanded(
                                     child: Text(
                                       charger.name,
-                                      style: AppTypography
-                                          .headlineSmall,
+                                      style: AppTypography.headlineSmall,
                                       maxLines: 1,
-                                      overflow:
-                                          TextOverflow.ellipsis,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   Container(
@@ -871,20 +909,16 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                               const Spacer(),
                               Row(
                                 mainAxisAlignment:
-                                    MainAxisAlignment
-                                        .spaceBetween,
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     '${charger.powerKw.round()} kW \u00B7 \u20B9${charger.pricePerKwh.round()}/kWh',
-                                    style: AppTypography
-                                        .labelMedium
-                                        .copyWith(
+                                    style: AppTypography.labelMedium.copyWith(
                                       color: AppColors.primary,
                                     ),
                                   ),
                                   Icon(
-                                    Icons
-                                        .arrow_forward_ios_rounded,
+                                    Icons.arrow_forward_ios_rounded,
                                     size: 12,
                                     color: AppColors.textMuted,
                                   ),
@@ -920,10 +954,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Power Range',
-                    style: AppTypography.headlineMedium,
-                  ),
+                  Text('Power Range', style: AppTypography.headlineMedium),
                   const SizedBox(height: 4),
                   Text(
                     'Filter chargers by power output',
@@ -951,14 +982,18 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('7 kW', style: AppTypography.labelSmall),
-                      Text('${discovery.powerRange.start.round()} kW',
-                          style: AppTypography.labelMedium.copyWith(
-                            color: AppColors.secondary,
-                          )),
-                      Text('${discovery.powerRange.end.round()} kW',
-                          style: AppTypography.labelMedium.copyWith(
-                            color: AppColors.secondary,
-                          )),
+                      Text(
+                        '${discovery.powerRange.start.round()} kW',
+                        style: AppTypography.labelMedium.copyWith(
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                      Text(
+                        '${discovery.powerRange.end.round()} kW',
+                        style: AppTypography.labelMedium.copyWith(
+                          color: AppColors.secondary,
+                        ),
+                      ),
                       Text('150 kW', style: AppTypography.labelSmall),
                     ],
                   ),

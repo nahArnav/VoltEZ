@@ -786,7 +786,9 @@ class _RecommendationCardState extends State<_RecommendationCard> {
                   child: _metricCell(
                       Icons.currency_rupee,
                       '₹${rec.estimatedCost.round()}',
-                      'Est. Cost',
+                      rec.estimatedPricePerKwh == null
+                          ? 'Est. Cost'
+                          : 'Dynamic cost',
                       AppColors.success)),
               Container(
                   width: 1,
@@ -838,13 +840,7 @@ class _RecommendationCardState extends State<_RecommendationCard> {
   // ─── Connector + Power Inline Badge ───
   Widget _buildConnectorBadge(ChargerRecommendation rec) {
     final connectorNames = rec.charger.connectors
-        .map((ct) => ct == ConnectorType.ccs2
-            ? 'CCS2'
-            : ct == ConnectorType.type2
-                ? 'Type 2'
-                : ct == ConnectorType.chademo
-                    ? 'CHAdeMO'
-                    : ct.name)
+        .map((ct) => connectorTypeLabel(ct.name))
         .join(' · ');
 
     return Row(

@@ -5,16 +5,15 @@ Compose deployment, the local web build, and the native phone prerequisites.
 
 ## What is verified in this branch
 
-- ML suite: 133 tests passed.
-- Backend integration suite: 6 tests passed against PostGIS and Redis.
-- Python compilation and fatal Ruff checks: passed.
-- Flutter analyzer: 0 issues; Flutter tests: 4 passed.
-- Flutter release web build: passed.
-- Isolated Compose stack: PostGIS, Redis, Alembic migration, API, and ARQ worker
-  started successfully; `/health/ready` returned database/Redis/ML all `true`.
+- Backend unit/contract suite: 136 tests passed with integration tests excluded.
+- Python compilation, fatal Ruff checks, and a single Alembic head: passed.
+- Flutter static analyzer: 0 issues found.
+- Dynamic pricing bounds and tariff-lock behavior have focused regression tests.
 
-The native Android and iOS builds cannot be verified on the current Mac until
-their SDKs are installed (see the prerequisites section below).
+The PostGIS/Redis integration suite, native Android/iOS builds, and release web
+build require the corresponding local services and SDKs. They are not claimed
+as verified by the checks above; run the deployment steps below on the target
+machine before releasing.
 
 ## Local deployment with Docker Compose
 
@@ -26,7 +25,7 @@ their SDKs are installed (see the prerequisites section below).
    # Put the generated value in SECRET_KEY in .env.
    ```
 
-2. Start the complete stack (database, Redis, migration job, API, and worker):
+2. Start the local infrastructure (PostGIS and Redis):
 
    ```bash
    /opt/homebrew/bin/docker-compose up -d --build
@@ -36,27 +35,44 @@ their SDKs are installed (see the prerequisites section below).
    ports. This is the configuration used during verification:
 
    ```bash
-   POSTGRES_PORT=55432 REDIS_PORT=56379 API_PORT=18000 \
+   POSTGRES_PORT=55432 REDIS_PORT=56379 \
      /opt/homebrew/bin/docker-compose -p voltez-final up -d --build
    ```
+
+   Compose intentionally starts only PostGIS and Redis. Run the migration and
+   application processes from the `backend` directory so they use the same
+   environment and the checked-in Alembic history:
+
+   ```bash
+   cd backend
+   cp .env.example .env                         # edit credentials/ports first
+   .venv/bin/alembic upgrade head
+   .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 18000
+   ```
+
+   Run the API worker separately when background jobs are enabled. The exact
+   worker command depends on the deployment supervisor; do not assume that
+   `docker-compose up` starts one automatically.
 
 3. Verify the stack:
 
    ```bash
    curl -fsS http://localhost:8000/health/live
    curl -fsS http://localhost:8000/health/ready
-   python scripts/smoke_test.py http://localhost:8000
+   backend/.venv/bin/python backend/scripts/smoke_test.py http://localhost:8000
    ```
 
-   With the isolated ports, replace `8000` with `18000`. Readiness must show
-   `database: true`, `redis: true`, and `ml: true`. A 503 is correct when one
-   dependency is down; it should not be treated as a healthy deployment.
+   With the isolated ports, replace `8000` with `18000`. A healthy readiness
+   response has HTTP 200 with `status: "ready"` and `checks.database`,
+   `checks.redis`, and `checks.ml` all `true`. A 503 is expected when any
+   dependency or either core model is unavailable; inspect the response and
+   API logs before treating the deployment as healthy.
 
 4. Inspect service state and logs:
 
    ```bash
    /opt/homebrew/bin/docker-compose ps
-   /opt/homebrew/bin/docker-compose logs --tail=100 api worker migrate
+   /opt/homebrew/bin/docker-compose logs --tail=100 db redis
    ```
 
 5. Stop the isolated stack when finished. This does not remove named volumes:
@@ -65,9 +81,10 @@ their SDKs are installed (see the prerequisites section below).
    /opt/homebrew/bin/docker-compose -p voltez-final stop
    ```
 
-The Compose database uses the checked-in Alembic migrations. Do not use
+The backend uses the checked-in Alembic migrations. Do not use
 `Base.metadata.create_all()` in deployment; migration history is the schema
-source of truth.
+source of truth. Compose only provisions the database and Redis containers;
+it does not run migrations or start the API automatically.
 
 ## Web testing on the phone (fastest route)
 
@@ -114,27 +131,21 @@ Google Maps, and payment SDKs are more reliable from an HTTPS staging URL.
 
 2. Enable Developer options and USB debugging on the phone. Connect it by USB,
    authorize the Mac, and confirm it appears in `flutter devices`.
-3. Put a restricted Maps key in `~/.gradle/gradle.properties` (or export it):
-
-   ```properties
-   GOOGLE_MAPS_API_KEY=your_android_restricted_key
-   ```
-
-4. For USB testing, use the repository runner. It sets up the required reverse
+3. For USB testing, use the repository runner. It sets up the required reverse
    tunnel before launching Flutter, so the app's `127.0.0.1` points back to the
    Mac API:
 
    ```bash
    # From the repository root
-   ./scripts/run_phone.sh
+   ./frontend/scripts/run_phone.sh
    ```
 
    The runner verifies an authorized device and configures
    `adb reverse tcp:8000 tcp:8000`. If you prefer Wi-Fi, keep both devices on
-   the same network and run `./scripts/run_phone.sh --lan`; do not use
+   the same network and run `./frontend/scripts/run_phone.sh --lan`; do not use
    `127.0.0.1` in LAN mode because that is the phone itself.
 
-5. To launch manually against the Mac LAN API, use:
+4. To launch manually against the Mac LAN API, use:
 
    ```bash
    flutter run -d <ANDROID_DEVICE_ID> \
@@ -159,8 +170,9 @@ Google Maps, and payment SDKs are more reliable from an HTTPS staging URL.
    ```
 
 2. Copy `ios/Flutter/Secrets.xcconfig.example` to
-   `ios/Flutter/Secrets.xcconfig` and put the restricted iOS Maps key there.
-   The real file is ignored by Git.
+   `ios/Flutter/Secrets.xcconfig` only if a paid map/geocoding provider is
+   enabled. The checked-in map uses OpenStreetMap tiles and native geocoding,
+   so no Maps key is required for this flow.
 3. Open `ios/Runner.xcworkspace` in Xcode, choose a signing Team, use the
    `com.voltez.app` bundle identifier, enable Developer Mode on the phone, and
    trust the development certificate.
@@ -176,7 +188,8 @@ Google Maps, and payment SDKs are more reliable from an HTTPS staging URL.
   ID to the mobile build.
 - Use HTTPS for REST and WSS for realtime; terminate TLS at a reverse proxy or
   managed load balancer.
-- Restrict Maps keys by package/bundle ID and API usage; do not commit keys.
+- If a paid map/geocoding provider is enabled, restrict its keys by
+  package/bundle ID and API usage; do not commit keys.
 - Configure Postgres backups, Redis persistence/alerts, log retention, and a
   deployment health check for `/health/ready`.
 - Replace the current FCM/mock notification adapter and simulated session

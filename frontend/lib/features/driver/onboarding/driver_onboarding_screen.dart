@@ -32,35 +32,55 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   bool _saving = false;
   String? _saveError;
 
-  // Covers the common Indian EV catalogue plus representative two/three
-  // wheeler makers. Users can still choose "Other" and enter the model later.
+  // Covers the major Indian EV catalogue, including the two-wheelers most
+  // commonly seen on Indian roads. "Other" remains available for imports and
+  // newly launched models without pretending this list is exhaustive.
   final _makes = [
     'Tata', 'MG', 'Hyundai', 'Mahindra', 'Kia', 'BYD', 'Citroen', 'Volvo',
     'BMW', 'Mercedes-Benz', 'Audi', 'Porsche', 'Ather', 'Ola', 'TVS', 'Bajaj',
-    'Revolt', 'Ultraviolette', 'Matter', 'Hero Electric', 'Ampere', 'Other',
+    'Revolt', 'Ultraviolette', 'Matter', 'Hero Electric', 'Ampere', 'Okinawa',
+    'Vida', 'Simple Energy', 'Oben', 'River', 'Tork', 'Joy e-bike', 'PURE EV',
+    'Komaki', 'EeVe', 'Bounce', 'BGauss', 'Lectrix', 'Raptee', 'Hop Electric',
+    'Odysse', 'Other',
   ];
   final _modelsByMake = {
-    'Tata': ['Nexon EV', 'Tiago EV', 'Punch EV', 'Harrier EV'],
-    'MG': ['ZS EV', 'Comet EV'],
-    'Hyundai': ['Ioniq 5', 'Kona Electric'],
-    'Mahindra': ['XUV400', 'XUV.e8'],
-    'Kia': ['EV6', 'EV9'],
-    'BYD': ['Atto 3', 'Seal', 'e6'],
-    'Citroen': ['eC3'],
-    'Volvo': ['XC40 Recharge', 'C40 Recharge'],
-    'BMW': ['i4', 'iX', 'i7'],
-    'Mercedes-Benz': ['EQS', 'EQB'],
-    'Audi': ['Q4 e-tron', 'e-tron GT'],
+    'Tata': ['Tiago EV', 'Tigor EV', 'Nexon EV', 'Punch EV', 'Curvv EV', 'Harrier EV'],
+    'MG': ['Comet EV', 'ZS EV', 'Windsor EV', 'Cyberster'],
+    'Hyundai': ['Kona Electric', 'Ioniq 5', 'Creta Electric'],
+    'Mahindra': ['eVerito', 'XUV400', 'BE 6', 'XEV 9e'],
+    'Kia': ['EV6', 'EV9', 'Carens Clavis EV'],
+    'BYD': ['Atto 3', 'Seal', 'e6', 'Sealion 7'],
+    'Citroen': ['eC3', 'eC3 Aircross'],
+    'Volvo': ['XC40 Recharge', 'C40 Recharge', 'EX30'],
+    'BMW': ['i4', 'i5', 'iX', 'i7'],
+    'Mercedes-Benz': ['EQA', 'EQB', 'EQE', 'EQS'],
+    'Audi': ['Q4 e-tron', 'Q8 e-tron', 'e-tron GT'],
     'Porsche': ['Taycan', 'Macan Electric'],
-    'Ather': ['450X', '450S'],
-    'Ola': ['S1 Pro', 'S1 Air'],
-    'TVS': ['iQube'],
-    'Bajaj': ['Chetak EV'],
-    'Revolt': ['RV400', 'RV1'],
-    'Ultraviolette': ['F77'],
-    'Matter': ['Aera'],
-    'Hero Electric': ['Optima', 'Photon'],
-    'Ampere': ['Magnus EX', 'Nexus'],
+    'Ather': ['450S', '450X', '450 Apex', 'Rizta'],
+    'Ola': ['S1 Pro', 'S1 Air', 'S1X', 'S1X+', 'S1Z', 'Roadster'],
+    'TVS': ['iQube', 'iQube ST', 'X'],
+    'Bajaj': ['Chetak Premium', 'Chetak Urbane', 'Chetak 2901'],
+    'Revolt': ['RV400', 'RV1', 'RV1+', 'RV BlazeX'],
+    'Ultraviolette': ['F77', 'F77 Mach 2', 'F77 SuperStreet', 'Tesseract'],
+    'Matter': ['Aera 5000', 'Aera 5000+'],
+    'Hero Electric': ['Optima', 'NYX', 'Photon', 'Atria', 'Dash'],
+    'Ampere': ['Magnus EX', 'Magnus Neo', 'Primus', 'Nexus', 'Zeal EX', 'Reo'],
+    'Okinawa': ['Ridge+', 'PraisePro', 'iPraise+', 'Okhi90', 'R30', 'Lite', 'Dual 100', 'Cruiser'],
+    'Vida': ['V1 Plus', 'V1 Pro', 'V2', 'VX2'],
+    'Simple Energy': ['One', 'Dot One'],
+    'Oben': ['Rorr', 'Rorr EZ'],
+    'River': ['Indie'],
+    'Tork': ['Kratos R', 'Kratos R Urban'],
+    'Joy e-bike': ['Beast', 'Hurricane', 'Mihos', 'Wolf', 'Wolf+', 'Gen Next Nanu'],
+    'PURE EV': ['ePluto 7G', 'eTrance Neo', 'eTron+'],
+    'Komaki': ['Ranger', 'Venice', 'XGT VP', 'Flora'],
+    'EeVe': ['Ahava', 'Xeniaa', 'Wind', 'Atreo'],
+    'Bounce': ['Infinity E1'],
+    'BGauss': ['D15', 'C12', 'RUV350'],
+    'Lectrix': ['LXS G3.0', 'LXS 2.0'],
+    'Raptee': ['T30'],
+    'Hop Electric': ['Leo', 'OXO'],
+    'Odysse': ['E2Go', 'Hawk'],
     'Other': ['Custom model'],
   };
 
@@ -228,8 +248,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
 
   // ─── STEP 1: Vehicle Selection ───
   Widget _buildVehicleStep() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

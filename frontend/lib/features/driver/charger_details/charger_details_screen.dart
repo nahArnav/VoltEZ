@@ -305,11 +305,12 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
   // ─── Connector Info ───
   Widget _buildConnectorInfo(Charger charger) {
     final connectorNames = charger.connectors
-        .map((ct) => ct == ConnectorType.ccs2
-            ? 'CCS2 (DC)'
-            : ct == ConnectorType.type2
-                ? 'Type 2 (AC)'
-                : ct.name)
+        .map((ct) => '${connectorTypeLabel(ct.name)} '
+            '${ct == ConnectorType.type2 ||
+                    ct == ConnectorType.type1 ||
+                    ct == ConnectorType.bharatAc
+                ? '(AC)'
+                : '(DC)'}')
         .join(', ');
 
     return Column(

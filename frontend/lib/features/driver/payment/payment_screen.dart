@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
@@ -29,6 +30,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String _selectedMethod = 'UPI';
   RazorpayService? _razorpay;
 
+  @override
+  void initState() {
+    super.initState();
+    _restoreDefaultPaymentMethod();
+  }
+
+  Future<void> _restoreDefaultPaymentMethod() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString('voltez_default_payment_method');
+    if (!mounted || value == null || !{'upi', 'card', 'cash'}.contains(value)) {
+      return;
+    }
+    setState(
+      () => _selectedMethod = value == 'upi'
+          ? 'UPI'
+          : value == 'card'
+          ? 'Card'
+          : 'Cash',
+    );
+    context.read<BookingProvider>().proceedToPayment(method: value);
+  }
+
   final List<Map<String, dynamic>> _methods = [
     {
       'icon': Icons.account_balance_rounded,
@@ -56,12 +79,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
   /// Open Razorpay checkout sheet and handle the result.
   Future<void> _launchRazorpay(BookingProvider booking) async {
     final hold = booking.holdResult;
-    final order = booking.paymentOrder;
-    if (hold == null || order == null) return;
+    if (hold == null) return;
+
+    // Create the gateway order only after the user has selected a method and
+    // tapped Pay. This keeps UPI/card orders from being created prematurely
+    // and lets the user switch methods safely.
+    final prepared = await booking.preparePayment(
+      method: booking.paymentMethod,
+    );
+    if (!prepared || !mounted) return;
+
     if (booking.paymentMethod == 'cash') {
       await booking.processCashPayment();
       return;
     }
+    final order = booking.paymentOrder;
+    if (order == null || order.orderId.isEmpty) return;
     if (kRazorpayKeyId.isEmpty) {
       booking.setPaymentError(
         'Razorpay is not configured for this build. Add the RAZORPAY_KEY_ID build setting.',
@@ -78,7 +111,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       amount: (order.amount * 100).round(), // ₹ → paise
       orderId: order.orderId,
       name: 'VoltEZ Charging',
-      description: 'Charging at ${hold.slot.connectorLabel} · '
+      description:
+          'Charging at ${hold.slot.connectorLabel} · '
           '${_formatTime(hold.slot.startTime)} – ${_formatTime(hold.slot.endTime)}',
       prefill: RazorpayPrefill(
         contact: auth.user?.phone ?? '',
@@ -157,10 +191,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: GestureDetector(
-                      onTap: () async {
+                      onTap: () {
                         setState(() => _selectedMethod = m['label']);
                         final method = (m['label'] as String).toLowerCase();
-                        await booking.proceedToPayment(method: method);
+                        booking.proceedToPayment(method: method);
                       },
                       child: Container(
                         padding: const EdgeInsets.all(16),
@@ -177,27 +211,35 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         ),
                         child: Row(
                           children: [
-                            Icon(m['icon'],
-                                color: selected
-                                    ? AppColors.primary
-                                    : AppColors.textMuted,
-                                size: 24),
+                            Icon(
+                              m['icon'],
+                              color: selected
+                                  ? AppColors.primary
+                                  : AppColors.textMuted,
+                              size: 24,
+                            ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(m['label'],
-                                      style:
-                                          AppTypography.headlineSmall),
-                                  Text(m['subtitle'],
-                                      style: AppTypography.bodySmall),
+                                  Text(
+                                    m['label'],
+                                    style: AppTypography.headlineSmall,
+                                  ),
+                                  Text(
+                                    m['subtitle'],
+                                    style: AppTypography.bodySmall,
+                                  ),
                                 ],
                               ),
                             ),
                             if (selected)
-                              const Icon(Icons.check_circle_rounded,
-                                  color: AppColors.primary, size: 22),
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: AppColors.primary,
+                                size: 22,
+                              ),
                           ],
                         ),
                       ),
@@ -209,8 +251,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    Icon(Icons.lock_rounded,
-                        size: 14, color: AppColors.textMuted),
+                    Icon(
+                      Icons.lock_rounded,
+                      size: 14,
+                      color: AppColors.textMuted,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Secured by Razorpay',
@@ -273,7 +318,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       child: Column(
         children: [
           Text(
-            'TOTAL AMOUNT',
+            'BOOKING HOLD',
             style: TextStyle(
               color: AppColors.textOnPrimary.withValues(alpha: 0.7),
               fontSize: 11,
@@ -300,6 +345,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 fontSize: 12,
               ),
             ),
+          if (slot != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Charging tariff: ₹${slot.pricePerKwh.toStringAsFixed(2)}/kWh · final bill uses delivered energy',
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.textOnPrimary.withValues(alpha: 0.75),
+                fontSize: 11,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -316,13 +374,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
         children: [
           CircularProgressIndicator(color: AppColors.primary),
           SizedBox(height: 24),
-          Text('Verifying payment…',
-              style: AppTypography.headlineMedium),
+          Text('Verifying payment…', style: AppTypography.headlineMedium),
           SizedBox(height: 8),
           Text(
             'Confirming with backend',
-            style: AppTypography.bodyMedium
-                .copyWith(color: AppColors.textMuted),
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.textMuted,
+            ),
           ),
         ],
       ),
@@ -347,16 +405,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 color: AppColors.success.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle_rounded,
-                  color: AppColors.success, size: 44),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.success,
+                size: 44,
+              ),
             ),
             const SizedBox(height: 20),
-            Text('Payment Successful!',
-                style: AppTypography.displaySmall
-                    .copyWith(color: AppColors.success)),
+            Text(
+              booking.paymentMethod == 'cash'
+                  ? 'Reservation Confirmed'
+                  : 'Payment Successful!',
+              style: AppTypography.displaySmall.copyWith(
+                color: AppColors.success,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
-              '₹${booking.holdResult?.estimatedCost.round() ?? 0} · ${booking.paymentMethod == 'cash' ? 'pay at charger' : booking.paymentMethod.toUpperCase()}',
+              '₹${booking.holdResult?.estimatedCost.round() ?? 0} hold · ${booking.paymentMethod == 'cash' ? 'pay at charger' : booking.paymentMethod.toUpperCase()}',
               style: AppTypography.bodyMedium,
             ),
             if (booking.razorpayPaymentId != null) ...[
@@ -370,8 +436,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ],
             const SizedBox(height: 8),
-            Text('Booking confirmed',
-                style: AppTypography.bodySmall),
+            Text('Booking confirmed', style: AppTypography.bodySmall),
             const SizedBox(height: 24),
             PrimaryButton(
               text: 'VIEW BOOKING',
@@ -402,13 +467,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 color: AppColors.error.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.error_outline_rounded,
-                  color: AppColors.error, size: 44),
+              child: const Icon(
+                Icons.error_outline_rounded,
+                color: AppColors.error,
+                size: 44,
+              ),
             ),
             const SizedBox(height: 20),
-            Text('Payment Failed',
-                style: AppTypography.displaySmall
-                    .copyWith(color: AppColors.error)),
+            Text(
+              'Payment Failed',
+              style: AppTypography.displaySmall.copyWith(
+                color: AppColors.error,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               booking.errorMessage ?? 'Payment could not be processed.',
@@ -458,17 +529,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.cancel_rounded,
-                size: 64,
-                color: AppColors.textMuted.withValues(alpha: 0.4)),
+            Icon(
+              Icons.cancel_rounded,
+              size: 64,
+              color: AppColors.textMuted.withValues(alpha: 0.4),
+            ),
             const SizedBox(height: 20),
-            Text('Payment Cancelled',
-                style: AppTypography.headlineMedium),
+            Text('Payment Cancelled', style: AppTypography.headlineMedium),
             const SizedBox(height: 8),
             Text(
               'Your slot hold has been released.',
-              style: AppTypography.bodyMedium
-                  .copyWith(color: AppColors.textMuted),
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textMuted,
+              ),
             ),
             const SizedBox(height: 24),
             PrimaryButton(
@@ -503,13 +576,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 color: AppColors.warning.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.timer_off_rounded,
-                  color: AppColors.warning, size: 44),
+              child: const Icon(
+                Icons.timer_off_rounded,
+                color: AppColors.warning,
+                size: 44,
+              ),
             ),
             const SizedBox(height: 20),
-            Text('Hold Expired',
-                style: AppTypography.displaySmall
-                    .copyWith(color: AppColors.warning)),
+            Text(
+              'Hold Expired',
+              style: AppTypography.displaySmall.copyWith(
+                color: AppColors.warning,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               'Your 5-minute hold has expired.\nPlease select another slot.',

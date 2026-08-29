@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -366,6 +370,8 @@ class _ChargerList extends StatelessWidget {
                         _showAddPort(context, charger);
                       } else if (value == 'availability') {
                         _showAvailability(context, charger);
+                      } else if (value == 'tariff') {
+                        _showEditTariff(context, charger);
                       } else {
                         provider.setChargerStatus(
                           charger['id'].toString(),
@@ -381,6 +387,10 @@ class _ChargerList extends StatelessWidget {
                       PopupMenuItem(
                         value: 'availability',
                         child: Text('Set availability'),
+                      ),
+                      PopupMenuItem(
+                        value: 'tariff',
+                        child: Text('Update base tariff'),
                       ),
                       PopupMenuItem(
                         value: 'available',
@@ -657,25 +667,82 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
   final _name = TextEditingController();
   final _category = TextEditingController(text: 'charging_host');
   final _address = TextEditingController();
-  final _lat = TextEditingController();
-  final _lng = TextEditingController();
+  Timer? _addressSearchTimer;
+  var _addressSearchToken = 0;
+  var _addressSearching = false;
+  List<_AddressSuggestion> _addressSuggestions = const [];
+  double? _selectedLatitude;
+  double? _selectedLongitude;
   @override
   void dispose() {
+    _addressSearchTimer?.cancel();
     _name.dispose();
     _category.dispose();
     _address.dispose();
-    _lat.dispose();
-    _lng.dispose();
     super.dispose();
   }
 
+  void _searchAddress(String value) {
+    _addressSearchTimer?.cancel();
+    final token = ++_addressSearchToken;
+    setState(() {
+      _selectedLatitude = null;
+      _selectedLongitude = null;
+      _addressSuggestions = const [];
+      _addressSearching = value.trim().length >= 3;
+    });
+    if (value.trim().length < 3) return;
+    _addressSearchTimer = Timer(const Duration(milliseconds: 350), () async {
+      final suggestions = await _searchAddressSuggestions(value.trim());
+      if (!mounted || token != _addressSearchToken) return;
+      setState(() {
+        _addressSuggestions = suggestions;
+        _addressSearching = false;
+      });
+    });
+  }
+
+  Future<void> _useCurrentLocation() async {
+    _addressSearchTimer?.cancel();
+    _addressSearchToken++;
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw StateError('Location permission was denied.');
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _selectedLatitude = position.latitude;
+        _selectedLongitude = position.longitude;
+        _address.text = 'Current device location';
+        _addressSuggestions = const [];
+        _addressSearching = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not read device location: $error')),
+      );
+    }
+  }
+
   Future<void> _submit() async {
-    final latitude = double.tryParse(_lat.text.trim());
-    final longitude = double.tryParse(_lng.text.trim());
-    if (_name.text.trim().isEmpty || latitude == null || longitude == null) {
+    if (_name.text.trim().isEmpty ||
+        _selectedLatitude == null ||
+        _selectedLongitude == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Enter business name and valid latitude/longitude.'),
+          content: Text('Enter a business name and select a verified address.'),
         ),
       );
       return;
@@ -684,8 +751,8 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
       name: _name.text.trim(),
       category: _category.text.trim(),
       address: _address.text.trim(),
-      latitude: latitude,
-      longitude: longitude,
+      latitude: _selectedLatitude!,
+      longitude: _selectedLongitude!,
     );
     if (ok) await widget.onCreated();
   }
@@ -710,30 +777,64 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
           const SizedBox(height: 20),
           _input(_name, 'Business name'),
           _input(_category, 'Category'),
-          _input(_address, 'Address'),
-          Row(
-            children: [
-              Expanded(
-                child: _input(
-                  _lat,
-                  'Latitude',
-                  keyboard: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                ),
+          TextField(
+            controller: _address,
+            onChanged: _searchAddress,
+            decoration: InputDecoration(
+              labelText: 'Search business address',
+              hintText: 'Search a landmark, street, or business',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: IconButton(
+                tooltip: 'Use current location',
+                icon: const Icon(Icons.my_location_rounded),
+                onPressed: _useCurrentLocation,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _input(
-                  _lng,
-                  'Longitude',
-                  keyboard: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
+          if (_addressSearching)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+          if (_addressSuggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 4, bottom: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                children: _addressSuggestions
+                    .map(
+                      (suggestion) => ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.location_on_outlined),
+                        title: Text(
+                          suggestion.label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => setState(() {
+                          _addressSearchTimer?.cancel();
+                          _addressSearchToken++;
+                          _selectedLatitude = suggestion.latitude;
+                          _selectedLongitude = suggestion.longitude;
+                          _address.text = suggestion.label;
+                          _addressSuggestions = const [];
+                        }),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          if (_selectedLatitude != null)
+            const Padding(
+              padding: EdgeInsets.only(top: 4, bottom: 12),
+              child: Text(
+                'Location selected. Coordinates will be saved automatically.',
+                style: TextStyle(fontSize: 12, color: AppColors.success),
+              ),
+            ),
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _submit,
@@ -760,85 +861,296 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
   );
 }
 
+class _AddressSuggestion {
+  const _AddressSuggestion({
+    required this.label,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final String label;
+  final double latitude;
+  final double longitude;
+}
+
+Future<List<_AddressSuggestion>> _searchAddressSuggestions(String query) async {
+  try {
+    final locations = await locationFromAddress(query);
+    final suggestions = <_AddressSuggestion>[];
+    for (final location in locations.take(5)) {
+      var label = query;
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          location.latitude,
+          location.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          label = [
+            place.name,
+            place.street,
+            place.locality,
+            place.administrativeArea,
+          ]
+              .whereType<String>()
+              .map((value) => value.trim())
+              .where((value) => value.isNotEmpty)
+              .toSet()
+              .join(', ');
+        }
+      } catch (_) {
+        // Coordinates remain usable even when reverse labelling is unavailable.
+      }
+      suggestions.add(
+        _AddressSuggestion(
+          label: label,
+          latitude: location.latitude,
+          longitude: location.longitude,
+        ),
+      );
+    }
+    return suggestions;
+  } catch (_) {
+    return const [];
+  }
+}
+
 Future<void> _showAddCharger(BuildContext context) async {
   final name = TextEditingController();
   final type = TextEditingController(text: 'DC');
   final power = TextEditingController();
-  final price = TextEditingController(text: '15');
-  final lat = TextEditingController();
-  final lng = TextEditingController();
+  final price = TextEditingController();
+  final location = TextEditingController();
+  Timer? searchTimer;
+  var searchToken = 0;
   await showDialog<void>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Register charger'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _dialogInput(name, 'Name'),
-            _dialogInput(type, 'Type (AC/DC)'),
-            _dialogInput(
-              power,
-              'Power kW',
-              keyboard: const TextInputType.numberWithOptions(decimal: true),
+    builder: (dialogContext) {
+      var suggestions = <_AddressSuggestion>[];
+      var searching = false;
+      var saving = false;
+      double? selectedLatitude;
+      double? selectedLongitude;
+
+      Future<void> search(String query, void Function(void Function()) setState) async {
+        searchTimer?.cancel();
+        final token = ++searchToken;
+        if (query.trim().length < 3) {
+          setState(() {
+            suggestions = [];
+            searching = false;
+          });
+          return;
+        }
+        searchTimer = Timer(const Duration(milliseconds: 350), () async {
+          if (!dialogContext.mounted) return;
+          setState(() => searching = true);
+          final results = await _searchAddressSuggestions(query.trim());
+          if (!dialogContext.mounted || token != searchToken) return;
+          setState(() {
+            suggestions = results;
+            searching = false;
+          });
+        });
+      }
+
+      Future<void> useCurrentLocation(void Function(void Function()) setState) async {
+        searchTimer?.cancel();
+        searchToken++;
+        try {
+          var permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          if (permission == LocationPermission.denied ||
+              permission == LocationPermission.deniedForever) {
+            throw StateError('Location permission was denied.');
+          }
+          final position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 10),
             ),
-            _dialogInput(
-              price,
-              'Price per kWh',
-              keyboard: const TextInputType.numberWithOptions(decimal: true),
+          );
+          if (!dialogContext.mounted) return;
+          selectedLatitude = position.latitude;
+          selectedLongitude = position.longitude;
+          location.text = 'Current device location';
+          setState(() => suggestions = []);
+        } catch (error) {
+          if (dialogContext.mounted) {
+            ScaffoldMessenger.of(dialogContext).showSnackBar(
+              SnackBar(content: Text('Could not read device location: $error')),
+            );
+          }
+        }
+      }
+
+      return StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: const [
+              Icon(Icons.ev_station_rounded, color: AppColors.primary),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Register charger',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.68,
             ),
-            _dialogInput(
-              lat,
-              'Latitude',
-              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _dialogInput(name, 'Name'),
+                  _dialogInput(type, 'Type (AC/DC)'),
+                  _dialogInput(
+                    power,
+                    'Power kW',
+                    keyboard: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  _dialogInput(
+                    price,
+                    'Base price per kWh (INR)',
+                    keyboard: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      'VoltEZ applies a bounded peak/off-peak multiplier using live demand and availability signals.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ),
+                  TextField(
+                    controller: location,
+                    onChanged: (value) {
+                      selectedLatitude = null;
+                      selectedLongitude = null;
+                      search(value, setState);
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Search charger address',
+                      hintText: 'Search a landmark, street, or business',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: IconButton(
+                        tooltip: 'Use current location',
+                        icon: const Icon(Icons.my_location_rounded),
+                        onPressed: () => useCurrentLocation(setState),
+                      ),
+                    ),
+                  ),
+                  if (searching) const LinearProgressIndicator(minHeight: 2),
+                  if (suggestions.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        children: suggestions
+                            .map(
+                              (suggestion) => ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.location_on_outlined),
+                                title: Text(
+                                  suggestion.label,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onTap: () {
+                                  searchTimer?.cancel();
+                                  searchToken++;
+                                  selectedLatitude = suggestion.latitude;
+                                  selectedLongitude = suggestion.longitude;
+                                  location.text = suggestion.label;
+                                  setState(() => suggestions = []);
+                                },
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  if (selectedLatitude != null)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Location selected. Coordinates will be saved automatically.',
+                        style: TextStyle(fontSize: 12, color: AppColors.success),
+                      ),
+                    ),
+                ],
+              ),
             ),
-            _dialogInput(
-              lng,
-              'Longitude',
-              keyboard: const TextInputType.numberWithOptions(decimal: true),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialogContext),
+              child: const Text('CANCEL'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final p = double.tryParse(power.text.trim());
+                      final pr = double.tryParse(price.text.trim());
+                      if (name.text.trim().isEmpty || p == null || p <= 0 || pr == null || pr <= 0) {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(content: Text('Enter a name, positive power, and base tariff.')),
+                        );
+                        return;
+                      }
+                      if (selectedLatitude == null || selectedLongitude == null) {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(content: Text('Select the charger address from the suggestions first.')),
+                        );
+                        return;
+                      }
+                      setState(() => saving = true);
+                      final ok = await context.read<BusinessProvider>().createCharger(
+                        name: name.text.trim(),
+                        chargerType: type.text.trim(),
+                        powerKw: p,
+                        pricePerKwh: pr,
+                        latitude: selectedLatitude!,
+                        longitude: selectedLongitude!,
+                        addressText: location.text.trim(),
+                      );
+                      if (!dialogContext.mounted) return;
+                      if (ok) {
+                        Navigator.pop(dialogContext);
+                      } else {
+                        final error = context
+                                .read<BusinessProvider>()
+                                .errorMessage ??
+                            'Charger could not be registered. Check your session and try again.';
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          SnackBar(content: Text(error)),
+                        );
+                        setState(() => saving = false);
+                      }
+                    },
+              child: Text(saving ? 'SAVING…' : 'SAVE'),
             ),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('CANCEL'),
-        ),
-        FilledButton(
-          onPressed: () async {
-            final p = double.tryParse(power.text);
-            final la = double.tryParse(lat.text);
-            final lo = double.tryParse(lng.text);
-            final pr = double.tryParse(price.text);
-            if (name.text.trim().isEmpty ||
-                p == null ||
-                la == null ||
-                lo == null ||
-                pr == null) {
-              return;
-            }
-            final ok = await context.read<BusinessProvider>().createCharger(
-              name: name.text.trim(),
-              chargerType: type.text.trim(),
-              powerKw: p,
-              pricePerKwh: pr,
-              latitude: la,
-              longitude: lo,
-            );
-            if (dialogContext.mounted && ok) Navigator.pop(dialogContext);
-          },
-          child: const Text('SAVE'),
-        ),
-      ],
-    ),
+      );
+    },
   );
+  searchTimer?.cancel();
   name.dispose();
   type.dispose();
   power.dispose();
   price.dispose();
-  lat.dispose();
-  lng.dispose();
+  location.dispose();
 }
 
 Future<void> _showAddPort(
@@ -927,6 +1239,74 @@ Future<void> _showAddPort(
   );
   portNumber.dispose();
   power.dispose();
+}
+
+Future<void> _showEditTariff(
+  BuildContext context,
+  Map<String, dynamic> charger,
+) async {
+  final price = TextEditingController(
+    text: charger['price_per_kwh']?.toString() ?? '',
+  );
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('Update base tariff · ${charger['name'] ?? ''}'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _dialogInput(
+              price,
+              'Base price per kWh (INR)',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            const Text(
+              'This is the owner-controlled base. VoltEZ applies a bounded live multiplier per slot.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final value = double.tryParse(price.text.trim());
+            if (value == null || value <= 0) {
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                const SnackBar(content: Text('Enter a positive base tariff.')),
+              );
+              return;
+            }
+            final ok = await context.read<BusinessProvider>().updateChargerTariff(
+              chargerId: charger['id'].toString(),
+              pricePerKwh: value,
+            );
+            if (!dialogContext.mounted) return;
+            if (ok) {
+              Navigator.pop(dialogContext);
+            } else {
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    context.read<BusinessProvider>().errorMessage ??
+                        'Could not update tariff.',
+                  ),
+                ),
+              );
+            }
+          },
+          child: const Text('SAVE TARIFF'),
+        ),
+      ],
+    ),
+  );
+  price.dispose();
 }
 
 Future<void> _showAvailability(
@@ -1049,25 +1429,36 @@ Future<void> _showBusinessKycDialog(
         children: const [
           Icon(Icons.verified_user_rounded, color: AppColors.primary),
           SizedBox(width: 8),
-          Expanded(child: Text('Host KYC Verification')),
+          Flexible(
+            child: Text(
+              'Host KYC Verification',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
 
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Submit verified business credentials to receive automated driver payouts and unlock 24/7 public listing.',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            _dialogInput(gstin, 'GSTIN (e.g. 27AAAAA0000A1Z5)'),
-            _dialogInput(pan, 'Business PAN (e.g. AAAAA0000A)'),
-            _dialogInput(meter, 'Electricity Consumer / Meter ID'),
-            _dialogInput(upi, 'Payout UPI ID'),
-          ],
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.58,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Submit verified business credentials to receive automated driver payouts and unlock 24/7 public listing.',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              _dialogInput(gstin, 'GSTIN (e.g. 27AAAAA0000A1Z5)'),
+              _dialogInput(pan, 'Business PAN (e.g. AAAAA0000A)'),
+              _dialogInput(meter, 'Electricity Consumer / Meter ID'),
+              _dialogInput(upi, 'Payout UPI ID'),
+            ],
+          ),
         ),
       ),
       actions: [

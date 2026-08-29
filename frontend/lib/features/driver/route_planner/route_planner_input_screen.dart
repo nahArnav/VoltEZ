@@ -467,7 +467,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                       const SizedBox(width: 8),
                       _vehicleSpec(
                         Icons.power_rounded,
-                        vehicle.connectorType == 'CCS2' ? 'CCS2' : 'Type 2',
+                        connectorTypeLabel(vehicle.primaryConnector),
                         selected,
                       ),
                     ],
@@ -839,7 +839,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                     child: Text(
                       'Finding stops compatible with your '
                       '${planner.selectedVehicle!.make} ${planner.selectedVehicle!.model} '
-                      '(${planner.selectedVehicle!.connectorType == 'CCS2' ? 'CCS2' : 'Type 2'}, '
+                      '(${connectorTypeLabel(planner.selectedVehicle!.primaryConnector)}, '
                       '${planner.selectedVehicle!.batteryCapacityKwh.round()} kWh). '
                       'Calculating reachable stations based on your SOC.',
                       style: AppTypography.bodySmall.copyWith(

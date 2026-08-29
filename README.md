@@ -3,6 +3,14 @@
 > **For Person 2 (Business Side)**  
 > This guide covers the full codebase context you need to build the business owner experience in VoltEZ Flutter.
 
+> **Current-branch note (2026-08-30):** This document began as an early
+> handoff and some examples below describe the pre-integration/mock state.
+> For the current live API, database, ML, Compose, and phone workflow, use
+> [`docs/DEPLOYMENT_AND_PHONE_TESTING.md`](docs/DEPLOYMENT_AND_PHONE_TESTING.md),
+> [`docs/frontend-api-mapping.md`](docs/frontend-api-mapping.md), and the
+> backend/ML documentation index. Do not copy the legacy mock adapters or old
+> integer-ID examples into new code.
+
 ---
 
 ## Table of Contents

@@ -102,9 +102,7 @@ class _BookingScreenState extends State<BookingScreen> {
             child: Text(
               label,
               style: TextStyle(
-                color: selected
-                    ? AppColors.primary
-                    : AppColors.textMuted,
+                color: selected ? AppColors.primary : AppColors.textMuted,
                 fontWeight: FontWeight.w800,
                 fontSize: 13,
               ),
@@ -127,14 +125,18 @@ class _BookingScreenState extends State<BookingScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded,
-              color: AppColors.error, size: 20),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.error,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               booking.errorMessage!,
-              style: AppTypography.bodySmall
-                  .copyWith(color: AppColors.textPrimary),
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           GestureDetector(
@@ -182,8 +184,9 @@ class _BookingScreenState extends State<BookingScreen> {
               children: [
                 Text(
                   isHolding ? 'Holding slot…' : 'Slot held — confirm within:',
-                  style: AppTypography.bodySmall
-                      .copyWith(color: AppColors.textPrimary),
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                 ),
                 if (!isHolding)
                   Text(
@@ -202,7 +205,10 @@ class _BookingScreenState extends State<BookingScreen> {
             Flexible(
               child: PrimaryButton(
                 text: 'CONTINUE',
-                onPressed: () => booking.proceedToPayment(),
+                onPressed: () {
+                  booking.proceedToPayment();
+                  if (context.mounted) context.go('/driver/payment');
+                },
                 height: 44,
               ),
             ),
@@ -223,17 +229,19 @@ class _BookingScreenState extends State<BookingScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.ev_station_rounded,
-                size: 48,
-                color: AppColors.textMuted.withValues(alpha: 0.3)),
+            Icon(
+              Icons.ev_station_rounded,
+              size: 48,
+              color: AppColors.textMuted.withValues(alpha: 0.3),
+            ),
             const SizedBox(height: 16),
-            Text('No charger selected',
-                style: AppTypography.headlineMedium),
+            Text('No charger selected', style: AppTypography.headlineMedium),
             const SizedBox(height: 8),
             Text(
               'Select a charger from the map or recommendations',
-              style: AppTypography.bodyMedium
-                  .copyWith(color: AppColors.textMuted),
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textMuted,
+              ),
             ),
             const SizedBox(height: 24),
             PrimaryButton(
@@ -262,21 +270,24 @@ class _BookingScreenState extends State<BookingScreen> {
           _buildDatePicker(booking),
           const SizedBox(height: 14),
 
-          Text('Available Slots — ${_dateHeading(booking.selectedDate)}',
-              style: AppTypography.headlineMedium),
+          Text(
+            'Available Slots — ${_dateHeading(booking.selectedDate)}',
+            style: AppTypography.headlineMedium,
+          ),
           const SizedBox(height: 4),
           Text(
             'Select a slot to hold it for 10 minutes',
-            style: AppTypography.bodySmall
-                .copyWith(color: AppColors.textMuted, fontSize: 11),
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textMuted,
+              fontSize: 11,
+            ),
           ),
           const SizedBox(height: 12),
 
           // ─── Slots Grid ───
           Expanded(
             child: GridView.builder(
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
@@ -285,10 +296,8 @@ class _BookingScreenState extends State<BookingScreen> {
               itemCount: booking.slots.length,
               itemBuilder: (context, index) {
                 final slot = booking.slots[index];
-                final selected =
-                    booking.selectedSlot?.id == slot.id;
-                final isHolding =
-                    booking.phase == BookingPhase.holding;
+                final selected = booking.selectedSlot?.id == slot.id;
+                final isHolding = booking.phase == BookingPhase.holding;
 
                 return _buildSlotCard(
                   slot: slot,
@@ -309,13 +318,12 @@ class _BookingScreenState extends State<BookingScreen> {
   Widget _buildDatePicker(BookingProvider booking) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final days = List.generate(
-      7,
-      (index) => today.add(Duration(days: index)),
-    );
+    final days = List.generate(7, (index) => today.add(Duration(days: index)));
 
     return SizedBox(
-      height: 66,
+      // Leave room for the border, vertical padding, weekday and date text on
+      // small Android screens; 66px caused the red RenderFlex overflow stripe.
+      height: 78,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: days.length,
@@ -381,15 +389,8 @@ class _BookingScreenState extends State<BookingScreen> {
   bool _sameDate(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  String _weekday(DateTime date) => const [
-        'MON',
-        'TUE',
-        'WED',
-        'THU',
-        'FRI',
-        'SAT',
-        'SUN',
-      ][date.weekday - 1];
+  String _weekday(DateTime date) =>
+      const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'][date.weekday - 1];
 
   String _dateHeading(DateTime date) {
     if (_sameDate(date, DateTime.now())) return 'Today';
@@ -413,8 +414,11 @@ class _BookingScreenState extends State<BookingScreen> {
               color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.ev_station_rounded,
-                color: AppColors.primary, size: 22),
+            child: const Icon(
+              Icons.ev_station_rounded,
+              color: AppColors.primary,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -504,8 +508,11 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
                 if (slot.isStale) ...[
                   const SizedBox(width: 4),
-                  Icon(Icons.info_outline_rounded,
-                      size: 12, color: AppColors.warning),
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 12,
+                    color: AppColors.warning,
+                  ),
                 ],
               ],
             ),
@@ -538,8 +545,7 @@ class _BookingScreenState extends State<BookingScreen> {
           const SizedBox(height: 16),
           Expanded(
             child: GridView.builder(
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
@@ -584,17 +590,19 @@ class _BookingScreenState extends State<BookingScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_rounded,
-                size: 48,
-                color: AppColors.textMuted.withValues(alpha: 0.3)),
+            Icon(
+              Icons.history_rounded,
+              size: 48,
+              color: AppColors.textMuted.withValues(alpha: 0.3),
+            ),
             const SizedBox(height: 16),
-            Text('No bookings yet',
-                style: AppTypography.headlineMedium),
+            Text('No bookings yet', style: AppTypography.headlineMedium),
             const SizedBox(height: 8),
             Text(
               'Your booking history will appear here',
-              style: AppTypography.bodyMedium
-                  .copyWith(color: AppColors.textMuted),
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textMuted,
+              ),
             ),
           ],
         ),
@@ -606,8 +614,7 @@ class _BookingScreenState extends State<BookingScreen> {
       itemCount: booking.bookingHistory.length,
       itemBuilder: (context, index) {
         final b = booking.bookingHistory[index];
-        final (statusLabel, statusColor) =
-            _historyStatus(b.status);
+        final (statusLabel, statusColor) = _historyStatus(b.status);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -625,20 +632,21 @@ class _BookingScreenState extends State<BookingScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color:
-                          AppColors.primary.withValues(alpha: 0.12),
+                      color: AppColors.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.ev_station_rounded,
-                        color: AppColors.primary, size: 22),
+                    child: const Icon(
+                      Icons.ev_station_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(b.chargerName,
-                            style: AppTypography.headlineSmall),
+                        Text(b.chargerName, style: AppTypography.headlineSmall),
                         const SizedBox(height: 2),
                         Text(
                           '${b.date} · ${b.startTime} – ${b.endTime}',
@@ -649,7 +657,9 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
@@ -676,9 +686,13 @@ class _BookingScreenState extends State<BookingScreen> {
                   if (b.status == 'completed')
                     TextButton(
                       onPressed: () {},
-                      child: Text('Rate',
-                          style: TextStyle(
-                              color: AppColors.warning, fontSize: 12)),
+                      child: Text(
+                        'Rate',
+                        style: TextStyle(
+                          color: AppColors.warning,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                 ],
               ),
