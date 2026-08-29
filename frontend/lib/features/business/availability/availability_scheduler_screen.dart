@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/theme/typography.dart';
+import '../../../shared/widgets/widgets.dart';
 
 class AvailabilitySchedulerScreen extends StatefulWidget {
   const AvailabilitySchedulerScreen({super.key});
@@ -11,12 +13,6 @@ class AvailabilitySchedulerScreen extends StatefulWidget {
 
 class _AvailabilitySchedulerScreenState
     extends State<AvailabilitySchedulerScreen> {
-  final Color bg = AppColors.background;
-  final Color panel = AppColors.card;
-  final Color cyan = AppColors.primary;
-  final Color green = AppColors.success;
-  final Color amber = AppColors.warning;
-
   bool repeatWeekly = false;
   double price = 20;
 
@@ -36,22 +32,30 @@ class _AvailabilitySchedulerScreenState
   ];
 
   Color slotColor(String status) =>
-      status == "active" ? green : amber;
+      status == "active" ? AppColors.success : AppColors.warning;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: AppColors.background,
         elevation: 0,
-        title: const Column(
+        foregroundColor: AppColors.textPrimary,
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Availability"),
+            Text(
+              "Availability",
+              style: AppTypography.headlineMedium.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
             Text(
               "Port P1 • CCS2 • 60 kW",
-              style: TextStyle(fontSize: 12, color: Colors.white60),
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
             )
           ],
         ),
@@ -62,28 +66,24 @@ class _AvailabilitySchedulerScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             /// Day Header
-            Container(
-              width: double.infinity,
+            GlassCard(
               padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: panel,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const Column(
+              borderRadius: 18,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     "Tuesday • 25 Aug",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                    style: AppTypography.headlineMedium.copyWith(
+                      color: AppColors.onPrimary,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
                   Text(
                     "Manage charging availability",
-                    style: TextStyle(color: Colors.white60),
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.onPrimary.withValues(alpha: 0.7),
+                    ),
                   ),
                 ],
               ),
@@ -91,12 +91,10 @@ class _AvailabilitySchedulerScreenState
 
             const SizedBox(height: 26),
 
-            const Text(
+            Text(
               "Today's Slots",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
+              style: AppTypography.headlineSmall.copyWith(
+                color: AppColors.onPrimary,
               ),
             ),
 
@@ -104,22 +102,16 @@ class _AvailabilitySchedulerScreenState
 
             ...slots.map((slot) => Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: Container(
+                  child: GlassCard(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: panel,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: slotColor(slot["status"]).withValues(alpha: .3),
-                      ),
-                    ),
+                    borderRadius: 16,
                     child: Row(
                       children: [
                         Container(
                           width: 6,
                           height: 58,
                           decoration: BoxDecoration(
-                            color: slotColor(slot["status"]),
+                            color: AppColors.onPrimary.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
@@ -131,17 +123,15 @@ class _AvailabilitySchedulerScreenState
                             children: [
                               Text(
                                 "${slot["start"]} - ${slot["end"]}",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                style: AppTypography.headlineSmall.copyWith(
+                                  color: AppColors.onPrimary,
                                 ),
                               ),
                               const SizedBox(height: 5),
                               Text(
                                 "₹${slot["price"]}/kWh",
-                                style: const TextStyle(
-                                  color: Colors.white70,
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.onPrimary.withValues(alpha: 0.7),
                                 ),
                               )
                             ],
@@ -149,7 +139,7 @@ class _AvailabilitySchedulerScreenState
                         ),
                         Switch(
                           value: slot["status"] == "active",
-                          activeThumbColor: cyan,
+                          activeThumbColor: AppColors.primary,
                           onChanged: (v) {
                             setState(() {
                               slot["status"] =
@@ -164,30 +154,25 @@ class _AvailabilitySchedulerScreenState
 
             const SizedBox(height: 28),
 
-            const Text(
+            Text(
               "Create New Slot",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
+              style: AppTypography.headlineSmall.copyWith(
+                color: AppColors.onPrimary,
               ),
             ),
 
             const SizedBox(height: 14),
 
-            Container(
+            GlassCard(
               padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: panel,
-                borderRadius: BorderRadius.circular(18),
-              ),
+              borderRadius: 18,
               child: Column(
                 children: [
                   Row(
                     children: [
-                      Expanded(child: timeBox("17:00")),
+                      Expanded(child: _timeBox("17:00")),
                       const SizedBox(width: 12),
-                      Expanded(child: timeBox("20:00")),
+                      Expanded(child: _timeBox("20:00")),
                     ],
                   ),
 
@@ -195,18 +180,19 @@ class _AvailabilitySchedulerScreenState
 
                   Row(
                     children: [
-                      const Icon(Icons.repeat,
-                          color: Colors.white70),
+                      Icon(Icons.repeat, color: AppColors.onPrimary.withValues(alpha: 0.7)),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           "Repeat Weekly",
-                          style: TextStyle(color: Colors.white),
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.onPrimary,
+                          ),
                         ),
                       ),
                       Switch(
                         value: repeatWeekly,
-                        activeThumbColor: cyan,
+                        activeThumbColor: AppColors.primary,
                         onChanged: (v) =>
                             setState(() => repeatWeekly = v),
                       )
@@ -217,17 +203,17 @@ class _AvailabilitySchedulerScreenState
 
                   Row(
                     children: [
-                      const Text(
+                      Text(
                         "Price Override",
-                        style: TextStyle(color: Colors.white),
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.onPrimary,
+                        ),
                       ),
                       const Spacer(),
                       Text(
                         "₹${price.toInt()}",
-                        style: TextStyle(
-                          color: cyan,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                        style: AppTypography.headlineMedium.copyWith(
+                          color: AppColors.onPrimary,
                         ),
                       )
                     ],
@@ -237,7 +223,7 @@ class _AvailabilitySchedulerScreenState
                     value: price,
                     min: 10,
                     max: 40,
-                    activeColor: cyan,
+                    activeColor: AppColors.primary,
                     onChanged: (v) =>
                         setState(() => price = v),
                   ),
@@ -249,8 +235,8 @@ class _AvailabilitySchedulerScreenState
                     height: 52,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: cyan,
-                        foregroundColor: Colors.black,
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.onPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius:
                               BorderRadius.circular(14),
@@ -265,10 +251,10 @@ class _AvailabilitySchedulerScreenState
                           ),
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         "SAVE AVAILABILITY",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
+                        style: AppTypography.buttonText.copyWith(
+                          color: AppColors.onPrimary,
                         ),
                       ),
                     ),
@@ -282,20 +268,18 @@ class _AvailabilitySchedulerScreenState
     );
   }
 
-  Widget timeBox(String time) {
+  Widget _timeBox(String time) {
     return Container(
       height: 54,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.white10,
+        color: AppColors.onPrimary.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Text(
         time,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
+        style: AppTypography.headlineMedium.copyWith(
+          color: AppColors.onPrimary,
         ),
       ),
     );

@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoltEZ — Complete API Reference</title>
+<style>
+  @page { margin: 1.5cm; size: A4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; font-size: 13px; }
+  
+  .cover { page-break-after: always; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #0A0F1F 0%, #1a1a2e 50%, #16213e 100%); color: white; text-align: center; padding: 60px 40px; }
+  .cover h1 { font-size: 48px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
+  .cover .subtitle { font-size: 18px; color: #94A3B8; margin-bottom: 40px; }
+  .cover .meta { font-size: 13px; color: #64748B; margin-top: 40px; }
+  .cover .badge { display: inline-block; background: #00E5FF; color: #0A0F1F; padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 12px; margin: 4px; }
+  
+  .toc { page-break-after: always; padding: 40px; }
+  .toc h2 { font-size: 24px; margin-bottom: 20px; color: #0A0F1F; }
+  .toc ul { list-style: none; }
+  .toc li { padding: 6px 0; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+  .toc li a { text-decoration: none; color: #1a1a2e; }
+  .toc li span.num { color: #00B4D8; font-weight: 700; margin-right: 8px; }
+  
+  .section { page-break-inside: avoid; margin-bottom: 30px; }
+  .section-title { font-size: 22px; font-weight: 800; color: #0A0F1F; border-bottom: 3px solid #00E5FF; padding-bottom: 8px; margin: 30px 0 16px; page-break-after: avoid; }
+  .subsection { font-size: 16px; font-weight: 700; color: #1e293b; margin: 20px 0 10px; page-break-after: avoid; }
+  
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 12px; page-break-inside: avoid; }
+  th { background: #0A0F1F; color: #00E5FF; padding: 10px 12px; text-align: left; font-weight: 700; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; }
+  td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  
+  .method { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px; color: white; min-width: 52px; text-align: center; }
+  .get { background: #22c55e; }
+  .post { background: #3b82f6; }
+  .patch { background: #f59e0b; }
+  .delete { background: #ef4444; }
+  .ws { background: #8b5cf6; }
+  
+  .auth-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+  .auth-public { background: #dcfce7; color: #166534; }
+  .auth-bearer { background: #dbeafe; color: #1e40af; }
+  .auth-owner { background: #fef3c7; color: #92400e; }
+  .auth-driver { background: #ede9fe; color: #5b21b6; }
+  
+  .schema-block { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 16px; margin: 8px 0 16px; font-family: 'Fira Code', 'Consolas', monospace; font-size: 11px; line-height: 1.5; white-space: pre-wrap; page-break-inside: avoid; }
+  
+  .note { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin: 12px 0; border-radius: 0 6px 6px 0; font-size: 12px; }
+  .note.info { background: #eff6ff; border-left-color: #3b82f6; }
+  .note.success { background: #f0fdf4; border-left-color: #22c55e; }
+  
+  h3 { font-size: 15px; font-weight: 700; color: #1e293b; margin: 16px 0 8px; }
+  
+  .flow-diagram { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 12px 0; font-family: monospace; font-size: 12px; line-height: 1.8; text-align: center; page-break-inside: avoid; }
+  .flow-arrow { color: #00E5FF; font-weight: 800; }
+  
+  .enum-table td:first-child { font-family: monospace; font-weight: 600; }
+  
+  @media print {
+    .cover { min-height: auto; padding: 100px 40px; }
+    .section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- COVER PAGE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <h1>VoltEZ</h1>
+  <div class="subtitle">Complete API Reference &amp; System Architecture</div>
+  <div style="margin: 20px 0;">
+    <span class="badge">FastAPI Backend</span>
+    <span class="badge">Flutter Frontend</span>
+    <span class="badge">ML Models</span>
+    <span class="badge">WebSocket</span>
+  </div>
+  <div class="meta">
+    <p>Generated: August 2026</p>
+    <p>Branch: <code>final-frontend</code> | Backend: <code>backend-kalpesh</code> | ML: <code>ML-Final</code></p>
+    <p>Backend Base URL: <code>http://localhost:3000/api/v1</code></p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- TABLE OF CONTENTS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><span class="num">01</span> System Architecture Overview</li>
+    <li><span class="num">02</span> Authentication &amp; Authorization</li>
+    <li><span class="num">03</span> User Management</li>
+    <li><span class="num">04</span> Vehicle Management</li>
+    <li><span class="num">05</span> Business (Charger Owner) Management</li>
+    <li><span class="num">06</span> Charger &amp; Port Management</li>
+    <li><span class="num">07</span> Availability Window Management</li>
+    <li><span class="num">08</span> Booking System</li>
+    <li><span class="num">09</span> Payment Integration (Razorpay)</li>
+    <li><span class="num">10</span> Charging Session Lifecycle</li>
+    <li><span class="num">11</span> Route Recommendations (ML)</li>
+    <li><span class="num">12</span> Business Analytics &amp; Intelligence</li>
+    <li><span class="num">13</span> WebSocket Real-Time Updates</li>
+    <li><span class="num">14</span> ML Model Reference</li>
+    <li><span class="num">15</span> Data Models &amp; Schemas</li>
+    <li><span class="num">16</span> Error Handling</li>
+    <li><span class="num">17</span> Frontend Integration Status</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 01. SYSTEM ARCHITECTURE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">01 — System Architecture Overview</h2>
+  
+  <div class="flow-diagram">
+    <strong>Flutter App (Driver + Business)</strong><br>
+    &nbsp;&nbsp;├── Driver screens → <span class="flow-arrow">→</span> Dio HTTP client → <span class="flow-arrow">→</span> FastAPI Backend (port 3000)<br>
+    &nbsp;&nbsp;├── Business screens → <span class="flow-arrow">→</span> Dio HTTP client → <span class="flow-arrow">→</span> FastAPI Backend (port 3000)<br>
+    &nbsp;&nbsp;├── WebSocket client → <span class="flow-arrow">→</span> ws://localhost:3000/api/v1/ws/{user_id}<br>
+    &nbsp;&nbsp;└── Razorpay SDK → <span class="flow-arrow">→</span> Razorpay servers (mobile only)<br>
+    <br>
+    <strong>FastAPI Backend (Python)</strong><br>
+    &nbsp;&nbsp;├── /api/v1/auth/* → JWT tokens (access + refresh)<br>
+    &nbsp;&nbsp;├── /api/v1/users/* → User CRUD<br>
+    &nbsp;&nbsp;├── /api/v1/vehicles/* → Vehicle CRUD<br>
+    &nbsp;&nbsp;├── /api/v1/businesses/* → Business CRUD<br>
+    &nbsp;&nbsp;├── /api/v1/chargers/* → Charger CRUD + nearby search<br>
+    &nbsp;&nbsp;├── /api/v1/availability/* → Time slot management<br>
+    &nbsp;&nbsp;├── /api/v1/bookings/* → Booking with Redis hold locks<br>
+    &nbsp;&nbsp;├── /api/v1/payments/* → Razorpay order + webhook<br>
+    &nbsp;&nbsp;├── /api/v1/sessions/* → Charging session lifecycle<br>
+    &nbsp;&nbsp;├── /api/v1/recommendations/* → Route-aware charger ranking<br>
+    &nbsp;&nbsp;├── /api/v1/analytics/* → Business intelligence<br>
+    &nbsp;&nbsp;└── /api/v1/ws/* → Real-time updates<br>
+    <br>
+    <strong>ML Layer (Python)</strong><br>
+    &nbsp;&nbsp;├── Model A: Demand Forecasting (60-min booking prediction)<br>
+    &nbsp;&nbsp;├── Model B: Wait-time / Occupancy Predictor<br>
+    &nbsp;&nbsp;├── Model C: Route Energy Estimator<br>
+    &nbsp;&nbsp;└── Internal: /api/v1/internal/ml/demand, /api/v1/internal/ml/availability<br>
+    <br>
+    <strong>Database: PostgreSQL + PostGIS (spatial queries)</strong><br>
+    <strong>Cache/Locks: Redis (booking hold atomic locking)</strong>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 02. AUTHENTICATION -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">02 — Authentication &amp; Authorization</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request Body</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/auth/register</code></td>
+      <td><span class="auth-badge auth-public">Public</span></td>
+      <td><code>{ name, email, password, role: "DRIVER"|"OWNER", phone? }</code></td>
+      <td><code>UserResponse</code> (201)</td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/auth/login</code></td>
+      <td><span class="auth-badge auth-public">Public</span></td>
+      <td>OAuth2 form data: <code>username={email}, password={password}</code></td>
+      <td><code>{ access_token, refresh_token, token_type: "bearer" }</code></td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/auth/refresh</code></td>
+      <td><span class="auth-badge auth-public">Refresh Token</span></td>
+      <td><code>{ refresh_token }</code></td>
+      <td><code>TokenResponse</code> (new tokens)</td>
+    </tr>
+  </table>
+
+  <h3>JWT Token Flow</h3>
+  <div class="flow-diagram">
+    Register/Login → Receive access_token (15min) + refresh_token (7 days)<br>
+    → All subsequent requests include <code>Authorization: Bearer &lt;access_token&gt;</code><br>
+    → On 401: Frontend automatically calls <code>/auth/refresh</code> with refresh_token<br>
+    → If refresh fails: User is logged out, redirected to /login
+  </div>
+
+  <h3>User Roles</h3>
+  <table class="enum-table">
+    <tr><th>Role</th><th>Description</th><th>Can Do</th></tr>
+    <tr><td>DRIVER</td><td>EV driver who books and charges</td><td>Register vehicle, search chargers, book, charge, rate</td></tr>
+    <tr><td>OWNER</td><td>Charger station business owner</td><td>Manage business, chargers, availability, view analytics</td></tr>
+    <tr><td>ADMIN</td><td>Platform administrator</td><td>Full access to all resources</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 03. USER MANAGEMENT -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">03 — User Management</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/users/me</code></td>
+      <td><span class="auth-badge auth-bearer">Bearer</span></td>
+      <td>—</td>
+      <td><code>UserResponse</code></td>
+    </tr>
+    <tr>
+      <td><span class="method patch">PATCH</span></td>
+      <td><code>/users/me</code></td>
+      <td><span class="auth-badge auth-bearer">Bearer</span></td>
+      <td><code>{ name?, phone? }</code></td>
+      <td><code>UserResponse</code></td>
+    </tr>
+  </table>
+
+  <h3>UserResponse Schema</h3>
+  <div class="schema-block">{
+  "id": 1,                    // int (backend primary key)
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "+919876543210",   // nullable
+  "role": "DRIVER",           // "DRIVER" | "OWNER" | "ADMIN"
+  "verification_status": "unverified",
+  "created_at": "2026-08-18T10:00:00Z"
+}</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 04. VEHICLE MANAGEMENT -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">04 — Vehicle Management</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/vehicles</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td>—</td>
+      <td><code>List&lt;VehicleResponse&gt;</code></td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/vehicles</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td><code>VehicleCreate</code></td>
+      <td><code>VehicleResponse</code> (201)</td>
+    </tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/vehicles/{id}</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td>—</td>
+      <td><code>VehicleResponse</code></td>
+    </tr>
+    <tr>
+      <td><span class="method patch">PATCH</span></td>
+      <td><code>/vehicles/{id}</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td><code>VehicleUpdate</code></td>
+      <td><code>VehicleResponse</code></td>
+    </tr>
+    <tr>
+      <td><span class="method delete">DELETE</span></td>
+      <td><code>/vehicles/{id}</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td>—</td>
+      <td>204 No Content</td>
+    </tr>
+  </table>
+
+  <h3>VehicleCreate Schema</h3>
+  <div class="schema-block">{
+  "make": "Tata",                     // required
+  "model": "Nexon EV",                // required
+  "battery_kwh": 40.5,                // required, &gt; 0
+  "connector_types": ["CCS2"],         // required, min 1 item
+  "max_ac_kw": 7.2,                    // optional
+  "max_dc_kw": 60.0,                   // optional
+  "estimated_range_km": 312.0          // optional
+}</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 05. BUSINESS MANAGEMENT -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">05 — Business (Charger Owner) Management</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/businesses</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td>—</td>
+      <td><code>List&lt;BusinessResponse&gt;</code></td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/businesses</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td><code>BusinessCreate</code></td>
+      <td><code>BusinessResponse</code> (201)</td>
+    </tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/businesses/{id}</code></td>
+      <td><span class="auth-badge auth-bearer">Bearer</span></td>
+      <td>—</td>
+      <td><code>BusinessResponse</code></td>
+    </tr>
+    <tr>
+      <td><span class="method patch">PATCH</span></td>
+      <td><code>/businesses/{id}</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td><code>BusinessUpdate</code></td>
+      <td><code>BusinessResponse</code></td>
+    </tr>
+    <tr>
+      <td><span class="method delete">DELETE</span></td>
+      <td><code>/businesses/{id}</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td>—</td>
+      <td>204 No Content</td>
+    </tr>
+  </table>
+
+  <h3>BusinessResponse Schema</h3>
+  <div class="schema-block">{
+  "id": 1,
+  "owner_id": 1,
+  "name": "ABC Motors",
+  "category": "mall",                    // "mall" | "office" | "apartment"
+  "address": "123 MG Road, Bangalore",
+  "opening_hours": {
+    "mon": {"open": "09:00", "close": "21:00"},
+    "tue": {"open": "09:00", "close": "21:00"}
+  },
+  "verification_status": "verified",
+  "latitude": 12.9716,
+  "longitude": 77.5946,
+  "created_at": "2026-08-18T10:00:00Z",
+  "updated_at": "2026-08-18T10:00:00Z"
+}</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 06. CHARGER & PORT MANAGEMENT -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">06 — Charger &amp; Port Management</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/chargers</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td><code>ChargerCreate</code></td>
+      <td><code>ChargerResponse</code> (201)</td>
+    </tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/chargers/nearby</code></td>
+      <td><span class="auth-badge auth-public">Public</span></td>
+      <td><code>?latitude=...&longitude=...&radius_meters=5000</code></td>
+      <td><code>List&lt;ChargerResponse&gt;</code></td>
+    </tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/chargers/{id}</code></td>
+      <td><span class="auth-badge auth-bearer">Bearer</span></td>
+      <td>—</td>
+      <td><code>ChargerResponse</code></td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/chargers/{id}/report-issue</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td>—</td>
+      <td>204 No Content</td>
+    </tr>
+  </table>
+
+  <h3>ChargerCreate Schema</h3>
+  <div class="schema-block">{
+  "business_id": 1,                  // required
+  "name": "Phoenix Mall Charger",    // required
+  "power_kw": 60.0,                  // required, &gt; 0
+  "access_type": "public",           // "public" | "private" | "restricted"
+  "base_price": 14.0,                // required, INR per kWh
+  "status": "active",                // "active" | "paused" | "inactive"
+  "parking_info": "B2 Near Elevator",// optional
+  "amenities": "WiFi, Food",         // optional, comma-separated
+  "latitude": 12.9716,               // required
+  "longitude": 77.5946               // required
+}</div>
+
+  <h3>ChargerResponse Schema</h3>
+  <div class="schema-block">{
+  "id": 1,
+  "business_id": 1,
+  "name": "Phoenix Mall Charger",
+  "power_kw": 60.0,
+  "access_type": "public",
+  "base_price": 14.0,                 // INR per kWh
+  "status": "active",
+  "reliability_score": 0.94,          // 0.0 – 1.0 (Bayesian-smoothed)
+  "parking_info": "B2 Near Elevator",
+  "amenities": "WiFi, Food, Restroom",
+  "latitude": 12.9716,
+  "longitude": 77.5946,
+  "created_at": "...",
+  "updated_at": "...",
+  "ports": [
+    {
+      "id": 1,
+      "charger_id": 1,
+      "connector_type": "CCS2",       // string: "CCS2"|"Type2"|"CHAdeMO"|"GB_T"|"Type1"
+      "max_power_kw": 60.0,
+      "status": "available",          // "available"|"occupied"|"offline"|"unknown"
+      "created_at": "..."
+    }
+  ]
+}</div>
+
+  <h3>Connector Types</h3>
+  <table class="enum-table">
+    <tr><th>Value</th><th>Display Name</th><th>Typical Power</th></tr>
+    <tr><td>CCS2</td><td>CCS2</td><td>50–150 kW (DC fast)</td></tr>
+    <tr><td>Type2</td><td>Type 2</td><td>7–22 kW (AC)</td></tr>
+    <tr><td>CHAdeMO</td><td>CHAdeMO</td><td>50–100 kW (DC fast)</td></tr>
+    <tr><td>GB_T</td><td>GB/T</td><td>30–120 kW (DC)</td></tr>
+    <tr><td>Type1</td><td>Type 1</td><td>7–19 kW (AC)</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 07. AVAILABILITY WINDOWS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">07 — Availability Window Management</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/availability/port/{port_id}</code></td>
+      <td><span class="auth-badge auth-public">Public</span></td>
+      <td>—</td>
+      <td><code>List&lt;AvailabilityWindowResponse&gt;</code></td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/availability</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td><code>AvailabilityWindowCreate</code></td>
+      <td><code>AvailabilityWindowResponse</code> (201)</td>
+    </tr>
+    <tr>
+      <td><span class="method patch">PATCH</span></td>
+      <td><code>/availability/{id}</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td><code>AvailabilityWindowUpdate</code></td>
+      <td><code>AvailabilityWindowResponse</code></td>
+    </tr>
+    <tr>
+      <td><span class="method delete">DELETE</span></td>
+      <td><code>/availability/{id}</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td>—</td>
+      <td>204 No Content</td>
+    </tr>
+  </table>
+
+  <h3>AvailabilityWindowCreate Schema</h3>
+  <div class="schema-block">{
+  "port_id": 1,                          // required
+  "start_at": "2026-08-25T09:00:00Z",   // required
+  "end_at": "2026-08-25T11:00:00Z",     // required, must be after start_at
+  "source": "owner",                     // "owner"|"ai_recommendation"|"admin"
+  "price_override": 18.0,                // optional, overrides charger base_price
+  "status": "active",                    // "active"|"paused"|"cancelled"
+  "is_recurring": false,
+  "recurrence_rule": "RRULE:FREQ=WEEKLY;BYDAY=TU,TH"  // optional
+}</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 08. BOOKING SYSTEM -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">08 — Booking System</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/bookings</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td><code>BookingCreate</code></td>
+      <td><code>BookingResponse</code> (201)</td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/bookings/{id}/cancel</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td>—</td>
+      <td><code>BookingResponse</code></td>
+    </tr>
+  </table>
+
+  <div class="note info">
+    <strong>Atomic Hold Lock:</strong> The backend uses Redis <code>SET NX</code> with a 600-second (10 min) TTL to prevent double-booking. If the lock can't be acquired, it returns <code>409 SLOT_UNAVAILABLE</code>. On payment failure, the lock is released.
+  </div>
+
+  <h3>BookingCreate Schema</h3>
+  <div class="schema-block">{
+  "port_id": 1,                          // required
+  "start_at": "2026-08-25T10:00:00Z",   // required, must be in future
+  "end_at": "2026-08-25T11:00:00Z",     // required, must be after start_at
+  "vehicle_id": 1,                       // optional
+  "idempotency_key": "abc-123"          // optional, prevents duplicate submissions
+}</div>
+
+  <h3>Booking Status Machine</h3>
+  <div class="flow-diagram">
+    <span style="color:#3b82f6">PENDING</span>
+    <span class="flow-arrow">→</span>
+    <span style="color:#f59e0b">HELD</span>
+    <span class="flow-arrow">→</span>
+    <span style="color:#f59e0b">PAYMENT_PENDING</span>
+    <span class="flow-arrow">→</span>
+    <span style="color:#22c55e">CONFIRMED</span>
+    <span class="flow-arrow">→</span>
+    <span style="color:#8b5cf6">CHECKED_IN</span>
+    <span class="flow-arrow">→</span>
+    <span style="color:#00E5FF">CHARGING</span>
+    <span class="flow-arrow">→</span>
+    <span style="color:#22c55e">COMPLETED</span>
+    <br><br>
+    Side paths:
+    <span style="color:#ef4444">CANCELLED</span> (user/admin),
+    <span style="color:#ef4444">EXPIRED</span> (hold timeout),
+    <span style="color:#ef4444">FAILED</span> (payment error),
+    <span style="color:#ef4444">NO_SHOW</span> (missed slot)
+  </div>
+
+  <h3>BookingResponse Schema</h3>
+  <div class="schema-block">{
+  "id": 1,
+  "user_id": 2,
+  "vehicle_id": 1,
+  "port_id": 1,
+  "start_at": "2026-08-25T10:00:00Z",
+  "end_at": "2026-08-25T11:00:00Z",
+  "status": "CONFIRMED",               // See status machine above
+  "hold_expires_at": null,             // set when HELD, null after payment
+  "quote_snapshot": {
+    "price_per_kwh": 14.0,
+    "estimated_kwh": 30.0,
+    "estimated_total": 420.0
+  },
+  "idempotency_key": "abc-123",
+  "created_at": "...",
+  "updated_at": "..."
+}</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 09. PAYMENT -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">09 — Payment Integration (Razorpay)</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/payments/create-order</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td><code>{ booking_id, amount, currency: "INR" }</code></td>
+      <td><code>PaymentResponse</code> (201)</td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/payments/webhook</code></td>
+      <td><span class="auth-badge auth-public">Razorpay HMAC</span></td>
+      <td>Razorpay event payload</td>
+      <td><code>{ status: "ok" }</code></td>
+    </tr>
+  </table>
+
+  <div class="note success">
+    <strong>Payment Flow:</strong><br>
+    1. Frontend calls <code>POST /payments/create-order</code> → Backend creates Razorpay order + saves pending payment<br>
+    2. Frontend opens Razorpay checkout sheet (mobile) or mock (web)<br>
+    3. User completes payment inside Razorpay<br>
+    4. Razorpay sends webhook to <code>POST /payments/webhook</code><br>
+    5. Backend verifies HMAC signature → Updates payment status → Transitions booking to CONFIRMED<br>
+    6. Frontend polls or receives WebSocket notification of booking confirmation
+  </div>
+
+  <h3>PaymentResponse Schema</h3>
+  <div class="schema-block">{
+  "id": 1,
+  "booking_id": 1,
+  "amount": 420.0,
+  "currency": "INR",
+  "status": "completed",            // "pending"|"completed"|"failed"|"refunded"
+  "provider_order_id": "order_abc123",  // Razorpay order ID
+  "provider_payment_id": "pay_xyz789",  // Razorpay payment ID
+  "verified_at": "2026-08-25T09:50:00Z",
+  "created_at": "..."
+}</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 10. CHARGING SESSION -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">10 — Charging Session Lifecycle</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/sessions/check-in</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td><code>{ booking_id: int }</code></td>
+      <td><code>ChargingSessionResponse</code> (201)</td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/sessions/{id}/start</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td>—</td>
+      <td><code>ChargingSessionResponse</code></td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/sessions/{id}/complete</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td><code>{ energy_kwh: float }</code></td>
+      <td><code>ChargingSessionResponse</code></td>
+    </tr>
+  </table>
+
+  <div class="note">
+    <strong>Important:</strong> The backend calculates the final cost from <code>energy_kwh × charger.base_price</code>. The frontend sends only the energy consumed — never the price.
+  </div>
+
+  <h3>Session Lifecycle</h3>
+  <div class="flow-diagram">
+    Booking CONFIRMED
+    <span class="flow-arrow">→</span>
+    <strong>POST /sessions/check-in</strong> (booking_id)
+    <span class="flow-arrow">→</span>
+    <span style="color:#8b5cf6">CHECKED_IN</span>
+    <span class="flow-arrow">→</span>
+    <strong>POST /sessions/{id}/start</strong>
+    <span class="flow-arrow">→</span>
+    <span style="color:#00E5FF">CHARGING</span>
+    <span class="flow-arrow">→</span>
+    <strong>POST /sessions/{id}/complete</strong> (energy_kwh)
+    <span class="flow-arrow">→</span>
+    <span style="color:#22c55e">COMPLETED</span>
+  </div>
+
+  <h3>ChargingSessionResponse Schema</h3>
+  <div class="schema-block">{
+  "id": 1,
+  "booking_id": 1,
+  "check_in_at": "2026-08-25T10:02:00Z",
+  "start_at": "2026-08-25T10:05:00Z",
+  "end_at": "2026-08-25T10:35:00Z",
+  "energy_kwh": 28.5,
+  "final_amount": 399.0,            // calculated server-side
+  "status": "completed",            // "checked_in"|"charging"|"completed"|"failed"
+  "created_at": "..."
+}</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 11. ROUTE RECOMMENDATIONS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">11 — Route Recommendations (ML-Powered)</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/recommendations</code></td>
+      <td><span class="auth-badge auth-driver">Driver</span></td>
+      <td><code>RecommendationRequest</code></td>
+      <td><code>RecommendationResponse</code></td>
+    </tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/recommendations/business/{business_id}</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td>—</td>
+      <td>Placeholder (ML under construction)</td>
+    </tr>
+  </table>
+
+  <h3>RecommendationRequest Schema</h3>
+  <div class="schema-block">{
+  "latitude": 18.5204,                // driver's current latitude
+  "longitude": 73.8567,               // driver's current longitude
+  "vehicle_id": 1,                     // driver's vehicle
+  "current_soc": 0.45,                // current state of charge (0.0 – 1.0)
+  "reserve_soc": 0.15,                // desired reserve (0.0 – 1.0)
+  "target_soc": 0.80,                 // target charge level (0.0 – 1.0)
+  "radius_meters": 10000,             // search radius in meters
+  "destination_lat": 18.5300,         // optional destination
+  "destination_lng": 73.8800
+}</div>
+
+  <h3>How Recommendations Work (Backend Logic)</h3>
+  <div class="flow-diagram">
+    1. Fetch driver's vehicle (battery capacity, connector types, efficiency)<br>
+    2. Spatial search: PostGIS nearby chargers within radius<br>
+    3. Filter: active status + connector compatibility<br>
+    4. Calculate: haversine distance, reachable with current SoC<br>
+    5. For each reachable charger:<br>
+    &nbsp;&nbsp;&nbsp;├── Best port power &amp; estimated charge time<br>
+    &nbsp;&nbsp;&nbsp;├── ML wait-time prediction (Model B: queue math)<br>
+    &nbsp;&nbsp;&nbsp;├── Reliability score from charger.reliability_score<br>
+    &nbsp;&nbsp;&nbsp;└── Cost = energy_needed × base_price<br>
+    6. Rank by weighted score (distance, wait, reliability, cost)<br>
+    7. Return top 3 recommendations with reason codes
+  </div>
+
+  <h3>RecommendationResponse Schema</h3>
+  <div class="schema-block">{
+  "recommendations": [
+    {
+      "charger": { /* full ChargerResponse */ },
+      "rank": 1,
+      "detour_minutes": 6,
+      "wait_minutes": 0,
+      "charge_minutes": 27,
+      "estimated_cost_inr": 205.0,
+      "reliability_score": 0.94,
+      "confidence": 0.91,
+      "connector_compatible": true,
+      "best_port_id": 1,
+      "reason_codes": [
+        "COMPATIBLE_CONNECTOR",
+        "NO_QUEUE_EXPECTED",
+        "HIGH_RELIABILITY",
+        "SHORT_DETOUR"
+      ]
+    }
+  ]
+}</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 12. ANALYTICS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">12 — Business Analytics &amp; Intelligence</h2>
+  
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Request</th><th>Response</th></tr>
+    <tr>
+      <td><span class="method get">GET</span></td>
+      <td><code>/analytics/businesses/{business_id}/recommendations</code></td>
+      <td><span class="auth-badge auth-owner">Owner</span></td>
+      <td>—</td>
+      <td><code>List&lt;RecommendationResponse&gt;</code></td>
+    </tr>
+  </table>
+
+  <h3>Business Intelligence Response</h3>
+  <div class="schema-block">[
+  {
+    "charger_id": 1,
+    "recommended_action": "Create Availability Window",
+    "reason_code": "BUSINESS_OFF_PEAK",
+    "expected_demand": 1.5,
+    "suggested_discount_pct": 20,
+    "confidence": 0.85
+  },
+  {
+    "charger_id": 2,
+    "recommended_action": "Enable Peak Pricing",
+    "reason_code": "HIGH_DEMAND_LOW_SUPPLY",
+    "expected_demand": 5.2,
+    "suggested_discount_pct": 0,
+    "confidence": 0.85
+  }
+]</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 13. WEBSOCKET -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">13 — WebSocket Real-Time Updates</h2>
+  
+  <table>
+    <tr><th>Protocol</th><th>Endpoint</th><th>Auth</th><th>Description</th></tr>
+    <tr>
+      <td><span class="method ws">WS</span></td>
+      <td><code>/ws/{user_id}</code></td>
+      <td>User ID in path</td>
+      <td>Real-time session updates pushed from server</td>
+    </tr>
+  </table>
+
+  <h3>WebSocket Events</h3>
+  <table>
+    <tr><th>Event</th><th>Direction</th><th>Payload</th></tr>
+    <tr>
+      <td><code>ping</code></td>
+      <td>Client → Server</td>
+      <td><code>{ "type": "ping" }</code></td>
+    </tr>
+    <tr>
+      <td><code>pong</code></td>
+      <td>Server → Client</td>
+      <td><code>{ "type": "pong" }</code></td>
+    </tr>
+    <tr>
+      <td><code>status_update</code></td>
+      <td>Server → Client</td>
+      <td><code>{ "type": "status_update", "data": { /* ChargingSession */ } }</code></td>
+    </tr>
+    <tr>
+      <td><code>session_completed</code></td>
+      <td>Server → Client</td>
+      <td><code>{ "type": "session_completed", "data": { /* session summary */ } }</code></td>
+    </tr>
+    <tr>
+      <td><code>error</code></td>
+      <td>Server → Client</td>
+      <td><code>{ "type": "error", "message": "..." }</code></td>
+    </tr>
+  </table>
+
+  <div class="note info">
+    <strong>Frontend reconnection:</strong> Exponential backoff (1s → 2s → 4s → ... → 30s cap, max 10 attempts). Keepalive ping every 30s. Last known data stays visible during reconnection.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 14. ML MODELS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">14 — ML Model Reference</h2>
+
+  <div class="note">
+    <strong>Important:</strong> ML models are called internally by the backend via <code>MLAdapter</code>. They are NOT exposed as public API endpoints. The frontend never calls ML directly — it calls <code>/recommendations</code> or <code>/analytics</code> which invoke ML internally.
+  </div>
+
+  <table>
+    <tr><th>Model</th><th>Purpose</th><th>Input</th><th>Output</th><th>Called By</th></tr>
+    <tr>
+      <td><strong>Model A: Demand Forecast</strong></td>
+      <td>Predict booking demand in next 60 minutes</td>
+      <td>charger_id, current hour, day of week</td>
+      <td><code>{ expected_demand: float, confidence: float }</code></td>
+      <td><code>/analytics/.../recommendations</code></td>
+    </tr>
+    <tr>
+      <td><strong>Model B: Wait-time Predictor</strong></td>
+      <td>Estimate queue wait for a specific port</td>
+      <td>charger_id, port_id, active sessions</td>
+      <td><code>{ wait_minutes: float, congestion_level: "LOW"|"MEDIUM"|"HIGH", confidence: float }</code></td>
+      <td><code>/recommendations</code> (route planner)</td>
+    </tr>
+    <tr>
+      <td><strong>Model C: Route Energy</strong></td>
+      <td>Estimate energy needed for route segment</td>
+      <td>vehicle_id, route geometry, elevation</td>
+      <td><code>{ energy_kwh: float, confidence: float }</code></td>
+      <td><code>/recommendations</code> (route planner)</td>
+    </tr>
+  </table>
+
+  <h3>ML Integration (Internal Endpoints)</h3>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/internal/ml/demand</code></td>
+      <td>Demand forecast (internal, called by analytics service)</td>
+    </tr>
+    <tr>
+      <td><span class="method post">POST</span></td>
+      <td><code>/internal/ml/availability</code></td>
+      <td>Availability prediction (internal, called by recommendation service)</td>
+    </tr>
+  </table>
+
+  <h3>Current Implementation Status</h3>
+  <div class="note success">
+    <strong>Prototype phase:</strong> Models use deterministic heuristics (queue math, rolling averages, time-of-day patterns) as recommended by the playbook. The ML artifacts are trained on synthetic Pune data and packaged as <code>joblib</code> bundles. Full ML model integration (scikit-learn HGBR models) is ready for swap when backend integrates the <code>voltez-ml</code> package.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 15. DATA MODELS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">15 — Complete Data Model Reference</h2>
+  
+  <h3>All Backend Enums</h3>
+  <table class="enum-table">
+    <tr><th>Model</th><th>Field</th><th>Allowed Values</th></tr>
+    <tr><td>User</td><td>role</td><td>"DRIVER", "OWNER", "ADMIN"</td></tr>
+    <tr><td>User</td><td>verification_status</td><td>"unverified", "verified"</td></tr>
+    <tr><td>Vehicle</td><td>connector_types</td><td>["CCS2", "Type2", "CHAdeMO", "GB_T", "Type1"]</td></tr>
+    <tr><td>Business</td><td>verification_status</td><td>"unverified", "PENDING", "verified"</td></tr>
+    <tr><td>Business</td><td>category</td><td>"mall", "office", "apartment"</td></tr>
+    <tr><td>Charger</td><td>status</td><td>"active", "paused", "inactive"</td></tr>
+    <tr><td>Charger</td><td>access_type</td><td>"public", "private", "restricted"</td></tr>
+    <tr><td>ChargerPort</td><td>status</td><td>"available", "occupied", "offline", "unknown"</td></tr>
+    <tr><td>ChargerPort</td><td>connector_type</td><td>"CCS2", "Type2", "CHAdeMO", "GB_T", "Type1"</td></tr>
+    <tr><td>Booking</td><td>status</td><td>"PENDING", "HELD", "PAYMENT_PENDING", "CONFIRMED", "CANCELLED", "EXPIRED", "FAILED", "NO_SHOW", "CHECKED_IN", "CHARGING", "COMPLETED"</td></tr>
+    <tr><td>ChargingSession</td><td>status</td><td>"checked_in", "charging", "completed", "failed"</td></tr>
+    <tr><td>Payment</td><td>status</td><td>"pending", "completed", "failed", "refunded"</td></tr>
+    <tr><td>AvailabilityWindow</td><td>status</td><td>"active", "paused", "cancelled"</td></tr>
+    <tr><td>AvailabilityWindow</td><td>source</td><td>"owner", "ai_recommendation", "admin"</td></tr>
+  </table>
+
+  <h3>Frontend Dart Models</h3>
+  <div class="note info">
+    All Dart models are in <code>lib/shared/models/models.dart</code>. Each model has <code>fromJson</code> factory constructors that handle both backend format and legacy frontend format. The <code>BookingStatus</code> enum uses UPPER_CASE names intentionally to match backend JSON strings directly.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 16. ERROR HANDLING -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">16 — Error Handling</h2>
+  
+  <h3>Standard Backend Error Response</h3>
+  <div class="schema-block">{
+  "detail": "Error message here",         // or "code" + "message"
+  "code": "SLOT_UNAVAILABLE",             // machine-readable error code
+  "request_id": "req_abc123"              // for debugging
+}</div>
+
+  <h3>HTTP Status Codes Used</h3>
+  <table>
+    <tr><th>Status</th><th>Meaning</th><th>When</th></tr>
+    <tr><td>200</td><td>OK</td><td>Successful GET/PATCH</td></tr>
+    <tr><td>201</td><td>Created</td><td>Successful POST</td></tr>
+    <tr><td>204</td><td>No Content</td><td>Successful DELETE</td></tr>
+    <tr><td>400</td><td>Bad Request</td><td>Invalid Razorpay webhook signature</td></tr>
+    <tr><td>401</td><td>Unauthorized</td><td>Missing/invalid JWT, expired refresh token</td></tr>
+    <tr><td>403</td><td>Forbidden</td><td>Role doesn't match (e.g., DRIVER accessing OWNER endpoint)</td></tr>
+    <tr><td>404</td><td>Not Found</td><td>Resource doesn't exist or user doesn't own it</td></tr>
+    <tr><td>409</td><td>Conflict</td><td>SLOT_UNAVAILABLE (Redis lock failed, double-booking)</td></tr>
+    <tr><td>422</td><td>Validation Error</td><td>Pydantic validation failed (bad field types, missing required fields)</td></tr>
+    <tr><td>502</td><td>Bad Gateway</td><td>Razorpay API is unreachable</td></tr>
+  </table>
+
+  <h3>Frontend Error Handling (Flutter)</h3>
+  <div class="note">
+    The <code>_ErrorInterceptor</code> in <code>api_service.dart</code> catches all HTTP errors and parses them into a typed <code>ApiError</code> object with <code>code</code>, <code>message</code>, <code>statusCode</code>, and <code>fieldErrors</code>. Providers handle errors by setting <code>_error</code> state and showing retry UI.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 17. FRONTEND INTEGRATION -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">17 — Frontend Integration Status</h2>
+  
+  <table>
+    <tr><th>Frontend Feature</th><th>Backend Endpoint</th><th>Status</th><th>Notes</th></tr>
+    <tr><td>Register</td><td><code>POST /auth/register</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Login</td><td><code>POST /auth/login</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Token Refresh</td><td><code>POST /auth/refresh</code></td><td>✅ Live</td><td>Auto-refresh on 401</td></tr>
+    <tr><td>Get Profile</td><td><code>GET /users/me</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Vehicle CRUD</td><td><code>/vehicles/*</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Nearby Chargers</td><td><code>GET /chargers/nearby</code></td><td>✅ Live</td><td>PostGIS spatial query</td></tr>
+    <tr><td>Charger Details</td><td><code>GET /chargers/{id}</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Create Booking</td><td><code>POST /bookings</code></td><td>✅ Live</td><td>Redis atomic lock</td></tr>
+    <tr><td>Cancel Booking</td><td><code>POST /bookings/{id}/cancel</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Payment Order</td><td><code>POST /payments/create-order</code></td><td>✅ Live</td><td>Razorpay integration</td></tr>
+    <tr><td>Payment Webhook</td><td><code>POST /payments/webhook</code></td><td>✅ Live</td><td>HMAC verification</td></tr>
+    <tr><td>Check-in</td><td><code>POST /sessions/check-in</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Start Charging</td><td><code>POST /sessions/{id}/start</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Complete Session</td><td><code>POST /sessions/{id}/complete</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Route Recommendations</td><td><code>POST /recommendations</code></td><td>✅ Live</td><td>ML-powered ranking</td></tr>
+    <tr><td>Business Recommendations</td><td><code>GET /analytics/.../recommendations</code></td><td>✅ Live</td><td>Demand forecast → pricing advice</td></tr>
+    <tr><td>Business CRUD</td><td><code>/businesses/*</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>Availability CRUD</td><td><code>/availability/*</code></td><td>✅ Live</td><td></td></tr>
+    <tr><td>WebSocket Updates</td><td><code>ws:///ws/{user_id}</code></td><td>✅ Live</td><td>Session telemetry</td></tr>
+    <tr><td>Report Charger Issue</td><td><code>POST /chargers/{id}/report-issue</code></td><td>✅ Live</td><td>Penalizes reliability score</td></tr>
+  </table>
+
+  <div class="note success">
+    <strong>All 20 frontend features are connected to real backend endpoints.</strong> Mock adapters remain in place for testing without a live backend — swap <code>Mock*</code> for <code>Live*</code> at the DI root in <code>main.dart</code>.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- FOOTER -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div style="text-align: center; padding: 40px; color: #64748B; font-size: 12px; border-top: 2px solid #e5e7eb; margin-top: 40px;">
+  <p><strong>VoltEZ</strong> — Smart EV Charging Platform</p>
+  <p>API Reference v1.0 | Generated August 2026</p>
+  <p>Backend: FastAPI + PostgreSQL/PostGIS + Redis | Frontend: Flutter (Dart) | ML: scikit-learn + joblib</p>
+  <p>⚡ Built for Hackathon Demo</p>
+</div>
+
+</body>
+</html>

@@ -3,11 +3,9 @@
     <!-- Location permissions for geolocator -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <!-- Required by Dio, Google Maps tiles, and live charger/session APIs. -->
-    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="VoltEZ"
+        android:label="voltez_frontend"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -37,11 +35,6 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-
-        <!-- Google Maps SDK API Key -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${GOOGLE_MAPS_API_KEY}" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

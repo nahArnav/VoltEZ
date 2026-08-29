@@ -1,8 +1,7 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/colors.dart';
@@ -11,16 +10,16 @@ import '../../../core/providers/charger_discovery_provider.dart';
 import '../../../core/providers/route_planner_provider.dart';
 import '../../../shared/models/models.dart';
 
-/// Station discovery screen with Google Maps.
+/// Station discovery screen with OpenStreetMap (flutter_map).
 ///
 /// Features:
-/// - GoogleMap centered on driver's GPS (fallback: Pune pilot zone).
+/// - OpenStreetMap tiles centered on driver's GPS (fallback: Mumbai).
 /// - Custom colored markers: green = available, amber = busy, red = offline.
 /// - Marker tap → bottom sheet with station name, distance, ports, wait
 ///   time prediction, and "View Details" button.
 /// - Connector-type filter chips (CCS2, Type 2, CHAdeMO).
 /// - Power range slider (7 kW – 150 kW).
-/// - ClusterManager-ready marker set for 50+ pins.
+/// - No API key required — uses free OpenStreetMap tile servers.
 class DriverMapScreen extends StatefulWidget {
   const DriverMapScreen({super.key});
 
@@ -29,15 +28,12 @@ class DriverMapScreen extends StatefulWidget {
 }
 
 class _DriverMapScreenState extends State<DriverMapScreen> {
-  final Completer<GoogleMapController> _mapController = Completer();
+  final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
-  final DraggableScrollableController _sheetController =
-      DraggableScrollableController();
-
   bool _sheetExpanded = false;
 
-  // Default center: Pune pilot zone
-  static const LatLng _defaultCenter = LatLng(18.5204, 73.8567);
+  // Default center: Mumbai
+  static const latlong.LatLng _defaultCenter = latlong.LatLng(19.0760, 72.8777);
 
   // Connector type display labels (backend uses plain strings)
   static const Map<String, String> _connectorLabels = {
@@ -63,74 +59,33 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _sheetController.dispose();
     super.dispose();
   }
 
-  // ─── Marker hue mapping (backend status strings) ───
-  double _markerHue(String status) {
-    switch (_normalizedStatus(status)) {
-      case 'available':
-        return BitmapDescriptor.hueGreen;
-      case 'unavailable':
-        return BitmapDescriptor.hueOrange;
-      case 'offline':
-      case 'maintenance':
-        return BitmapDescriptor.hueRed;
-      default:
-        return BitmapDescriptor.hueRed;
-    }
-  }
-
+  // ─── Marker color mapping (backend status strings) ───
   Color _statusColor(String status) {
-    switch (_normalizedStatus(status)) {
-      case 'available':
+    switch (status) {
+      case 'active':
         return AppColors.success;
-      case 'unavailable':
+      case 'paused':
         return AppColors.warning;
-      case 'offline':
-      case 'maintenance':
+      case 'inactive':
         return AppColors.error;
       default:
         return AppColors.textMuted;
     }
   }
 
-
-
   String _waitTimeEstimate(String status) {
-    switch (_normalizedStatus(status)) {
-      case 'available':
-        return 'Open now';
-      case 'unavailable':
-        return 'Currently occupied';
-      case 'offline':
-      case 'maintenance':
-        return 'N/A';
-      default:
-        return 'N/A';
-    }
-  }
-
-  /// Normalise the backend's operational vocabulary before rendering.
-  /// The API uses available/unavailable/maintenance/offline, while older
-  /// clients may still return active/paused/inactive.
-  String _normalizedStatus(String status) {
-    switch (status.toLowerCase()) {
+    switch (status) {
       case 'active':
-      case 'available':
-        return 'available';
+        return '< 5 min';
       case 'paused':
-      case 'unavailable':
-      case 'busy':
-        return 'unavailable';
-      case 'maintenance':
-        return 'maintenance';
+        return '~15 min';
       case 'inactive':
-      case 'offline':
-        return 'offline';
+        return 'N/A';
       default:
-        return 'offline';
+        return 'N/A';
     }
   }
 
@@ -142,7 +97,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
       body: Consumer<ChargerDiscoveryProvider>(
         builder: (context, discovery, _) {
           final center = discovery.currentPosition != null
-              ? LatLng(
+              ? latlong.LatLng(
                   discovery.currentPosition!.latitude,
                   discovery.currentPosition!.longitude,
                 )
@@ -150,8 +105,8 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
           return Stack(
             children: [
-              // ─── Google Map ───
-              _buildGoogleMap(discovery, center),
+              // ─── OpenStreetMap ───
+              _buildMap(discovery, center),
 
               // ─── Search Bar ───
               Positioned(
@@ -192,172 +147,87 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     );
   }
 
-  // ─── Google Map ───
-  Widget _buildGoogleMap(
-      ChargerDiscoveryProvider discovery, LatLng center) {
-    // google_maps_flutter does not support Flutter Web.
-    // Show a charger list fallback on web.
-    if (kIsWeb) {
-      return _buildWebMapFallback(discovery);
-    }
-
-    final markers = <Marker>{};
-
-    // Collect recommended charger IDs so we can visually distinguish them
-    final recIds = <String>{};
+  // ─── OpenStreetMap ───
+  Widget _buildMap(ChargerDiscoveryProvider discovery, latlong.LatLng center) {
+    // Collect recommended charger IDs
+    final recIds = <int>{};
     try {
       final planner = context.read<RoutePlannerProvider>();
       for (final r in planner.recommendations) {
         recIds.add(r.charger.id);
       }
-    } catch (_) {
-      // Provider not available — skip recommended markers
-    }
+    } catch (_) {}
 
-    for (final charger in discovery.filteredChargers) {
-      final isRecommended = recIds.contains(charger.id);
-      markers.add(
-        Marker(
-          markerId: MarkerId('discovery_${charger.id}'),
-          position: LatLng(charger.latitude, charger.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            isRecommended
-                ? BitmapDescriptor.hueAzure
-                : _markerHue(charger.status),
-          ),
-          infoWindow: InfoWindow(
-            title: '${isRecommended ? '★ ' : ''}${charger.name}',
-            snippet: '${charger.powerKw.round()} kW · ₹${charger.pricePerKwh.round()}/kWh',
-          ),
-          onTap: () {
-            discovery.selectCharger(charger);
-            _animateSheet(true);
-          },
-        ),
-      );
-    }
-
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(
-        target: center,
-        zoom: 13,
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: center,
+        initialZoom: 13,
+        onTap: (tapPosition, point) {
+          discovery.clearSelection();
+          _animateSheet(false);
+        },
       ),
-      myLocationEnabled: true,
-      myLocationButtonEnabled: false,
-      mapToolbarEnabled: false,
-      zoomControlsEnabled: false,
-      compassEnabled: false,
-      markers: markers,
-      onMapCreated: (controller) {
-        if (!_mapController.isCompleted) {
-          _mapController.complete(controller);
-        }
-      },
-      onCameraMove: (position) {
-        // Future: load chargers for visible bounds
-      },
-      onTap: (_) {
-        discovery.clearSelection();
-        _animateSheet(false);
-      },
-      style: _mapStyle,
-    );
-  }
+      children: [
+        // OpenStreetMap tile layer — dark themed
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.voltzez.app',
+        ),
 
-  // ─── Web fallback: styled charger list instead of Google Map ───
-  Widget _buildWebMapFallback(ChargerDiscoveryProvider discovery) {
-    return Container(
-      color: AppColors.background,
-      child: discovery.filteredChargers.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.map_rounded,
-                      size: 64,
-                      color: AppColors.textMuted.withValues(alpha: 0.3)),
-                  const SizedBox(height: 16),
-                  Text('No chargers found',
-                      style: AppTypography.headlineMedium),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Map view is available on mobile.\nShowing charger list on web.',
-                    textAlign: TextAlign.center,
-                    style: AppTypography.bodyMedium
-                        .copyWith(color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 120, 16, 200),
-              itemCount: discovery.filteredChargers.length,
-              itemBuilder: (context, index) {
-                final charger = discovery.filteredChargers[index];
-                final statusCol = _statusColor(charger.status);
+        // Marker layer with charger pins
+        MarkerLayer(
+          markers: discovery.filteredChargers.map((charger) {
+            final isRecommended = recIds.contains(charger.id);
+            final statusCol = _statusColor(charger.status);
 
-                return GestureDetector(
-                  onTap: () => context
-                      .go('/driver/charger/${charger.id}'),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.card,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.border,
+            return Marker(
+              point: latlong.LatLng(charger.latitude, charger.longitude),
+              width: 40,
+              height: 40,
+              child: GestureDetector(
+                onTap: () {
+                  discovery.selectCharger(charger);
+                  _animateSheet(true);
+                  _mapController.move(
+                    latlong.LatLng(charger.latitude, charger.longitude),
+                    _mapController.camera.zoom,
+                  );
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isRecommended ? AppColors.secondary : statusCol,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: statusCol.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(Icons.ev_station_rounded,
-                              color: statusCol, size: 26),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(charger.name,
-                                  style: AppTypography.headlineSmall),
-                              const SizedBox(height: 2),
-                              Text(charger.address ?? '${charger.latitude.toStringAsFixed(5)}, ${charger.longitude.toStringAsFixed(5)}',
-                                  style: AppTypography.bodySmall,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '${charger.powerKw.round()} kW',
-                              style: AppTypography.labelMedium
-                                  .copyWith(color: AppColors.primary),
-                            ),
-                            Text(
-                              charger.pricePerKwh > 0
-                                  ? '₹${charger.pricePerKwh.round()}/kWh'
-                                  : 'Price pending',
-                              style: AppTypography.labelSmall,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
-                );
-              },
+                  child: Icon(
+                    Icons.ev_station_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+
+        // Attribution
+        RichAttributionWidget(
+          attributions: [
+            TextSourceAttribution(
+              'OpenStreetMap contributors',
+              onTap: () {},
             ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -410,7 +280,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(Icons.close_rounded,
@@ -515,7 +385,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                           : AppColors.textSecondary),
                   const SizedBox(width: 6),
                   Text(
-                    '${discovery.powerRange.start.round()}–${discovery.powerRange.end.round()} kW',
+                    '${discovery.powerRange.start.round()}\u2013${discovery.powerRange.end.round()} kW',
                     style: TextStyle(
                       color: _isPowerRangeActive(discovery)
                           ? AppColors.secondary
@@ -619,17 +489,14 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   // ─── Location FAB ───
   Widget _buildLocationFab(ChargerDiscoveryProvider discovery) {
     return GestureDetector(
-      onTap: () async {
-        if (kIsWeb) return;
+      onTap: () {
         if (discovery.currentPosition != null) {
-          final controller = await _mapController.future;
-          controller.animateCamera(
-            CameraUpdate.newLatLng(
-              LatLng(
-                discovery.currentPosition!.latitude,
-                discovery.currentPosition!.longitude,
-              ),
+          _mapController.move(
+            latlong.LatLng(
+              discovery.currentPosition!.latitude,
+              discovery.currentPosition!.longitude,
             ),
+            14,
           );
         } else {
           discovery.refreshLocation();
@@ -760,7 +627,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                       ),
                       _sheetMetric(
                         Icons.currency_rupee,
-                        '₹${charger.pricePerKwh.round()}/kWh',
+                        '\u20B9${charger.pricePerKwh.round()}/kWh',
                         'Price',
                         AppColors.success,
                       ),
@@ -785,7 +652,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   Row(
                     children: [
                       // Connector badges
-                      ...charger.connectors.map((ct) => Padding(
+                      ...charger.connectorTypes.map((ct) => Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -795,7 +662,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                connectorTypeLabel(ct.name),
+                                _connectorLabels[ct] ?? ct,
                                 style: AppTypography.labelMedium.copyWith(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w800,
@@ -810,8 +677,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                       // View Details button
                       GestureDetector(
                         onTap: () {
-                          context
-                              .go('/driver/charger/${charger.id}');
+                          context.go('/driver/charger/${charger.id}');
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -943,18 +809,11 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                         onTap: () {
                           discovery.selectCharger(charger);
                           _animateSheet(true);
-
-                          // Pan map to marker (native only)
-                          if (!kIsWeb) {
-                            _mapController.future.then((ctrl) {
-                              ctrl.animateCamera(
-                                CameraUpdate.newLatLng(
-                                  LatLng(charger.latitude,
-                                      charger.longitude),
-                                ),
-                              );
-                            });
-                          }
+                          _mapController.move(
+                            latlong.LatLng(charger.latitude,
+                                charger.longitude),
+                            _mapController.camera.zoom,
+                          );
                         },
                         child: Container(
                           width: 210,
@@ -1006,7 +865,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                                         .spaceBetween,
                                 children: [
                                   Text(
-                                    '${charger.powerKw.round()} kW · ₹${charger.pricePerKwh.round()}/kWh',
+                                    '${charger.powerKw.round()} kW \u00B7 \u20B9${charger.pricePerKwh.round()}/kWh',
                                     style: AppTypography
                                         .labelMedium
                                         .copyWith(
@@ -1128,67 +987,4 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   void _animateSheet(bool expand) {
     setState(() => _sheetExpanded = expand);
   }
-
-  // ─── Dark Map Style (matches VoltEZ dark theme) ───
-  static const String _mapStyle = '''
-[
-  {
-    "elementType": "geometry",
-    "stylers": [{"color": "#1a1f2e"}]
-  },
-  {
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#8a8f9c"}]
-  },
-  {
-    "elementType": "labels.text.stroke",
-    "stylers": [{"color": "#1a1f2e"}]
-  },
-  {
-    "featureType": "administrative.country",
-    "elementType": "geometry.stroke",
-    "stylers": [{"color": "#2a3040"}]
-  },
-  {
-    "featureType": "landscape",
-    "elementType": "geometry",
-    "stylers": [{"color": "#111827"}]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [{"color": "#151c2c"}]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry",
-    "stylers": [{"color": "#1e2738"}]
-  },
-  {
-    "featureType": "road",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#6b7280"}]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry",
-    "stylers": [{"color": "#243044"}]
-  },
-  {
-    "featureType": "transit",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#6b7280"}]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [{"color": "#0e1525"}]
-  },
-  {
-    "featureType": "water",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#3e4a5a"}]
-  }
-]
-''';
 }

@@ -675,7 +675,7 @@ class _ChargingSessionScreenState extends State<ChargingSessionScreen>
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.onPrimary,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),

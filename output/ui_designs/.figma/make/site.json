@@ -1,0 +1,10 @@
+{
+  "description": "Enables users to customize and preview web designs with adjustable background colors, enhancing visual appeal and user experience for designers.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

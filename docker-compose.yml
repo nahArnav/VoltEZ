@@ -1,105 +1,39 @@
 services:
-  postgres:
-    image: postgis/postgis:16-3.4
+  db:
+    image: postgis/postgis:17-3.5
+    container_name: voltez_db
     restart: unless-stopped
+
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-voltez}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "${POSTGRES_PORT}:5432"
+
     volumes:
       - voltez_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      # Check TCP readiness explicitly. During PostGIS initialization a
-      # temporary server can answer Unix-socket probes before the final
-      # network listener is available, which would let migrations race and
-      # fail with connection refused.
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-voltez}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      # PostGIS initializes a temporary server before starting the final one.
-      # Do not let migrate observe that short-lived server as "healthy".
-      start_period: 20s
 
   redis:
     image: redis:7-alpine
+    container_name: voltez_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+
     ports:
       - "${REDIS_PORT:-6379}:6379"
+
     volumes:
       - voltez_redis_data:/data
+
+    # Keep Redis in memory-first mode with optional persistence
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 5s
-
-  migrate:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: "no"
-    environment: &backend-environment
-      PROJECT_NAME: ${PROJECT_NAME:-VoltEZ API}
-      VERSION: ${VERSION:-1.0.0}
-      ENVIRONMENT: ${ENVIRONMENT:-development}
-      SECRET_KEY: ${SECRET_KEY:-local-development-secret-change-before-deploying}
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-voltez}
-      REDIS_URL: redis://redis:6379/0
-      # Include both loopback spellings for local Flutter web development.
-      # Production/staging must override this with explicit HTTPS origins.
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080}
-      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_placeholder}
-      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-rzp_secret_placeholder}
-      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-rzp_webhook_secret}
-      BOOKING_HOLD_FEE_INR: ${BOOKING_HOLD_FEE_INR:-50}
-      DEFAULT_PRICE_PER_KWH_INR: ${DEFAULT_PRICE_PER_KWH_INR:-15}
-    command: alembic upgrade head
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    environment: *backend-environment
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
-    ports:
-      - "${API_PORT:-8000}:8000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)"
       interval: 10s
       timeout: 5s
-      retries: 12
-      start_period: 20s
-
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    environment: *backend-environment
-    command: arq app.worker.WorkerSettings
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
+      retries: 3
 
 volumes:
   voltez_postgres_data:

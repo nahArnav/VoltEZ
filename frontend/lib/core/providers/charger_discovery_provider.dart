@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../shared/models/models.dart';
 import '../network/api_service.dart';
+import '../../shared/models/models.dart';
 
 /// Charger discovery state + filtering logic.
 /// Supplies nearby station data, GPS location, connector/power filters,
@@ -74,7 +75,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   // ─── Init ───
   Future<void> init() async {
     await _fetchLocation();
-    await loadNearbyChargers();
+    await fetchNearbyChargers();
   }
 
   // ─── Location ───
@@ -124,38 +125,77 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> refreshLocation() async {
-    await _fetchLocation();
-    await loadNearbyChargers();
-  }
+  Future<void> refreshLocation() async => _fetchLocation();
 
   // ─── Chargers ───
-  Future<void> loadNearbyChargers() async {
+  Future<void> fetchNearbyChargers() async {
+    if (_currentPosition == null) {
+      _chargersError = 'Location not available';
+      notifyListeners();
+      return;
+    }
+
     _chargersLoading = true;
     _chargersError = null;
     notifyListeners();
 
-    // Pune is the project pilot and also provides a deterministic fallback when
-    // browser location permission is unavailable.
-    final latitude = _currentPosition?.latitude ?? 18.5204;
-    final longitude = _currentPosition?.longitude ?? 73.8567;
-
     try {
       final response = await _api.getNearbyChargers(
-        latitude: latitude,
-        longitude: longitude,
-        radiusMeters: 25000,
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        radiusMeters: 10000,
       );
-      _allChargers = (response.data as List<dynamic>)
-          .map((item) => Charger.fromJson(item as Map<String, dynamic>))
-          .toList();
-    } catch (error) {
-      _allChargers = [];
-      _chargersError = error.toString();
-    }
 
-    _chargersLoading = false;
+      final data = response.data;
+      if (data is List) {
+        _allChargers = data
+            .map((json) => Charger.fromJson(json as Map<String, dynamic>))
+            .toList();
+      } else {
+        _allChargers = [];
+      }
+
+      _chargersLoading = false;
+      _chargersError = null;
+    } catch (e) {
+      // If the backend is unreachable, fall back to demo chargers
+      // so the UI is not blank during development.
+      _chargersError = e.toString();
+      _allChargers = _demoChargers();
+      _chargersLoading = false;
+    }
     notifyListeners();
+  }
+
+  /// Refresh nearby chargers (pull-to-refresh support).
+  Future<void> refreshChargers() async {
+    await _fetchLocation();
+    await fetchNearbyChargers();
+  }
+
+  /// Calculate distance from user to a charger in km.
+  double distanceTo(Charger charger) {
+    if (_currentPosition == null) return 0;
+    // Haversine approximation for short distances
+    const earthRadius = 6371.0;
+    final dLat = _degreesToRad(charger.latitude - _currentPosition!.latitude);
+    final dLon = _degreesToRad(charger.longitude - _currentPosition!.longitude);
+    final a = dLat * dLat +
+        math.cos(_degreesToRad(_currentPosition!.latitude)) *
+            math.cos(_degreesToRad(charger.latitude)) *
+            dLon * dLon;
+    return earthRadius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+
+  double _degreesToRad(double degrees) => degrees * math.pi / 180;
+
+  /// Demo chargers shown when backend is unreachable.
+  List<Charger> _demoChargers() {
+    return [
+      const Charger(id: 1, businessId: 1, name: 'Phoenix Mall Charger', address: 'Phoenix Mall, Lower Parel, Mumbai', latitude: 19.0760, longitude: 72.8777, powerKw: 60, accessType: 'public', basePrice: 14, status: 'active', reliabilityScore: 0.92, amenities: 'WiFi,Food Court,Parking'),
+      const Charger(id: 2, businessId: 1, name: 'Highway Fast Charge', address: 'Mumbai-Pune Expressway, Khalapur', latitude: 19.0896, longitude: 72.8656, powerKw: 120, accessType: 'public', basePrice: 18, status: 'active', reliabilityScore: 0.84, amenities: 'Restroom,Cafe'),
+      const Charger(id: 3, businessId: 1, name: 'Tech Park Station', address: 'Infosys Campus, Airoli', latitude: 19.0596, longitude: 72.8295, powerKw: 30, accessType: 'public', basePrice: 11, status: 'active', reliabilityScore: 0.96, amenities: 'WiFi'),
+    ];
   }
 
   // ─── Filter Mutators ───
