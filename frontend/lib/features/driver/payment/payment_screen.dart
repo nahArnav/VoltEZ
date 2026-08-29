@@ -41,9 +41,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
       'subtitle': 'Debit / Credit card',
     },
     {
-      'icon': Icons.wallet_rounded,
-      'label': 'VoltEZ Wallet',
-      'subtitle': 'Wallet balance (if enabled on your account)',
+      'icon': Icons.payments_outlined,
+      'label': 'Cash',
+      'subtitle': 'Pay the host when you arrive',
     },
   ];
 
@@ -58,6 +58,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final hold = booking.holdResult;
     final order = booking.paymentOrder;
     if (hold == null || order == null) return;
+    if (booking.paymentMethod == 'cash') {
+      await booking.processCashPayment();
+      return;
+    }
     if (kRazorpayKeyId.isEmpty) {
       booking.setPaymentError(
         'Razorpay is not configured for this build. Add the RAZORPAY_KEY_ID build setting.',
@@ -153,8 +157,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _selectedMethod = m['label']),
+                      onTap: () async {
+                        setState(() => _selectedMethod = m['label']);
+                        final method = (m['label'] as String).toLowerCase();
+                        await booking.proceedToPayment(method: method);
+                      },
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -349,7 +356,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     .copyWith(color: AppColors.success)),
             const SizedBox(height: 8),
             Text(
-              '₹${booking.holdResult?.estimatedCost.round() ?? 0} charged via Razorpay',
+              '₹${booking.holdResult?.estimatedCost.round() ?? 0} · ${booking.paymentMethod == 'cash' ? 'pay at charger' : booking.paymentMethod.toUpperCase()}',
               style: AppTypography.bodyMedium,
             ),
             if (booking.razorpayPaymentId != null) ...[

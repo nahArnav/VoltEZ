@@ -13,7 +13,7 @@ import '../../../shared/models/models.dart';
 /// Station discovery screen with OpenStreetMap (flutter_map).
 ///
 /// Features:
-/// - OpenStreetMap tiles centered on driver's GPS (fallback: Mumbai).
+/// - OpenStreetMap tiles centered on driver's GPS (Pune pilot center until GPS is granted).
 /// - Custom colored markers: green = available, amber = busy, red = offline.
 /// - Marker tap → bottom sheet with station name, distance, ports, wait
 ///   time prediction, and "View Details" button.
@@ -32,8 +32,9 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _sheetExpanded = false;
 
-  // Default center: Mumbai
-  static const latlong.LatLng _defaultCenter = latlong.LatLng(19.0760, 72.8777);
+  // Base-map center only; no charger data is fabricated when GPS/API access
+  // is unavailable.
+  static const latlong.LatLng _defaultCenter = latlong.LatLng(18.5204, 73.8567);
 
   // Connector type display labels (backend uses plain strings)
   static const Map<String, String> _connectorLabels = {
@@ -65,10 +66,14 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   // ─── Marker color mapping (backend status strings) ───
   Color _statusColor(String status) {
     switch (status) {
+      case 'available':
       case 'active':
         return AppColors.success;
+      case 'unavailable':
       case 'paused':
         return AppColors.warning;
+      case 'maintenance':
+      case 'offline':
       case 'inactive':
         return AppColors.error;
       default:
@@ -78,12 +83,17 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
   String _waitTimeEstimate(String status) {
     switch (status) {
+      case 'available':
       case 'active':
-        return '< 5 min';
+        return 'Available now';
+      case 'unavailable':
       case 'paused':
-        return '~15 min';
+        return 'Currently unavailable';
+      case 'maintenance':
+        return 'Maintenance';
+      case 'offline':
       case 'inactive':
-        return 'N/A';
+        return 'Offline';
       default:
         return 'N/A';
     }

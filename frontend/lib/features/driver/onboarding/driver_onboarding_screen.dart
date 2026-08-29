@@ -23,14 +23,22 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   // Vehicle info
   String? _selectedMake;
   String? _selectedModel;
+  String _vehicleClass = 'car';
   double _batteryCapacity = 40;
+  double _estimatedRangeKm = 300;
   double _currentBattery = 72;
   ConnectorType? _connectorType;
   double _reserveBattery = 15;
   bool _saving = false;
   String? _saveError;
 
-  final _makes = ['Tata', 'MG', 'Hyundai', 'Mahindra', 'Kia', 'BYD', 'Ather', 'Ola'];
+  // Covers the common Indian EV catalogue plus representative two/three
+  // wheeler makers. Users can still choose "Other" and enter the model later.
+  final _makes = [
+    'Tata', 'MG', 'Hyundai', 'Mahindra', 'Kia', 'BYD', 'Citroen', 'Volvo',
+    'BMW', 'Mercedes-Benz', 'Audi', 'Porsche', 'Ather', 'Ola', 'TVS', 'Bajaj',
+    'Revolt', 'Ultraviolette', 'Matter', 'Hero Electric', 'Ampere', 'Other',
+  ];
   final _modelsByMake = {
     'Tata': ['Nexon EV', 'Tiago EV', 'Punch EV', 'Harrier EV'],
     'MG': ['ZS EV', 'Comet EV'],
@@ -38,8 +46,22 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     'Mahindra': ['XUV400', 'XUV.e8'],
     'Kia': ['EV6', 'EV9'],
     'BYD': ['Atto 3', 'Seal', 'e6'],
+    'Citroen': ['eC3'],
+    'Volvo': ['XC40 Recharge', 'C40 Recharge'],
+    'BMW': ['i4', 'iX', 'i7'],
+    'Mercedes-Benz': ['EQS', 'EQB'],
+    'Audi': ['Q4 e-tron', 'e-tron GT'],
+    'Porsche': ['Taycan', 'Macan Electric'],
     'Ather': ['450X', '450S'],
     'Ola': ['S1 Pro', 'S1 Air'],
+    'TVS': ['iQube'],
+    'Bajaj': ['Chetak EV'],
+    'Revolt': ['RV400', 'RV1'],
+    'Ultraviolette': ['F77'],
+    'Matter': ['Aera'],
+    'Hero Electric': ['Optima', 'Photon'],
+    'Ampere': ['Magnus EX', 'Nexus'],
+    'Other': ['Custom model'],
   };
 
   List<String> get _selectedModels => _modelsByMake[_selectedMake] ?? [];
@@ -71,9 +93,12 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       await context.read<ApiService>().createVehicle({
         'make': make,
         'model': model,
-        'vehicle_class': 'car',
+        'vehicle_class': _vehicleClass,
         'battery_kwh': _batteryCapacity,
         'connector_type_ids': [_connectorId(connector)],
+        'max_ac_kw': _vehicleClass == 'two_wheeler' ? 3.3 : 7.2,
+        if (_vehicleClass != 'two_wheeler') 'max_dc_kw': _vehicleClass == 'three_wheeler' ? 15.0 : 60.0,
+        'estimated_range_km': _estimatedRangeKm,
       });
       if (!mounted) return;
       context.read<RoutePlannerProvider>().loadVehicles();
@@ -97,6 +122,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         ConnectorType.chademo => 3,
         ConnectorType.gbT => 4,
         ConnectorType.type1 => 2,
+        ConnectorType.bharatAc => 4,
+        ConnectorType.bharatDc => 5,
       };
 
   void _back() {
@@ -208,6 +235,34 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
           Text('Choose your EV make and model for personalised charging.', style: AppTypography.bodyMedium),
           const SizedBox(height: 28),
 
+          Text('Vehicle type', style: AppTypography.labelLarge),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ('car', 'Car (hatchback / sedan / SUV)'),
+              ('two_wheeler', 'Bike / scooter'),
+              ('three_wheeler', 'Auto / 3-wheeler'),
+            ].map((item) {
+              final selected = _vehicleClass == item.$1;
+              return GestureDetector(
+                onTap: () => setState(() => _vehicleClass = item.$1),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.primary.withValues(alpha: 0.14) : AppColors.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+                  ),
+                  child: Text(item.$2, style: TextStyle(color: selected ? AppColors.primary : AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+
           // Make selector
           Text('Make', style: AppTypography.labelLarge),
           const SizedBox(height: 10),
@@ -311,6 +366,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               ConnectorType.chademo => 'DC fast charging (Japanese)',
               ConnectorType.gbT => 'Chinese standard',
               ConnectorType.type1 => 'AC charging (North America)',
+              ConnectorType.bharatAc => 'Bharat AC-001 for two-wheelers and light EVs',
+              ConnectorType.bharatDc => 'Bharat DC-001 fast charging',
             };
 
             return Padding(
@@ -393,6 +450,18 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
           ),
           const SizedBox(height: 32),
 
+          _sliderSection(
+            title: 'Estimated real-world range',
+            subtitle: 'Use the range you normally get, not the brochure maximum.',
+            value: _estimatedRangeKm,
+            min: 40,
+            max: 800,
+            unit: 'km',
+            color: AppColors.secondary,
+            onChanged: (v) => setState(() => _estimatedRangeKm = v),
+          ),
+          const SizedBox(height: 32),
+
           // Current Battery %
           _sliderSection(
             title: 'Current Battery',
@@ -435,6 +504,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 _summaryRow('Vehicle', '${_selectedMake ?? ''} ${_selectedModel ?? ''}'),
                 _summaryRow('Connector', _connectorType?.name.toUpperCase().replaceAll('_', ' ') ?? ''),
                 _summaryRow('Capacity', '${_batteryCapacity.round()} kWh'),
+                _summaryRow('Vehicle type', _vehicleClass.replaceAll('_', ' ')),
+                _summaryRow('Range', '${_estimatedRangeKm.round()} km'),
                 _summaryRow('Current', '${_currentBattery.round()}%'),
                 _summaryRow('Reserve', '${_reserveBattery.round()}%'),
               ],

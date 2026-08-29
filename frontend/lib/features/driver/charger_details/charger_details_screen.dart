@@ -27,6 +27,7 @@ class ChargerDetailsScreen extends StatefulWidget {
 
 class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
   Charger? _charger;
+  String? _loadError;
   int _detourMinutes = 0;
   double _reliabilityScore = 0.0;
   bool _connectorCompatible = true;
@@ -72,30 +73,36 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       }
     } catch (_) {}
 
-    // Final fallback — use default charger
-    setState(() {
-      _charger = const Charger(
-        id: '1', businessId: '1',
-        name: 'Phoenix Mall Charger',
-        address: 'Phoenix Mall, Lower Parel, Mumbai',
-        latitude: 19.0760,
-        longitude: 72.8777,
-        powerKw: 60,
-        accessType: 'public',
-        basePrice: 14,
-        status: 'active',
-        reliabilityScore: 0.92,
-        amenities: 'WiFi,Food Court,Parking,Restroom,AC Waiting Lounge',
-      );
-      _detourMinutes = 6;
-      _reliabilityScore = 0.94;
-      _connectorCompatible = true;
-    });
+    // Do not invent a charger when the API response is stale or a deep link
+    // points at an unknown id.  A booking must only be possible for a real
+    // backend record.
+    setState(() => _loadError = 'This charger is no longer available.');
   }
 
   @override
   Widget build(BuildContext context) {
     final charger = _charger;
+    if (charger == null && _loadError != null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: VoltAppBar(title: 'Charger unavailable'),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.ev_station_outlined, size: 64, color: AppColors.textMuted),
+                const SizedBox(height: 16),
+                Text(_loadError!, style: AppTypography.bodyLarge, textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+                FilledButton(onPressed: () => context.pop(), child: const Text('GO BACK')),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     if (charger == null) {
       return const Scaffold(
         backgroundColor: AppColors.background,
@@ -194,9 +201,9 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               ),
               const Spacer(),
               _infoChip(
-                Icons.star_rounded,
-                '${charger.rating} (${charger.totalRatings})',
-                AppColors.warning,
+                Icons.verified_outlined,
+                '${(_reliabilityScore * 100).round()}% reliable',
+                AppColors.success,
               ),
             ],
           ),
@@ -431,52 +438,11 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
         children: [
           Text('Ratings', style: AppTypography.headlineMedium),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Column(
-                children: [
-                  Text(
-                    charger.rating.toStringAsFixed(1),
-                    style: const TextStyle(
-                      color: AppColors.warning,
-                      fontSize: 40,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Row(
-                    children: List.generate(
-                      5,
-                      (i) => Icon(
-                        i < charger.rating.round()
-                            ? Icons.star_rounded
-                            : Icons.star_outline_rounded,
-                        color: AppColors.warning,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text('${charger.totalRatings} reviews',
-                      style: AppTypography.bodySmall),
-                ],
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                child: Column(
-                  children: [
-                    _ratingBar('Reliability',
-                        _reliabilityScore, AppColors.success),
-                    const SizedBox(height: 8),
-                    _ratingBar('Cleanliness', 0.88, AppColors.primary),
-                    const SizedBox(height: 8),
-                    _ratingBar('Speed', 0.91, AppColors.secondary),
-                    const SizedBox(height: 8),
-                    _ratingBar(
-                        'Location', 0.85, AppColors.warning),
-                  ],
-                ),
-              ),
-            ],
+          _ratingBar('Reliability', _reliabilityScore, AppColors.success),
+          const SizedBox(height: 12),
+          Text(
+            'Driver ratings and written reviews will appear here after completed sessions.',
+            style: AppTypography.bodySmall.copyWith(color: AppColors.onPrimary.withValues(alpha: 0.7)),
           ),
         ],
       ),

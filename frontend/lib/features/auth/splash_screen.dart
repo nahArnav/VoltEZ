@@ -210,17 +210,18 @@ class _SplashScreenState extends State<SplashScreen>
                     Opacity(
                       opacity: Curves.easeOut.transform(
                           ((entrance - 0.5) * 3).clamp(0, 1)),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           _Pill(Icons.bolt_rounded, 'Smart Charging', AppColors.primary),
-                          const SizedBox(width: 10),
                           _Pill(Icons.route_rounded, 'Route Planning', AppColors.secondary),
-                          const SizedBox(width: 10),
                           _Pill(Icons.schedule_rounded, 'Reservations', AppColors.marigold),
                         ],
                       ),
                     ),
+
 
                     const Spacer(flex: 2),
 

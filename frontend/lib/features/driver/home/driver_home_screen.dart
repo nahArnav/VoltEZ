@@ -5,9 +5,12 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/providers/session_provider.dart';
 import '../../../core/providers/charger_discovery_provider.dart';
+import '../../../core/providers/route_planner_provider.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/network/api_service.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
+
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -20,12 +23,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   int _selectedNav = 0;
   final _searchController = TextEditingController();
 
-  // Battery data — currently from the driver's vehicle or session
-  // TODO: Fetch from vehicle API or active session
-  final double _batteryPercent = 72;
-  final double _batteryKwh = 38.9;
-  final double _rangeKm = 245;
-
   @override
   void initState() {
     super.initState();
@@ -34,6 +31,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (discovery.allChargers.isEmpty && !discovery.chargersLoading) {
         discovery.init();
       }
+      context.read<RoutePlannerProvider>().loadVehicles();
     });
   }
 
@@ -203,7 +201,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 color: AppColors.primary,
               )),
               const SizedBox(height: 8),
-              Text('Good evening,', style: AppTypography.bodyMedium),
+              Text('${_greeting()},', style: AppTypography.bodyMedium),
               const SizedBox(height: 2),
               Consumer<AuthProvider>(
                 builder: (context, auth, _) {
@@ -228,13 +226,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Widget _buildBatteryCard() {
-    final color = _batteryPercent > 50
-        ? AppColors.success
-        : _batteryPercent > 20
-            ? AppColors.warning
-            : AppColors.error;
-
-    return GlassCard(
+    return Consumer<RoutePlannerProvider>(builder: (context, planner, _) {
+      final vehicle = planner.selectedVehicle;
+      if (vehicle == null) {
+        return const _HomeInfoCard(
+          icon: Icons.directions_car_outlined,
+          title: 'Add your EV details',
+          message: 'Save a car, bike or auto profile to unlock accurate range and charger compatibility.',
+        );
+      }
+      return GlassCard(
       accentColor: AppColors.primary,
       padding: const EdgeInsets.all(22),
       borderRadius: 22,
@@ -246,8 +247,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               Text('BATTERY STATUS', style: AppTypography.labelSmall.copyWith(
                 color: AppColors.onPrimary.withValues(alpha: 0.7),
               )),
-              Text(
-                '${_batteryPercent.round()}%',
+              const Text(
+                '—',
                 style: TextStyle(
                   color: AppColors.onPrimary,
                   fontSize: 36,
@@ -257,27 +258,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: _batteryPercent / 100,
-              color: AppColors.onPrimary,
-              backgroundColor: AppColors.onPrimary.withValues(alpha: 0.15),
-              minHeight: 8,
-            ),
-          ),
+          Text('Live battery percentage is available during an active session.', style: AppTypography.bodySmall.copyWith(color: AppColors.onPrimary.withValues(alpha: 0.7))),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _batteryMetric(Icons.bolt_rounded, '${_batteryKwh.toStringAsFixed(1)} kWh', 'Capacity', color),
-              _batteryMetric(Icons.route_rounded, '${_rangeKm.round()} km', 'Range', AppColors.primary),
-              _batteryMetric(Icons.ev_station_rounded, 'CCS2', 'Connector', AppColors.secondary),
+              _batteryMetric(Icons.bolt_rounded, '${vehicle.batteryKwh.toStringAsFixed(1)} kWh', 'Capacity', AppColors.primary),
+              _batteryMetric(Icons.route_rounded, vehicle.estimatedRangeKm == null ? '—' : '${vehicle.estimatedRangeKm!.round()} km', 'Range', AppColors.primary),
+              _batteryMetric(Icons.ev_station_rounded, vehicle.primaryConnector, 'Connector', AppColors.secondary),
             ],
           ),
         ],
       ),
-    );
+      );
+    });
   }
 
   Widget _batteryMetric(IconData icon, String value, String label, Color color) {
@@ -590,11 +584,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           const SizedBox(height: 32),
 
           // Profile options
-          _profileOption(
-            Icons.directions_car_rounded,
-            'My Vehicle',
-            'Tata Nexon EV, 2024',
-            () {},
+          Consumer<RoutePlannerProvider>(
+            builder: (context, planner, _) => _profileOption(
+              Icons.directions_car_rounded,
+              'My Vehicle',
+              planner.selectedVehicle?.displayName ?? 'No vehicle saved',
+              () => context.go('/driver/onboarding'),
+            ),
           ),
           _profileOption(
             Icons.receipt_long_rounded,
@@ -603,11 +599,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             () => context.go('/driver/history'),
           ),
           _profileOption(
+            Icons.verified_user_outlined,
+            'KYC & Identity Verification',
+            'Driving license / Aadhaar status',
+            () => _showDriverKycDialog(context),
+          ),
+          _profileOption(
             Icons.payment_rounded,
             'Payment Methods',
-            'Manage UPI, cards, wallet',
+            'UPI, cards or pay-at-charger cash',
             () {},
           ),
+
           _profileOption(
             Icons.notifications_outlined,
             'Notifications',
@@ -692,3 +695,130 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 }
+
+String _greeting() {
+  final hour = DateTime.now().hour;
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+class _HomeInfoCard extends StatelessWidget {
+  const _HomeInfoCard({required this.icon, required this.title, required this.message});
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(children: [
+            Icon(icon, color: AppColors.primary, size: 32),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: AppTypography.headlineSmall),
+              const SizedBox(height: 4),
+              Text(message, style: AppTypography.bodySmall),
+            ])),
+          ]),
+        ),
+      );
+}
+
+Future<void> _showDriverKycDialog(BuildContext context) async {
+  final docNumber = TextEditingController();
+  final rcNumber = TextEditingController();
+  String docType = 'driving_license';
+
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.verified_user_rounded, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Driver KYC Verification'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Verify your driving credentials to unlock instant slot holds, zero-deposit charging, and higher trust rating.',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: docType,
+                decoration: const InputDecoration(labelText: 'Document Type'),
+
+                items: const [
+                  DropdownMenuItem(value: 'driving_license', child: Text('Driving License (DL)')),
+                  DropdownMenuItem(value: 'aadhaar', child: Text('Aadhaar / National ID')),
+                  DropdownMenuItem(value: 'voter_id', child: Text('Voter ID')),
+                  DropdownMenuItem(value: 'passport', child: Text('Passport')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setDialogState(() => docType = val);
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: docNumber,
+                decoration: const InputDecoration(labelText: 'Document / ID Number (e.g. MH1220210001234)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: rcNumber,
+                decoration: const InputDecoration(labelText: 'Vehicle RC Number (Optional)'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('CANCEL'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (docNumber.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter your document ID number.')),
+                );
+                return;
+              }
+              try {
+                await context.read<ApiService>().submitUserKyc({
+                  'document_type': docType,
+                  'document_number': docNumber.text.trim(),
+                  if (rcNumber.text.trim().isNotEmpty) 'vehicle_rc_number': rcNumber.text.trim(),
+                });
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Driver identity verified successfully! Status: VERIFIED')),
+                  );
+                }
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Verification error: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('VERIFY & SAVE'),
+          ),
+        ],
+      ),
+    ),
+  );
+  docNumber.dispose();
+  rcNumber.dispose();
+}
+

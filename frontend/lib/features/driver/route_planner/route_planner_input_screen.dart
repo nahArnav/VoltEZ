@@ -239,6 +239,8 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                   trailing: planner.usingCurrentLocation
                       ? null
                       : _buildLocationButton(planner),
+                  suggestions: planner.originSuggestions,
+                  onSuggestionSelected: planner.selectOriginSuggestion,
                 ),
 
                 const SizedBox(height: 20),
@@ -251,6 +253,8 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                   icon: Icons.location_on_outlined,
                   iconColor: AppColors.primary,
                   planner: planner,
+                  suggestions: planner.destinationSuggestions,
+                  onSuggestionSelected: planner.selectDestinationSuggestion,
                 ),
               ],
             ),
@@ -269,6 +273,8 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
     required RoutePlannerProvider planner,
     bool isFilled = false,
     Widget? trailing,
+    List<LocationSuggestion> suggestions = const [],
+    ValueChanged<LocationSuggestion>? onSuggestionSelected,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,11 +314,34 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
           onChanged: (v) {
             if (label == 'From') {
               planner.setOrigin(v);
+              planner.searchOrigin(v);
             } else {
               planner.setDestination(v);
+              planner.searchDestination(v);
             }
           },
         ),
+        if (suggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: suggestions.map((suggestion) => ListTile(
+                dense: true,
+                leading: const Icon(Icons.place_outlined, color: AppColors.primary),
+                title: Text(suggestion.label, maxLines: 2, overflow: TextOverflow.ellipsis),
+                onTap: onSuggestionSelected == null ? null : () {
+                  onSuggestionSelected(suggestion);
+                  controller.text = suggestion.label;
+                  controller.selection = TextSelection.collapsed(offset: controller.text.length);
+                },
+              )).toList(),
+            ),
+          ),
       ],
     );
   }
