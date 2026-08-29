@@ -302,11 +302,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           children: [
             Icon(Icons.search_rounded, color: AppColors.onPrimary.withValues(alpha: 0.7), size: 22),
             const SizedBox(width: 12),
-            Text('Search destination or charger...', style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.onPrimary.withValues(alpha: 0.5),
-            )),
+            Expanded(
+              child: Text(
+                'Search destination or charger...',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.onPrimary.withValues(alpha: 0.5),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
+
       ),
     );
   }
