@@ -25,7 +25,10 @@ async def lifespan(app: FastAPI):
     # --- Load ML models with SHA-256 hash verification ---
     from app.ml.model_loader import load_model_bundle
 
-    base_dir = Path(__file__).parent.parent.parent.parent
+    # main.py lives at <repo>/backend/app/main.py; the model bundles live at
+    # <repo>/backend/models. Four parents would escape the repository and
+    # silently force every request onto heuristic fallbacks.
+    base_dir = Path(__file__).resolve().parents[1]
     models_dir = base_dir / "models"
 
     demand_bundle = None

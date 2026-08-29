@@ -82,9 +82,6 @@ async def create_order(
     """
     Create a Razorpay order and save the pending payment to the database.
     """
-    if not settings.razorpay_is_configured:
-        raise HTTPException(status_code=503, detail="Razorpay is not configured")
-
     booking = await _require_owned_booking(db, payment_in.booking_id, current_user)
     existing = await payment_repo.get_by_booking(db, booking_id=booking.id)
     if existing and existing.status in {"pending", "completed"}:
@@ -93,6 +90,39 @@ async def create_order(
 
     amount = Decimal(str(booking.estimated_amount or settings.BOOKING_HOLD_FEE_INR))
     amount_in_paise = int(amount * 100)
+
+    # Cash is an explicit pay-at-charger method. We confirm the reservation,
+    # but leave the payment pending so settlement is only recorded after the
+    # charging session completes (or an owner verifies cash collection).
+    if payment_in.method == "cash":
+        old_status = booking.status
+        payment = await payment_repo.create(
+            db,
+            obj_in={
+                "booking_id": booking.id,
+                "amount": amount,
+                "currency": "INR",
+                "method": "cash",
+                "status": "pending",
+            },
+        )
+        booking.status = BookingStatus.CONFIRMED.value
+        db.add(
+            BookingEvent(
+                booking_id=booking.id,
+                old_status=old_status,
+                new_status=BookingStatus.CONFIRMED.value,
+                actor="user:cash-pay-at-charger",
+                metadata_={"payment_method": "cash"},
+            )
+        )
+        db.add(booking)
+        await db.commit()
+        await db.refresh(payment)
+        return payment
+
+    if not settings.razorpay_is_configured:
+        raise HTTPException(status_code=503, detail="Razorpay is not configured")
 
     # Try/except block in case Razorpay API is down
     try:
@@ -113,6 +143,7 @@ async def create_order(
         "booking_id": booking.id,
         "amount": amount,
         "currency": "INR",
+        "method": payment_in.method,
         "provider_order_id": rzp_order.get("id"),
         "status": "pending",
     }

@@ -2,14 +2,49 @@ from datetime import timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user_id
 from app.db.session import get_db
 from app.schemas.booking import BookingCreate, BookingResponse
 from app.services.booking import booking_service
+from database.models.booking import Booking
+from database.models.charger import Charger
+from database.models.charger_port import ChargerPort
+from database.models.connector import ConnectorType
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
+
+
+async def _with_charger_context(db: AsyncSession, booking: Booking) -> dict:
+    """Expose station context so clients do not render fabricated labels."""
+    context = await db.execute(
+        select(
+            Charger.name,
+            Charger.address_text,
+            Charger.price_per_kwh,
+            ChargerPort.max_power_kw,
+            ConnectorType.display_name,
+        )
+        .select_from(Booking)
+        .join(ChargerPort, Booking.charger_port_id == ChargerPort.id)
+        .join(Charger, ChargerPort.charger_id == Charger.id)
+        .join(ConnectorType, ChargerPort.connector_type_id == ConnectorType.id)
+        .where(Booking.id == booking.id)
+    )
+    row = context.one_or_none()
+    payload = BookingResponse.model_validate(booking).model_dump()
+    if row is not None:
+        name, address, price, power, connector = row
+        payload.update(
+            charger_name=name,
+            charger_address=address,
+            price_per_kwh=float(price),
+            power_kw=float(power),
+            connector_type=connector,
+        )
+    return payload
 
 
 @router.get("/", response_model=list[BookingResponse])
@@ -17,7 +52,8 @@ async def list_bookings(
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    return await booking_service.list_bookings(db=db, user_id=user_id)
+    bookings = await booking_service.list_bookings(db=db, user_id=user_id)
+    return [await _with_charger_context(db, booking) for booking in bookings]
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)
@@ -29,7 +65,7 @@ async def get_booking(
     booking = await booking_service.get_booking(db=db, booking_id=booking_id, user_id=user_id)
     if booking is None:
         raise HTTPException(status_code=404, detail="Booking not found")
-    return booking
+    return await _with_charger_context(db, booking)
 
 
 @router.post("/", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
@@ -70,7 +106,7 @@ async def create_booking(
 
         await db.commit()
         await db.refresh(booking)
-        return booking
+        return await _with_charger_context(db, booking)
     except Exception:
         # If DB creation fails (e.g. overlap check fails), release the lock
         await db.rollback()
@@ -95,4 +131,4 @@ async def cancel_booking(
         f"{int(booking.start_at.timestamp())}:{int(booking.end_at.timestamp())}"
     )
     await request.app.state.redis.delete(lock_key)
-    return booking
+    return await _with_charger_context(db, booking)

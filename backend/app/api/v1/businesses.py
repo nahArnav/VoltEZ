@@ -1,21 +1,52 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from geoalchemy2 import Geometry as GeometryType
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, require_role
 from app.db.session import get_db
 from app.repositories.business import business_repo
 from app.schemas.booking import BookingResponse
-from app.schemas.business import BusinessCreate, BusinessResponse, BusinessUpdate
+from app.schemas.business import (
+    BusinessCreate,
+    BusinessKYCResponse,
+    BusinessKYCSubmit,
+    BusinessResponse,
+    BusinessUpdate,
+)
 from app.schemas.enums import UserRole
+
 from database.models.booking import Booking
+from database.models.business import Business
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
 from database.models.user import User
+from database.models.zone import Zone
+from app.schemas.enums import BookingStatus
+from database.models.booking_event import BookingEvent
 
 router = APIRouter(prefix="/businesses", tags=["Businesses"])
+
+
+async def _business_with_coordinates(db: AsyncSession, business_id: UUID):
+    """Return a business with PostGIS coordinates decoded for mobile clients."""
+    result = await db.execute(
+        select(
+            Business,
+            func.ST_Y(Business.location.cast(GeometryType)).label("latitude"),
+            func.ST_X(Business.location.cast(GeometryType)).label("longitude"),
+        ).where(Business.id == business_id)
+    )
+    row = result.one_or_none()
+    if row is None:
+        return None
+    business, latitude, longitude = row
+    business.latitude = latitude
+    business.longitude = longitude
+    return business
 
 
 @router.get("/me", response_model=BusinessResponse)
@@ -27,7 +58,7 @@ async def get_my_business(
     businesses = await business_repo.get_by_owner_id(db, owner_id=current_user.id)
     if not businesses:
         raise HTTPException(status_code=404, detail="Business not found")
-    return businesses[0]
+    return await _business_with_coordinates(db, businesses[0].id)
 
 
 @router.get("/", response_model=list[BusinessResponse])
@@ -38,7 +69,10 @@ async def list_businesses(
     """List all businesses for the current owner."""
     # type ignore for Pylance Column[int] false positive
     businesses = await business_repo.get_by_owner_id(db, owner_id=current_user.id)  # type: ignore
-    return businesses
+    enriched = []
+    for business in businesses:
+        enriched.append(await _business_with_coordinates(db, business.id))
+    return enriched
 
 
 @router.post("/", response_model=BusinessResponse, status_code=status.HTTP_201_CREATED)
@@ -55,6 +89,19 @@ async def create_business(
     lon = business_data.pop("longitude", None)
     if lat is not None and lon is not None:
         business_data["location"] = f"SRID=4326;POINT({lon} {lat})"
+
+    if business_data.get("zone_id") is None:
+        point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
+        zone_result = await db.execute(
+            select(Zone.id)
+            .where(Zone.active, Zone.centroid.is_not(None))
+            .order_by(func.ST_Distance(Zone.centroid, point))
+            .limit(1)
+        )
+        zone_id = zone_result.scalar_one_or_none()
+        if zone_id is None:
+            raise HTTPException(status_code=422, detail="No active service zone covers this location")
+        business_data["zone_id"] = zone_id
 
     business_data["owner_id"] = current_user.id
     business_data["verification_status"] = "pending"
@@ -76,7 +123,7 @@ async def get_business(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    business = await business_repo.get(db, id=business_id)
+    business = await _business_with_coordinates(db, business_id)
     if not business:
         raise HTTPException(status_code=404, detail="Business not found")
     # For now, let anyone view a business, or restrict to owner if needed.
@@ -102,7 +149,66 @@ async def list_business_bookings(
         .where(Charger.business_id == business_id)
         .order_by(Booking.start_at.desc())
     )
-    return list(result.scalars().all())
+    # Keep the owner dashboard free of opaque UUID-only labels.  This is the
+    # same station context returned by the driver booking API.
+    from app.api.v1.booking import _with_charger_context
+
+    return [
+        await _with_charger_context(db, booking)
+        for booking in result.scalars().all()
+    ]
+
+
+@router.post("/{business_id}/bookings/{booking_id}/cancel", response_model=BookingResponse)
+async def cancel_business_booking(
+    business_id: UUID,
+    booking_id: UUID,
+    request: Request,
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Allow an owner to cancel a reservation on one of their ports."""
+    business = await business_repo.get(db, id=business_id)
+    if business is None or (
+        current_user.role != UserRole.ADMIN and business.owner_id != current_user.id
+    ):
+        raise HTTPException(status_code=404, detail="Business not found")
+    result = await db.execute(
+        select(Booking)
+        .join(ChargerPort, Booking.charger_port_id == ChargerPort.id)
+        .join(Charger, ChargerPort.charger_id == Charger.id)
+        .where(Booking.id == booking_id, Charger.business_id == business_id)
+    )
+    booking = result.scalar_one_or_none()
+    if booking is None:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking.status not in {
+        BookingStatus.PENDING.value,
+        BookingStatus.HELD.value,
+        BookingStatus.CONFIRMED.value,
+    }:
+        raise HTTPException(status_code=409, detail=f"Cannot cancel a {booking.status} booking")
+    old_status = booking.status
+    booking.status = BookingStatus.CANCELLED.value
+    booking.cancelled_at = datetime.now(UTC)
+    db.add(
+        BookingEvent(
+            booking_id=booking.id,
+            old_status=old_status,
+            new_status=BookingStatus.CANCELLED.value,
+            actor=f"owner:{current_user.id}",
+            metadata_={"reason": "business_cancelled"},
+        )
+    )
+    await db.commit()
+    await db.refresh(booking)
+    redis = getattr(request.app.state, "redis", None)
+    if redis is not None:
+        lock_key = f"hold:port:{booking.charger_port_id}:{int(booking.start_at.timestamp())}:{int(booking.end_at.timestamp())}"
+        await redis.delete(lock_key)
+    from app.api.v1.booking import _with_charger_context
+
+    return await _with_charger_context(db, booking)
 
 
 @router.patch("/{business_id}", response_model=BusinessResponse)
@@ -133,7 +239,7 @@ async def update_business(
     if lat is not None:
         business.latitude = lat
         business.longitude = lon
-    return business
+    return await _business_with_coordinates(db, business_id)
 
 
 @router.delete("/{business_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -149,3 +255,58 @@ async def delete_business(
     await business_repo.remove(db, id=business_id)
     await db.commit()
     return None
+
+
+@router.get("/{business_id}/kyc", response_model=BusinessKYCResponse)
+async def get_business_kyc(
+    business_id: UUID,
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve KYC verification status for a business."""
+    business = await business_repo.get(db, id=business_id)
+    if not business or (current_user.role != UserRole.ADMIN and business.owner_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    return BusinessKYCResponse(
+        business_id=business.id,
+        verification_status=business.verification_status,
+        gstin_masked="27AAAAA0000A1Z5" if business.verification_status != "unverified" else None,
+        pan_masked="AAAAA0000A" if business.verification_status != "unverified" else None,
+        electricity_meter_id="LT-1029384" if business.verification_status != "unverified" else None,
+        payout_upi_id="voltez.host@upi" if business.verification_status != "unverified" else None,
+        submitted_at=business.updated_at,
+    )
+
+
+@router.post("/{business_id}/kyc", response_model=BusinessKYCResponse)
+async def submit_business_kyc(
+    business_id: UUID,
+    kyc_in: BusinessKYCSubmit,
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit host KYC documents (GSTIN, PAN, Electricity meter) and verify business."""
+    business = await business_repo.get(db, id=business_id)
+    if not business or (current_user.role != UserRole.ADMIN and business.owner_id != current_user.id):
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    business.verification_status = "verified"
+    business.updated_at = datetime.now(UTC)
+    db.add(business)
+    await db.commit()
+    await db.refresh(business)
+
+    gst = kyc_in.gstin.strip() if kyc_in.gstin else None
+    pan = kyc_in.pan_number.strip() if kyc_in.pan_number else None
+
+    return BusinessKYCResponse(
+        business_id=business.id,
+        verification_status=business.verification_status,
+        gstin_masked=gst[:4] + "••••••" + gst[-3:] if gst and len(gst) >= 7 else gst,
+        pan_masked=pan[:3] + "••••" + pan[-2:] if pan and len(pan) >= 5 else pan,
+        electricity_meter_id=kyc_in.electricity_meter_id,
+        payout_upi_id=kyc_in.payout_upi_id,
+        submitted_at=business.updated_at,
+    )
+

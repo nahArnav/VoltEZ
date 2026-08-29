@@ -37,12 +37,6 @@ async def get_business_recommendations(
     current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Get off-peak pricing and availability recommendations for a business.
-    Placeholder until the ML integration is ready.
-    """
-    return {
-        "status": "success",
-        "message": "Business intelligence engine is under construction.",
-        "data": [],
-    }
+    """Deprecated compatibility route; owners should use Analytics dashboard."""
+    from app.api.v1.analytics import get_business_recommendations as analytics_recommendations
+    return await analytics_recommendations(business_id, db=db, current_user=current_user)
