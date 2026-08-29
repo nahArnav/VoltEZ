@@ -35,7 +35,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Consumer<BusinessProvider>(
       builder: (context, business, _) {
         if (business.isLoading && business.business == null) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
         if (business.needsOnboarding) {
           return _BusinessOnboarding(onCreated: business.load);
@@ -101,10 +103,31 @@ class _OverviewPage extends StatelessWidget {
             crossAxisSpacing: 12,
             childAspectRatio: 1.55,
             children: [
-              _MetricCard(label: 'TOTAL EARNINGS', value: _rupees(metrics['total_earnings']), icon: Icons.currency_rupee_rounded, color: AppColors.primary),
-              _MetricCard(label: 'SESSIONS', value: _number(metrics['sessions']), icon: Icons.bolt_rounded, color: AppColors.marigold),
-              _MetricCard(label: 'ACTIVE CHARGERS', value: '${_number(metrics['active_chargers'])}/${_number(metrics['chargers'])}', icon: Icons.ev_station_rounded, color: AppColors.secondary),
-              _MetricCard(label: 'ACTIVE TIME', value: _minutes(metrics['active_minutes']), icon: Icons.timer_outlined, color: AppColors.coral),
+              _MetricCard(
+                label: 'TOTAL EARNINGS',
+                value: _rupees(metrics['total_earnings']),
+                icon: Icons.currency_rupee_rounded,
+                color: AppColors.primary,
+              ),
+              _MetricCard(
+                label: 'SESSIONS',
+                value: _number(metrics['sessions']),
+                icon: Icons.bolt_rounded,
+                color: AppColors.marigold,
+              ),
+              _MetricCard(
+                label: 'ACTIVE CHARGERS',
+                value:
+                    '${_number(metrics['active_chargers'])}/${_number(metrics['chargers'])}',
+                icon: Icons.ev_station_rounded,
+                color: AppColors.secondary,
+              ),
+              _MetricCard(
+                label: 'ACTIVE TIME',
+                value: _minutes(metrics['active_minutes']),
+                icon: Icons.timer_outlined,
+                color: AppColors.coral,
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -137,9 +160,18 @@ class _ChargersPage extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
-          const _PageHeader(eyebrow: 'FLEET', title: 'Chargers', subtitle: 'Manage live station status and tariffs', icon: Icons.ev_station_rounded),
+          const _PageHeader(
+            eyebrow: 'FLEET',
+            title: 'Chargers',
+            subtitle: 'Manage live station status and tariffs',
+            icon: Icons.ev_station_rounded,
+          ),
           const SizedBox(height: 18),
-          FilledButton.icon(onPressed: () => _showAddCharger(context), icon: const Icon(Icons.add_rounded), label: const Text('REGISTER CHARGER')),
+          FilledButton.icon(
+            onPressed: () => _showAddCharger(context),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('REGISTER CHARGER'),
+          ),
           const SizedBox(height: 14),
           _ChargerList(provider.chargers, showControls: true),
         ],
@@ -160,7 +192,12 @@ class _BookingsPage extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
-          const _PageHeader(eyebrow: 'RESERVATIONS', title: 'Bookings', subtitle: 'Confirmations and cancellations from your fleet', icon: Icons.calendar_today_rounded),
+          const _PageHeader(
+            eyebrow: 'RESERVATIONS',
+            title: 'Bookings',
+            subtitle: 'Confirmations and cancellations from your fleet',
+            icon: Icons.calendar_today_rounded,
+          ),
           const SizedBox(height: 18),
           _BookingList(provider.bookings, allowCancel: true),
         ],
@@ -181,10 +218,20 @@ class _AnalyticsPage extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
-          const _PageHeader(eyebrow: 'ML INSIGHTS', title: 'Analytics', subtitle: 'Recommendations generated from your live demand data', icon: Icons.insights_rounded),
+          const _PageHeader(
+            eyebrow: 'ML INSIGHTS',
+            title: 'Analytics',
+            subtitle: 'Recommendations generated from your live demand data',
+            icon: Icons.insights_rounded,
+          ),
           const SizedBox(height: 18),
           if (provider.recommendations.isEmpty)
-            const _EmptyState(icon: Icons.auto_awesome_outlined, title: 'No recommendations yet', message: 'Recommendations appear once the network has enough live observations.')
+            const _EmptyState(
+              icon: Icons.auto_awesome_outlined,
+              title: 'No recommendations yet',
+              message:
+                  'Recommendations appear once the network has enough live observations.',
+            )
           else
             ...provider.recommendations.map(_RecommendationCard.new),
         ],
@@ -202,21 +249,37 @@ class _ProfilePage extends StatelessWidget {
     final business = provider.business ?? const <String, dynamic>{};
     final name = business['name']?.toString().trim();
     final address = business['address_text']?.toString();
-    final verification = business['verification_status']?.toString() ?? 'pending';
+    final verification =
+        business['verification_status']?.toString() ?? 'pending';
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
       children: [
         const Icon(Icons.business_rounded, size: 64, color: AppColors.primary),
         const SizedBox(height: 12),
-        Center(child: Text(name?.isNotEmpty == true ? name! : 'Your business', style: AppTypography.displaySmall)),
+        Center(
+          child: Text(
+            name?.isNotEmpty == true ? name! : 'Your business',
+            style: AppTypography.displaySmall,
+          ),
+        ),
         const SizedBox(height: 4),
-        Center(child: Text(address?.isNotEmpty == true ? address! : 'Address not provided', style: AppTypography.bodyMedium, textAlign: TextAlign.center)),
+        Center(
+          child: Text(
+            address?.isNotEmpty == true ? address! : 'Address not provided',
+            style: AppTypography.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ),
         const SizedBox(height: 14),
         Center(
           child: ActionChip(
             avatar: Icon(
-              verification == 'verified' ? Icons.verified_rounded : Icons.pending_actions_rounded,
-              color: verification == 'verified' ? AppColors.success : AppColors.marigold,
+              verification == 'verified'
+                  ? Icons.verified_rounded
+                  : Icons.pending_actions_rounded,
+              color: verification == 'verified'
+                  ? AppColors.success
+                  : AppColors.marigold,
               size: 18,
             ),
             label: Text('KYC: ${verification.toUpperCase()}'),
@@ -228,16 +291,25 @@ class _ProfilePage extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         ListTile(
-          leading: const Icon(Icons.verified_user_outlined, color: AppColors.primary),
+          leading: const Icon(
+            Icons.verified_user_outlined,
+            color: AppColors.primary,
+          ),
           title: const Text('Host KYC & Verification'),
-          subtitle: Text('Status: ${verification.toUpperCase()} • Tap to update GSTIN/PAN'),
+          subtitle: Text(
+            'Status: ${verification.toUpperCase()} • Tap to update GSTIN/PAN',
+          ),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () {
             final id = business['id']?.toString();
             if (id != null) _showBusinessKycDialog(context, id);
           },
         ),
-        ListTile(leading: const Icon(Icons.refresh_rounded, color: AppColors.primary), title: const Text('Refresh live data'), onTap: provider.load),
+        ListTile(
+          leading: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+          title: const Text('Refresh live data'),
+          onTap: provider.load,
+        ),
         ListTile(
           leading: const Icon(Icons.logout_rounded, color: AppColors.error),
           title: const Text('Sign out'),
@@ -251,7 +323,6 @@ class _ProfilePage extends StatelessWidget {
   }
 }
 
-
 class _ChargerList extends StatelessWidget {
   const _ChargerList(this.chargers, {this.showControls = false});
   final List<Map<String, dynamic>> chargers;
@@ -259,7 +330,13 @@ class _ChargerList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (chargers.isEmpty) return const _EmptyState(icon: Icons.ev_station_outlined, title: 'No chargers registered', message: 'Register a real charger to make it discoverable to drivers.');
+    if (chargers.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.ev_station_outlined,
+        title: 'No chargers registered',
+        message: 'Register a real charger to make it discoverable to drivers.',
+      );
+    }
     final provider = context.read<BusinessProvider>();
     return Column(
       children: chargers.map((charger) {
@@ -271,16 +348,52 @@ class _ChargerList extends StatelessWidget {
         return Card(
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
-            leading: CircleAvatar(backgroundColor: _statusColor(status).withValues(alpha: 0.15), child: Icon(Icons.ev_station_rounded, color: _statusColor(status))),
+            leading: CircleAvatar(
+              backgroundColor: _statusColor(status).withValues(alpha: 0.15),
+              child: Icon(
+                Icons.ev_station_rounded,
+                color: _statusColor(status),
+              ),
+            ),
             title: Text(name, style: AppTypography.headlineSmall),
-            subtitle: Text('$power kW • $ports port${ports == 1 ? '' : 's'} • $price/kWh'),
+            subtitle: Text(
+              '$power kW • $ports port${ports == 1 ? '' : 's'} • $price/kWh',
+            ),
             trailing: showControls
                 ? PopupMenuButton<String>(
-                    onSelected: (value) => provider.setChargerStatus(charger['id'].toString(), value),
+                    onSelected: (value) {
+                      if (value == 'add_port') {
+                        _showAddPort(context, charger);
+                      } else if (value == 'availability') {
+                        _showAvailability(context, charger);
+                      } else {
+                        provider.setChargerStatus(
+                          charger['id'].toString(),
+                          value,
+                        );
+                      }
+                    },
                     itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'available', child: Text('Available')),
-                      PopupMenuItem(value: 'unavailable', child: Text('Unavailable')),
-                      PopupMenuItem(value: 'maintenance', child: Text('Maintenance')),
+                      PopupMenuItem(
+                        value: 'add_port',
+                        child: Text('Add connector port'),
+                      ),
+                      PopupMenuItem(
+                        value: 'availability',
+                        child: Text('Set availability'),
+                      ),
+                      PopupMenuItem(
+                        value: 'available',
+                        child: Text('Available'),
+                      ),
+                      PopupMenuItem(
+                        value: 'unavailable',
+                        child: Text('Unavailable'),
+                      ),
+                      PopupMenuItem(
+                        value: 'maintenance',
+                        child: Text('Maintenance'),
+                      ),
                       PopupMenuItem(value: 'offline', child: Text('Offline')),
                     ],
                   )
@@ -299,21 +412,48 @@ class _BookingList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (bookings.isEmpty) return const _EmptyState(icon: Icons.calendar_month_outlined, title: 'No bookings yet', message: 'Driver reservations will appear here when they are made.');
+    if (bookings.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.calendar_month_outlined,
+        title: 'No bookings yet',
+        message: 'Driver reservations will appear here when they are made.',
+      );
+    }
     final provider = context.read<BusinessProvider>();
     return Column(
       children: bookings.map((booking) {
-        final start = DateTime.tryParse(booking['start_at']?.toString() ?? '')?.toLocal();
+        final start = DateTime.tryParse(
+          booking['start_at']?.toString() ?? '',
+        )?.toLocal();
         final status = booking['status']?.toString() ?? 'unknown';
-        final cancellable = const {'pending', 'held', 'confirmed'}.contains(status.toLowerCase());
+        final cancellable = const {
+          'pending',
+          'held',
+          'confirmed',
+        }.contains(status.toLowerCase());
         return Card(
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
-            leading: const Icon(Icons.event_available_rounded, color: AppColors.primary),
-            title: Text(booking['charger_name']?.toString() ?? 'Unknown charger'),
-            subtitle: Text('${start == null ? 'Time unavailable' : _dateTime(start)} • ${booking['connector_type'] ?? 'Unknown connector'}'),
+            leading: const Icon(
+              Icons.event_available_rounded,
+              color: AppColors.primary,
+            ),
+            title: Text(
+              booking['charger_name']?.toString() ?? 'Unknown charger',
+            ),
+            subtitle: Text(
+              '${start == null ? 'Time unavailable' : _dateTime(start)} • ${booking['connector_type'] ?? 'Unknown connector'}',
+            ),
             trailing: allowCancel && cancellable
-                ? IconButton(tooltip: 'Cancel booking', icon: const Icon(Icons.cancel_outlined, color: AppColors.error), onPressed: () => provider.cancelBooking(booking['id'].toString()))
+                ? IconButton(
+                    tooltip: 'Cancel booking',
+                    icon: const Icon(
+                      Icons.cancel_outlined,
+                      color: AppColors.error,
+                    ),
+                    onPressed: () =>
+                        provider.cancelBooking(booking['id'].toString()),
+                  )
                 : Chip(label: Text(status.toUpperCase())),
           ),
         );
@@ -327,12 +467,27 @@ class _ReviewList extends StatelessWidget {
   final List<Map<String, dynamic>> reviews;
   @override
   Widget build(BuildContext context) {
-    if (reviews.isEmpty) return const _EmptyState(icon: Icons.rate_review_outlined, title: 'No reviews yet', message: 'Completed session feedback will be shown here.');
+    if (reviews.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.rate_review_outlined,
+        title: 'No reviews yet',
+        message: 'Completed session feedback will be shown here.',
+      );
+    }
     return Column(
       children: reviews.map((review) {
         final rating = (review['rating'] as num?)?.toDouble() ?? 0;
         final comment = review['comment']?.toString().trim();
-        return Card(margin: const EdgeInsets.only(bottom: 10), child: ListTile(leading: const Icon(Icons.star_rounded, color: AppColors.marigold), title: Text('${rating.toStringAsFixed(1)} / 5'), subtitle: Text(comment?.isNotEmpty == true ? comment! : 'No written feedback')));
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            leading: const Icon(Icons.star_rounded, color: AppColors.marigold),
+            title: Text('${rating.toStringAsFixed(1)} / 5'),
+            subtitle: Text(
+              comment?.isNotEmpty == true ? comment! : 'No written feedback',
+            ),
+          ),
+        );
       }).toList(),
     );
   }
@@ -342,72 +497,550 @@ class _RecommendationCard extends StatelessWidget {
   const _RecommendationCard(this.data);
   final Map<String, dynamic> data;
   @override
-  Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 10), child: ListTile(leading: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary), title: Text(data['recommended_action']?.toString() ?? 'Recommendation'), subtitle: Text(data['reason_code']?.toString() ?? 'Based on live demand'), trailing: Text('${_number((data['confidence'] as num?)?.toDouble().toStringAsFixed(0))}%')));
+  Widget build(BuildContext context) {
+    final confidence = (data['confidence'] as num?)?.toDouble() ?? 0;
+    final percent = confidence <= 1 ? confidence * 100 : confidence;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: const Icon(
+          Icons.auto_awesome_rounded,
+          color: AppColors.primary,
+        ),
+        title: Text(data['recommended_action']?.toString() ?? 'Recommendation'),
+        subtitle: Text(
+          data['reason_code']?.toString() ?? 'Based on live demand',
+        ),
+        trailing: Text('${percent.round()}%'),
+      ),
+    );
+  }
 }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.label, required this.value, required this.icon, required this.color});
-  final String label; final String value; final IconData icon; final Color color;
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
   @override
-  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Icon(icon, color: color, size: 22), Text(value, style: AppTypography.headlineMedium), Text(label, style: AppTypography.labelSmall)])));
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(icon, color: color, size: 22),
+          Text(value, style: AppTypography.headlineMedium),
+          Text(label, style: AppTypography.labelSmall),
+        ],
+      ),
+    ),
+  );
 }
 
 class _PageHeader extends StatelessWidget {
-  const _PageHeader({required this.eyebrow, required this.title, required this.subtitle, required this.icon});
-  final String eyebrow; final String title; final String subtitle; final IconData icon;
+  const _PageHeader({
+    required this.eyebrow,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+  final String eyebrow;
+  final String title;
+  final String subtitle;
+  final IconData icon;
   @override
-  Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(eyebrow, style: AppTypography.labelMedium.copyWith(color: AppColors.primary)), const SizedBox(height: 6), Text(title, style: AppTypography.displaySmall), const SizedBox(height: 4), Text(subtitle, style: AppTypography.bodySmall)])), CircleAvatar(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary, child: Icon(icon))]);
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              eyebrow,
+              style: AppTypography.labelMedium.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(title, style: AppTypography.displaySmall),
+            const SizedBox(height: 4),
+            Text(subtitle, style: AppTypography.bodySmall),
+          ],
+        ),
+      ),
+      CircleAvatar(
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.onPrimary,
+        child: Icon(icon),
+      ),
+    ],
+  );
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title); final String title;
+  const _SectionTitle(this.title);
+  final String title;
   @override
-  Widget build(BuildContext context) => Text(title, style: AppTypography.labelMedium.copyWith(letterSpacing: 1.1, color: AppColors.secondary));
+  Widget build(BuildContext context) => Text(
+    title,
+    style: AppTypography.labelMedium.copyWith(
+      letterSpacing: 1.1,
+      color: AppColors.secondary,
+    ),
+  );
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.icon, required this.title, required this.message});
-  final IconData icon; final String title; final String message;
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+  final IconData icon;
+  final String title;
+  final String message;
   @override
-  Widget build(BuildContext context) => Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [Icon(icon, size: 40, color: AppColors.textMuted), const SizedBox(height: 10), Text(title, style: AppTypography.headlineSmall, textAlign: TextAlign.center), const SizedBox(height: 4), Text(message, style: AppTypography.bodySmall, textAlign: TextAlign.center)])));
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: AppColors.textMuted),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: AppTypography.headlineSmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message,
+            style: AppTypography.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message}); final String message;
+  const _ErrorBanner({required this.message});
+  final String message;
   @override
-  Widget build(BuildContext context) => Card(color: AppColors.error.withValues(alpha: 0.08), child: Padding(padding: const EdgeInsets.all(12), child: Text(message, style: const TextStyle(color: AppColors.error))));
+  Widget build(BuildContext context) => Card(
+    color: AppColors.error.withValues(alpha: 0.08),
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Text(message, style: const TextStyle(color: AppColors.error)),
+    ),
+  );
 }
 
 class _BusinessOnboarding extends StatefulWidget {
-  const _BusinessOnboarding({required this.onCreated}); final Future<void> Function() onCreated;
-  @override State<_BusinessOnboarding> createState() => _BusinessOnboardingState();
+  const _BusinessOnboarding({required this.onCreated});
+  final Future<void> Function() onCreated;
+  @override
+  State<_BusinessOnboarding> createState() => _BusinessOnboardingState();
 }
 
 class _BusinessOnboardingState extends State<_BusinessOnboarding> {
-  final _name = TextEditingController(); final _category = TextEditingController(text: 'charging_host'); final _address = TextEditingController(); final _lat = TextEditingController(); final _lng = TextEditingController();
-  @override void dispose() { _name.dispose(); _category.dispose(); _address.dispose(); _lat.dispose(); _lng.dispose(); super.dispose(); }
+  final _name = TextEditingController();
+  final _category = TextEditingController(text: 'charging_host');
+  final _address = TextEditingController();
+  final _lat = TextEditingController();
+  final _lng = TextEditingController();
+  @override
+  void dispose() {
+    _name.dispose();
+    _category.dispose();
+    _address.dispose();
+    _lat.dispose();
+    _lng.dispose();
+    super.dispose();
+  }
+
   Future<void> _submit() async {
-    final latitude = double.tryParse(_lat.text.trim()); final longitude = double.tryParse(_lng.text.trim());
-    if (_name.text.trim().isEmpty || latitude == null || longitude == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter business name and valid latitude/longitude.'))); return; }
-    final ok = await context.read<BusinessProvider>().createBusiness(name: _name.text.trim(), category: _category.text.trim(), address: _address.text.trim(), latitude: latitude, longitude: longitude);
+    final latitude = double.tryParse(_lat.text.trim());
+    final longitude = double.tryParse(_lng.text.trim());
+    if (_name.text.trim().isEmpty || latitude == null || longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter business name and valid latitude/longitude.'),
+        ),
+      );
+      return;
+    }
+    final ok = await context.read<BusinessProvider>().createBusiness(
+      name: _name.text.trim(),
+      category: _category.text.trim(),
+      address: _address.text.trim(),
+      latitude: latitude,
+      longitude: longitude,
+    );
     if (ok) await widget.onCreated();
   }
+
   @override
-  Widget build(BuildContext context) => Scaffold(body: SafeArea(child: ListView(padding: const EdgeInsets.all(24), children: [const Icon(Icons.business_rounded, size: 56, color: AppColors.primary), const SizedBox(height: 14), Text('Register your business', style: AppTypography.displaySmall), const SizedBox(height: 6), const Text('We need the real location so drivers can discover your chargers accurately.'), const SizedBox(height: 20), _input(_name, 'Business name'), _input(_category, 'Category'), _input(_address, 'Address'), Row(children: [Expanded(child: _input(_lat, 'Latitude', keyboard: const TextInputType.numberWithOptions(decimal: true))), const SizedBox(width: 10), Expanded(child: _input(_lng, 'Longitude', keyboard: const TextInputType.numberWithOptions(decimal: true)))]), const SizedBox(height: 12), FilledButton(onPressed: _submit, child: const Text('CREATE BUSINESS'))])));
-  Widget _input(TextEditingController controller, String label, {TextInputType? keyboard}) => Padding(padding: const EdgeInsets.only(bottom: 12), child: TextField(controller: controller, keyboardType: keyboard, inputFormatters: keyboard == null ? null : [FilteringTextInputFormatter.allow(RegExp(r'[-.0-9]'))], decoration: InputDecoration(labelText: label)));
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const Icon(
+            Icons.business_rounded,
+            size: 56,
+            color: AppColors.primary,
+          ),
+          const SizedBox(height: 14),
+          Text('Register your business', style: AppTypography.displaySmall),
+          const SizedBox(height: 6),
+          const Text(
+            'We need the real location so drivers can discover your chargers accurately.',
+          ),
+          const SizedBox(height: 20),
+          _input(_name, 'Business name'),
+          _input(_category, 'Category'),
+          _input(_address, 'Address'),
+          Row(
+            children: [
+              Expanded(
+                child: _input(
+                  _lat,
+                  'Latitude',
+                  keyboard: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _input(
+                  _lng,
+                  'Longitude',
+                  keyboard: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: _submit,
+            child: const Text('CREATE BUSINESS'),
+          ),
+        ],
+      ),
+    ),
+  );
+  Widget _input(
+    TextEditingController controller,
+    String label, {
+    TextInputType? keyboard,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: TextField(
+      controller: controller,
+      keyboardType: keyboard,
+      inputFormatters: keyboard == null
+          ? null
+          : [FilteringTextInputFormatter.allow(RegExp(r'[-.0-9]'))],
+      decoration: InputDecoration(labelText: label),
+    ),
+  );
 }
 
 Future<void> _showAddCharger(BuildContext context) async {
-  final name = TextEditingController(); final type = TextEditingController(text: 'DC'); final power = TextEditingController(); final price = TextEditingController(text: '15'); final lat = TextEditingController(); final lng = TextEditingController();
-  await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(title: const Text('Register charger'), content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [_dialogInput(name, 'Name'), _dialogInput(type, 'Type (AC/DC)'), _dialogInput(power, 'Power kW'), _dialogInput(price, 'Price per kWh'), _dialogInput(lat, 'Latitude'), _dialogInput(lng, 'Longitude')])), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CANCEL')), FilledButton(onPressed: () async { final p = double.tryParse(power.text); final la = double.tryParse(lat.text); final lo = double.tryParse(lng.text); final pr = double.tryParse(price.text); if (name.text.trim().isEmpty || p == null || la == null || lo == null || pr == null) return; final ok = await context.read<BusinessProvider>().createCharger(name: name.text.trim(), chargerType: type.text.trim(), powerKw: p, pricePerKwh: pr, latitude: la, longitude: lo); if (dialogContext.mounted && ok) Navigator.pop(dialogContext); }, child: const Text('SAVE'))]));
-  name.dispose(); type.dispose(); power.dispose(); price.dispose(); lat.dispose(); lng.dispose();
+  final name = TextEditingController();
+  final type = TextEditingController(text: 'DC');
+  final power = TextEditingController();
+  final price = TextEditingController(text: '15');
+  final lat = TextEditingController();
+  final lng = TextEditingController();
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Register charger'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _dialogInput(name, 'Name'),
+            _dialogInput(type, 'Type (AC/DC)'),
+            _dialogInput(
+              power,
+              'Power kW',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            _dialogInput(
+              price,
+              'Price per kWh',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            _dialogInput(
+              lat,
+              'Latitude',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
+            _dialogInput(
+              lng,
+              'Longitude',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('CANCEL'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final p = double.tryParse(power.text);
+            final la = double.tryParse(lat.text);
+            final lo = double.tryParse(lng.text);
+            final pr = double.tryParse(price.text);
+            if (name.text.trim().isEmpty ||
+                p == null ||
+                la == null ||
+                lo == null ||
+                pr == null) {
+              return;
+            }
+            final ok = await context.read<BusinessProvider>().createCharger(
+              name: name.text.trim(),
+              chargerType: type.text.trim(),
+              powerKw: p,
+              pricePerKwh: pr,
+              latitude: la,
+              longitude: lo,
+            );
+            if (dialogContext.mounted && ok) Navigator.pop(dialogContext);
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
+    ),
+  );
+  name.dispose();
+  type.dispose();
+  power.dispose();
+  price.dispose();
+  lat.dispose();
+  lng.dispose();
 }
 
-Future<void> _showBusinessKycDialog(BuildContext context, String businessId) async {
+Future<void> _showAddPort(
+  BuildContext context,
+  Map<String, dynamic> charger,
+) async {
+  final portNumber = TextEditingController();
+  final power = TextEditingController();
+  var connectorId = 1;
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text('Add port to ${charger['name'] ?? 'charger'}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: connectorId,
+                decoration: const InputDecoration(labelText: 'Connector'),
+                items: const [
+                  DropdownMenuItem(value: 1, child: Text('CCS2')),
+                  DropdownMenuItem(value: 2, child: Text('Type 2')),
+                  DropdownMenuItem(value: 3, child: Text('CHAdeMO')),
+                  DropdownMenuItem(value: 4, child: Text('Bharat AC-001')),
+                  DropdownMenuItem(value: 5, child: Text('Bharat DC-001')),
+                  DropdownMenuItem(value: 6, child: Text('Type 1')),
+                  DropdownMenuItem(value: 7, child: Text('GB/T')),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => connectorId = value);
+                },
+              ),
+              _dialogInput(
+                portNumber,
+                'Port number',
+                keyboard: TextInputType.number,
+              ),
+              _dialogInput(
+                power,
+                'Maximum power (kW)',
+                keyboard: const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'After adding the port, use “Set availability” to publish host-approved time windows.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('CANCEL'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final number = int.tryParse(portNumber.text.trim());
+              final maxPower = double.tryParse(power.text.trim());
+              if (number == null ||
+                  number <= 0 ||
+                  maxPower == null ||
+                  maxPower <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Enter a valid port number and power.'),
+                  ),
+                );
+                return;
+              }
+              final ok = await context.read<BusinessProvider>().createPort(
+                chargerId: charger['id'].toString(),
+                connectorTypeId: connectorId,
+                portNumber: number,
+                maxPowerKw: maxPower,
+              );
+              if (ok && dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            child: const Text('ADD PORT'),
+          ),
+        ],
+      ),
+    ),
+  );
+  portNumber.dispose();
+  power.dispose();
+}
+
+Future<void> _showAvailability(
+  BuildContext context,
+  Map<String, dynamic> charger,
+) async {
+  final rawPorts = (charger['ports'] as List<dynamic>? ?? const [])
+      .whereType<Map>()
+      .map((port) => Map<String, dynamic>.from(port))
+      .toList();
+  if (rawPorts.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Add a connector port before publishing availability.'),
+      ),
+    );
+    return;
+  }
+  final start = TextEditingController(text: '08:00');
+  final end = TextEditingController(text: '22:00');
+  var day = DateTime.now().weekday - 1;
+  var portId = rawPorts.first['id'].toString();
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text('Publish availability · ${charger['name'] ?? ''}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: portId,
+                decoration: const InputDecoration(labelText: 'Port'),
+                items: [
+                  for (final port in rawPorts)
+                    DropdownMenuItem(
+                      value: port['id'].toString(),
+                      child: Text('Port ${port['port_number'] ?? ''}'),
+                    ),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => portId = value);
+                },
+              ),
+              DropdownButtonFormField<int>(
+                initialValue: day,
+                decoration: const InputDecoration(labelText: 'Day'),
+                items: const [
+                  DropdownMenuItem(value: 0, child: Text('Monday')),
+                  DropdownMenuItem(value: 1, child: Text('Tuesday')),
+                  DropdownMenuItem(value: 2, child: Text('Wednesday')),
+                  DropdownMenuItem(value: 3, child: Text('Thursday')),
+                  DropdownMenuItem(value: 4, child: Text('Friday')),
+                  DropdownMenuItem(value: 5, child: Text('Saturday')),
+                  DropdownMenuItem(value: 6, child: Text('Sunday')),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => day = value);
+                },
+              ),
+              _dialogInput(start, 'Start time (HH:MM)'),
+              _dialogInput(end, 'End time (HH:MM)'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('CANCEL'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final validTime = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$');
+              if (!validTime.hasMatch(start.text.trim()) ||
+                  !validTime.hasMatch(end.text.trim()) ||
+                  start.text.trim().compareTo(end.text.trim()) >= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Use valid times and ensure end is after start.',
+                    ),
+                  ),
+                );
+                return;
+              }
+              final ok = await context
+                  .read<BusinessProvider>()
+                  .createAvailability(
+                    portId: portId,
+                    dayOfWeek: day,
+                    startTime: start.text.trim(),
+                    endTime: end.text.trim(),
+                  );
+              if (ok && dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            child: const Text('PUBLISH'),
+          ),
+        ],
+      ),
+    ),
+  );
+  start.dispose();
+  end.dispose();
+}
+
+Future<void> _showBusinessKycDialog(
+  BuildContext context,
+  String businessId,
+) async {
   final gstin = TextEditingController();
   final pan = TextEditingController();
   final meter = TextEditingController();
-  final upi = TextEditingController(text: 'host@upi');
+  final upi = TextEditingController();
 
   await showDialog<void>(
     context: context,
@@ -416,9 +1049,10 @@ Future<void> _showBusinessKycDialog(BuildContext context, String businessId) asy
         children: const [
           Icon(Icons.verified_user_rounded, color: AppColors.primary),
           SizedBox(width: 8),
-          Text('Host KYC Verification'),
+          Expanded(child: Text('Host KYC Verification')),
         ],
       ),
+
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -445,22 +1079,38 @@ Future<void> _showBusinessKycDialog(BuildContext context, String businessId) asy
           onPressed: () async {
             if (gstin.text.trim().isEmpty && pan.text.trim().isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter at least GSTIN or PAN.')),
+                const SnackBar(
+                  content: Text('Please enter at least GSTIN or PAN.'),
+                ),
               );
               return;
             }
             try {
-              await context.read<BusinessProvider>().submitKyc(
+              final ok = await context.read<BusinessProvider>().submitKyc(
                 businessId: businessId,
                 gstin: gstin.text.trim().isNotEmpty ? gstin.text.trim() : null,
                 panNumber: pan.text.trim().isNotEmpty ? pan.text.trim() : null,
-                electricityMeterId: meter.text.trim().isNotEmpty ? meter.text.trim() : null,
-                payoutUpiId: upi.text.trim().isNotEmpty ? upi.text.trim() : null,
+                electricityMeterId: meter.text.trim().isNotEmpty
+                    ? meter.text.trim()
+                    : null,
+                payoutUpiId: upi.text.trim().isNotEmpty
+                    ? upi.text.trim()
+                    : null,
               );
-              if (dialogContext.mounted) {
+              if (dialogContext.mounted && ok) {
                 Navigator.pop(dialogContext);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Host KYC submitted successfully! Verification status: VERIFIED')),
+                  const SnackBar(
+                    content: Text(
+                      'Host KYC submitted. Verification status: PENDING REVIEW',
+                    ),
+                  ),
+                );
+              } else if (dialogContext.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('KYC submission failed. Please retry.'),
+                  ),
                 );
               }
             } catch (e) {
@@ -482,17 +1132,75 @@ Future<void> _showBusinessKycDialog(BuildContext context, String businessId) asy
   upi.dispose();
 }
 
-
-Widget _dialogInput(TextEditingController c, String label) => Padding(padding: const EdgeInsets.only(bottom: 10), child: TextField(controller: c, decoration: InputDecoration(labelText: label), keyboardType: label == 'Name' || label.startsWith('Type') ? TextInputType.text : const TextInputType.numberWithOptions(decimal: true)));
-List<Map<String, dynamic>> _listOfMaps(dynamic value) => (value as List<dynamic>? ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
-String _number(dynamic value) => value is num ? (value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(1)) : '0';
+Widget _dialogInput(
+  TextEditingController c,
+  String label, {
+  TextInputType keyboard = TextInputType.text,
+}) => Padding(
+  padding: const EdgeInsets.only(bottom: 10),
+  child: TextField(
+    controller: c,
+    decoration: InputDecoration(labelText: label),
+    keyboardType: keyboard,
+  ),
+);
+List<Map<String, dynamic>> _listOfMaps(dynamic value) =>
+    (value as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+String _number(dynamic value) => value is num
+    ? (value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(1))
+    : '0';
 String _rupees(dynamic value) => '₹${_number(value)}';
-String _minutes(dynamic value) { final mins = (value as num?)?.toDouble() ?? 0; return mins >= 60 ? '${(mins / 60).toStringAsFixed(1)} h' : '${mins.toStringAsFixed(0)} m'; }
-String _dateTime(DateTime value) => '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-Color _statusColor(String status) { switch (status.toLowerCase()) { case 'available': return AppColors.success; case 'maintenance': return AppColors.marigold; case 'unavailable': return AppColors.coral; default: return AppColors.textMuted; } }
+String _minutes(dynamic value) {
+  final mins = (value as num?)?.toDouble() ?? 0;
+  return mins >= 60
+      ? '${(mins / 60).toStringAsFixed(1)} h'
+      : '${mins.toStringAsFixed(0)} m';
+}
+
+String _dateTime(DateTime value) =>
+    '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+Color _statusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'available':
+      return AppColors.success;
+    case 'maintenance':
+      return AppColors.marigold;
+    case 'unavailable':
+      return AppColors.coral;
+    default:
+      return AppColors.textMuted;
+  }
+}
 
 class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.selectedIndex, required this.onChanged}); final int selectedIndex; final ValueChanged<int> onChanged;
+  const _BottomNav({required this.selectedIndex, required this.onChanged});
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
   @override
-  Widget build(BuildContext context) => NavigationBar(selectedIndex: selectedIndex, onDestinationSelected: onChanged, destinations: const [NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Home'), NavigationDestination(icon: Icon(Icons.ev_station_rounded), label: 'Chargers'), NavigationDestination(icon: Icon(Icons.calendar_today_rounded), label: 'Bookings'), NavigationDestination(icon: Icon(Icons.insights_rounded), label: 'Analytics'), NavigationDestination(icon: Icon(Icons.person_outline_rounded), label: 'Profile')]);
+  Widget build(BuildContext context) => NavigationBar(
+    selectedIndex: selectedIndex,
+    onDestinationSelected: onChanged,
+    destinations: const [
+      NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Home'),
+      NavigationDestination(
+        icon: Icon(Icons.ev_station_rounded),
+        label: 'Chargers',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.calendar_today_rounded),
+        label: 'Bookings',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.insights_rounded),
+        label: 'Analytics',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.person_outline_rounded),
+        label: 'Profile',
+      ),
+    ],
+  );
 }

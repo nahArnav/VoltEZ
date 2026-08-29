@@ -120,8 +120,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         ConnectorType.ccs2 => 1,
         ConnectorType.type2 => 2,
         ConnectorType.chademo => 3,
-        ConnectorType.gbT => 4,
-        ConnectorType.type1 => 2,
+        ConnectorType.gbT => 7,
+        ConnectorType.type1 => 6,
         ConnectorType.bharatAc => 4,
         ConnectorType.bharatDc => 5,
       };
@@ -134,9 +134,14 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       );
       setState(() => _step--);
     } else {
-      context.pop();
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/driver/home');
+      }
     }
   }
+
 
   bool get _canProceed {
     switch (_step) {

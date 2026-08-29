@@ -96,7 +96,11 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
                 const SizedBox(height: 16),
                 Text(_loadError!, style: AppTypography.bodyLarge, textAlign: TextAlign.center),
                 const SizedBox(height: 20),
-                FilledButton(onPressed: () => context.pop(), child: const Text('GO BACK')),
+                FilledButton(
+                  onPressed: () => context.canPop() ? context.pop() : context.go('/driver/home'),
+                  child: const Text('GO BACK'),
+                ),
+
               ],
             ),
           ),
