@@ -277,6 +277,31 @@ class BookingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Verify a hosted Stripe Checkout session after returning to the app.
+  Future<void> processStripePayment() async {
+    if (_paymentOrder == null || _holdResult == null) return;
+
+    _phase = BookingPhase.paymentProcessing;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      _confirmedBooking = await _api.verifyStripePayment(
+        bookingId: _holdResult!.bookingId,
+        checkoutSessionId: _paymentOrder!.orderId,
+      );
+      _stopCountdown();
+      _phase = BookingPhase.confirmed;
+    } on PaymentFailedException catch (e) {
+      _errorMessage = e.message;
+      _phase = BookingPhase.paymentFailed;
+    } catch (_) {
+      _errorMessage =
+          'Stripe payment is not confirmed yet. If you paid, retry in a moment.';
+      _phase = BookingPhase.paymentFailed;
+    }
+    notifyListeners();
+  }
+
   /// Retry payment after failure.
   void retryPayment() {
     _errorMessage = null;

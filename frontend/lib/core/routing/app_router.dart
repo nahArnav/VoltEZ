@@ -36,7 +36,8 @@ class AppRouter {
     refreshListenable: _auth,
     redirect: (context, state) {
       final isLoggedIn = _auth.isLoggedIn;
-      final isAuthRoute = state.matchedLocation == '/splash' ||
+      final isAuthRoute =
+          state.matchedLocation == '/splash' ||
           state.matchedLocation == '/login' ||
           state.matchedLocation == '/role-selection';
 
@@ -60,10 +61,7 @@ class AppRouter {
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/role-selection',
         builder: (context, state) => const RoleSelectionScreen(),
@@ -80,9 +78,8 @@ class AppRouter {
       ),
       GoRoute(
         path: '/driver/charger/:id',
-        builder: (context, state) => ChargerDetailsScreen(
-          chargerId: state.pathParameters['id'] ?? '',
-        ),
+        builder: (context, state) =>
+            ChargerDetailsScreen(chargerId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: '/driver/booking',
@@ -114,7 +111,9 @@ class AppRouter {
       ),
       GoRoute(
         path: '/driver/onboarding',
-        builder: (context, state) => const DriverOnboardingScreen(),
+        builder: (context, state) => DriverOnboardingScreen(
+          vehicleToEdit: state.extra is Vehicle ? state.extra as Vehicle : null,
+        ),
       ),
 
       // ─── Business Routes (Person 2) ───

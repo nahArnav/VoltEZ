@@ -31,8 +31,7 @@ class SlotInfo {
   final double pricePerKwh;
   final DateTime? lastUpdated;
 
-  int get durationMinutes =>
-      endTime.difference(startTime).inMinutes;
+  int get durationMinutes => endTime.difference(startTime).inMinutes;
 
   bool get isAvailable => status == SlotStatus.available;
 
@@ -92,11 +91,15 @@ class PaymentOrder {
     required this.orderId,
     required this.amount,
     required this.bookingId,
+    this.provider = 'razorpay',
+    this.checkoutUrl,
   });
 
   final String orderId;
   final double amount;
   final String bookingId;
+  final String provider;
+  final String? checkoutUrl;
 }
 
 /// Final confirmed booking data from the backend.
@@ -132,10 +135,7 @@ class ConfirmedBooking {
 
 abstract class BookingApi {
   /// GET /availability — fetch slots for a charger on a given date.
-  Future<List<SlotInfo>> getAvailability(
-    String chargerId,
-    DateTime date,
-  );
+  Future<List<SlotInfo>> getAvailability(String chargerId, DateTime date);
 
   /// POST /bookings/hold — hold a slot for the driver.
   /// Returns [HoldResult] with hold_expires_at from the backend.
@@ -163,6 +163,12 @@ abstract class BookingApi {
     required String bookingId,
     required String paymentId,
     required String signature,
+  });
+
+  /// Verify a Stripe Checkout session after the hosted page reports success.
+  Future<ConfirmedBooking> verifyStripePayment({
+    required String bookingId,
+    required String checkoutSessionId,
   });
 
   /// POST /bookings/{id}/cancel — release a held/confirmed booking.
@@ -202,20 +208,21 @@ class LiveBookingApi implements BookingApi {
         final openSlot = rawSlot as Map<String, dynamic>;
         final start = DateTime.parse(openSlot['start_at'] as String).toLocal();
         final end = DateTime.parse(openSlot['end_at'] as String).toLocal();
-        slots.add(SlotInfo(
-          id: '$portId|${start.toUtc().toIso8601String()}|${end.toUtc().toIso8601String()}',
-          chargerId: chargerId,
-          portName: 'Port ${port['port_number']}',
-          connectorType: _connectorName(
-            (port['connector_type_id'] as num?)?.toInt() ?? 1,
+        slots.add(
+          SlotInfo(
+            id: '$portId|${start.toUtc().toIso8601String()}|${end.toUtc().toIso8601String()}',
+            chargerId: chargerId,
+            portName: 'Port ${port['port_number']}',
+            connectorType: _connectorName(
+              (port['connector_type_id'] as num?)?.toInt() ?? 1,
+            ),
+            startTime: start,
+            endTime: end,
+            status: SlotStatus.available,
+            pricePerKwh: (openSlot['price_per_kwh'] as num?)?.toDouble() ?? 0,
+            lastUpdated: DateTime.now(),
           ),
-          startTime: start,
-          endTime: end,
-          status: SlotStatus.available,
-          pricePerKwh:
-              (openSlot['price_per_kwh'] as num?)?.toDouble() ?? 0,
-          lastUpdated: DateTime.now(),
-        ));
+        );
       }
     }
     slots.sort((a, b) => a.startTime.compareTo(b.startTime));
@@ -283,6 +290,8 @@ class LiveBookingApi implements BookingApi {
       orderId: json['provider_order_id']?.toString() ?? '',
       amount: (json['amount'] as num?)?.toDouble() ?? amount,
       bookingId: json['booking_id']?.toString() ?? bookingId,
+      provider: json['provider']?.toString() ?? 'razorpay',
+      checkoutUrl: json['checkout_url']?.toString(),
     );
   }
 
@@ -338,6 +347,33 @@ class LiveBookingApi implements BookingApi {
   }
 
   @override
+  Future<ConfirmedBooking> verifyStripePayment({
+    required String bookingId,
+    required String checkoutSessionId,
+  }) async {
+    await _api.verifyStripePayment({
+      'booking_id': bookingId,
+      'checkout_session_id': checkoutSessionId,
+    });
+    final response = await _api.getBooking(bookingId);
+    final json = response.data as Map<String, dynamic>;
+    final start = DateTime.parse(json['start_at'] as String).toLocal();
+    final end = DateTime.parse(json['end_at'] as String).toLocal();
+    return ConfirmedBooking(
+      bookingId: json['id'].toString(),
+      chargerName: json['charger_name']?.toString() ?? 'Unknown charger',
+      chargerAddress: json['charger_address']?.toString() ?? 'Unknown location',
+      date: '${start.day}/${start.month}/${start.year}',
+      startTime: _clock(start),
+      endTime: _clock(end),
+      connectorType: json['connector_type']?.toString() ?? 'Unknown connector',
+      powerKw: (json['power_kw'] as num?)?.toDouble() ?? 0,
+      estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0,
+      status: json['status']?.toString() ?? 'confirmed',
+    );
+  }
+
+  @override
   Future<void> cancelBooking(String bookingId) async {
     await _api.cancelBooking(bookingId);
   }
@@ -352,11 +388,13 @@ class LiveBookingApi implements BookingApi {
       return ConfirmedBooking(
         bookingId: json['id'].toString(),
         chargerName: json['charger_name']?.toString() ?? 'Unknown charger',
-        chargerAddress: json['charger_address']?.toString() ?? 'Unknown location',
+        chargerAddress:
+            json['charger_address']?.toString() ?? 'Unknown location',
         date: '${start.day}/${start.month}/${start.year}',
         startTime: _clock(start),
         endTime: _clock(end),
-        connectorType: json['connector_type']?.toString() ?? 'Unknown connector',
+        connectorType:
+            json['connector_type']?.toString() ?? 'Unknown connector',
         powerKw: (json['power_kw'] as num?)?.toDouble() ?? 0,
         estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0,
         status: json['status']?.toString() ?? 'held',

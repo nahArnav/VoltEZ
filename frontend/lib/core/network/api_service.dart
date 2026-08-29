@@ -153,6 +153,13 @@ class ApiService {
   Future<Response> updateMe(Map<String, dynamic> data) =>
       _dio.patch('/users/me', data: data);
 
+  /// GET /users/me/notifications
+  Future<Response> getNotifications() => _dio.get('/users/me/notifications');
+
+  /// PATCH /users/me/notifications/{id}
+  Future<Response> markNotificationRead(String id) =>
+      _dio.patch('/users/me/notifications/$id', data: {'status': 'read'});
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Vehicles — CRUD under /vehicles
   // ═══════════════════════════════════════════════════════════════════════════
@@ -192,6 +199,13 @@ class ApiService {
       'longitude': longitude,
       'radius_meters': radiusMeters,
     },
+  );
+
+  /// GET /locations/search?q=...&limit=...
+  /// The backend normalises provider results and returns real coordinates.
+  Future<Response> searchLocations(String query, {int limit = 5}) => _dio.get(
+    '/locations/search',
+    queryParameters: {'q': query, 'limit': limit},
   );
 
   /// GET /chargers/{id}
@@ -271,6 +285,10 @@ class ApiService {
   /// POST /payments/verify
   Future<Response> verifyPayment(Map<String, dynamic> data) =>
       _dio.post('/payments/verify', data: data);
+
+  /// POST /payments/stripe/verify
+  Future<Response> verifyStripePayment(Map<String, dynamic> data) =>
+      _dio.post('/payments/stripe/verify', data: data);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Sessions — POST /sessions/check-in, POST /sessions/{id}/start,
@@ -391,10 +409,11 @@ class ApiService {
   Future<Response> getBusinessKyc(String businessId) =>
       _dio.get('/businesses/$businessId/kyc');
 
-  Future<Response> submitBusinessKyc(String businessId, Map<String, dynamic> data) =>
-      _dio.post('/businesses/$businessId/kyc', data: data);
+  Future<Response> submitBusinessKyc(
+    String businessId,
+    Map<String, dynamic> data,
+  ) => _dio.post('/businesses/$businessId/kyc', data: data);
 }
-
 
 /// Adds Bearer token to every request.
 class _AuthInterceptor extends Interceptor {

@@ -8,7 +8,11 @@ import '../network/api_service.dart';
 import '../network/route_recommendation_api.dart';
 
 class LocationSuggestion {
-  const LocationSuggestion({required this.label, required this.latitude, required this.longitude});
+  const LocationSuggestion({
+    required this.label,
+    required this.latitude,
+    required this.longitude,
+  });
   final String label;
   final double latitude;
   final double longitude;
@@ -80,7 +84,8 @@ class RoutePlannerProvider extends ChangeNotifier {
   bool get hasSearched => _hasSearched;
   String? get analysisError => _analysisError;
   List<LocationSuggestion> get originSuggestions => _originSuggestions;
-  List<LocationSuggestion> get destinationSuggestions => _destinationSuggestions;
+  List<LocationSuggestion> get destinationSuggestions =>
+      _destinationSuggestions;
 
   bool get isRouteValid =>
       _originName.isNotEmpty &&
@@ -103,7 +108,7 @@ class RoutePlannerProvider extends ChangeNotifier {
   String? _vehiclesError;
   String? get vehiclesError => _vehiclesError;
 
-  Future<void> loadVehicles() async {
+  Future<void> loadVehicles({String? selectedVehicleId}) async {
     _vehiclesError = null;
     try {
       final response = await _apiService.getVehicles();
@@ -114,8 +119,20 @@ class RoutePlannerProvider extends ChangeNotifier {
             (item) => Vehicle.fromJson(item as Map<String, dynamic>),
           ),
         );
-      if (_selectedVehicle == null && availableVehicles.isNotEmpty) {
-        _selectedVehicle = availableVehicles.first;
+      if (availableVehicles.isNotEmpty) {
+        final requested = selectedVehicleId == null
+            ? null
+            : availableVehicles
+                  .where((v) => v.id == selectedVehicleId)
+                  .firstOrNull;
+        if (requested != null || _selectedVehicle == null) {
+          _selectedVehicle = requested ?? availableVehicles.first;
+        } else {
+          final refreshed = availableVehicles
+              .where((v) => v.id == _selectedVehicle!.id)
+              .firstOrNull;
+          _selectedVehicle = refreshed ?? availableVehicles.first;
+        }
       }
     } catch (error) {
       availableVehicles.clear();
@@ -204,22 +221,49 @@ class RoutePlannerProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    _destinationSearchTimer = Timer(const Duration(milliseconds: 350), () async {
-      final results = await _searchAddress(query.trim());
-      if (token != _destinationSearchToken) return;
-      _destinationSuggestions = results;
-      notifyListeners();
-    });
+    _destinationSearchTimer = Timer(
+      const Duration(milliseconds: 350),
+      () async {
+        final results = await _searchAddress(query.trim());
+        if (token != _destinationSearchToken) return;
+        _destinationSuggestions = results;
+        notifyListeners();
+      },
+    );
   }
 
   Future<List<LocationSuggestion>> _searchAddress(String query) async {
+    // Prefer the backend geocoder so suggestions are ranked, labelled and
+    // coordinate-backed consistently on Android, iOS and web. The platform
+    // geocoder remains a local fallback for offline development.
+    try {
+      final response = await _apiService.searchLocations(query);
+      final data = response.data;
+      if (data is List && data.isNotEmpty) {
+        return data
+            .whereType<Map>()
+            .map(
+              (item) => LocationSuggestion(
+                label: item['display_name']?.toString() ?? query,
+                latitude: (item['latitude'] as num).toDouble(),
+                longitude: (item['longitude'] as num).toDouble(),
+              ),
+            )
+            .toList();
+      }
+    } catch (_) {
+      // Fall through to the OS geocoder when the API/provider is unavailable.
+    }
     try {
       final locations = await locationFromAddress(query);
       final suggestions = <LocationSuggestion>[];
       for (final location in locations.take(5)) {
         var label = query;
         try {
-          final placemarks = await placemarkFromCoordinates(location.latitude, location.longitude);
+          final placemarks = await placemarkFromCoordinates(
+            location.latitude,
+            location.longitude,
+          );
           if (placemarks.isNotEmpty) {
             final p = placemarks.first;
             label = [p.name, p.street, p.locality, p.administrativeArea]
@@ -232,7 +276,13 @@ class RoutePlannerProvider extends ChangeNotifier {
         } catch (_) {
           // Coordinate results are still valid even if reverse labelling fails.
         }
-        suggestions.add(LocationSuggestion(label: label, latitude: location.latitude, longitude: location.longitude));
+        suggestions.add(
+          LocationSuggestion(
+            label: label,
+            latitude: location.latitude,
+            longitude: location.longitude,
+          ),
+        );
       }
       return suggestions;
     } catch (_) {
@@ -242,12 +292,20 @@ class RoutePlannerProvider extends ChangeNotifier {
 
   void selectOriginSuggestion(LocationSuggestion suggestion) {
     _originSuggestions = const [];
-    setOrigin(suggestion.label, lat: suggestion.latitude, lng: suggestion.longitude);
+    setOrigin(
+      suggestion.label,
+      lat: suggestion.latitude,
+      lng: suggestion.longitude,
+    );
   }
 
   void selectDestinationSuggestion(LocationSuggestion suggestion) {
     _destinationSuggestions = const [];
-    setDestination(suggestion.label, lat: suggestion.latitude, lng: suggestion.longitude);
+    setDestination(
+      suggestion.label,
+      lat: suggestion.latitude,
+      lng: suggestion.longitude,
+    );
   }
 
   /// Resolve typed origin/destination names with the platform geocoder.
@@ -259,7 +317,7 @@ class RoutePlannerProvider extends ChangeNotifier {
         (_originLat == null || _originLng == null) &&
         _originName.trim().isNotEmpty) {
       try {
-        final matches = await locationFromAddress(_originName.trim());
+        final matches = await _searchAddress(_originName.trim());
         if (matches.isNotEmpty) {
           _originLat = matches.first.latitude;
           _originLng = matches.first.longitude;
@@ -274,7 +332,7 @@ class RoutePlannerProvider extends ChangeNotifier {
     if ((_destinationLat == null || _destinationLng == null) &&
         _destinationName.trim().isNotEmpty) {
       try {
-        final matches = await locationFromAddress(_destinationName.trim());
+        final matches = await _searchAddress(_destinationName.trim());
         if (matches.isNotEmpty) {
           _destinationLat = matches.first.latitude;
           _destinationLng = matches.first.longitude;

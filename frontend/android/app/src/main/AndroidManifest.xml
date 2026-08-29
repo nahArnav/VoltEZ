@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Required for the live FastAPI API, map tiles, geocoding and hosted
+         payment checkout on every build variant (debug, profile and release). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <!-- Location permissions for geolocator -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>

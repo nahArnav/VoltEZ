@@ -19,6 +19,27 @@ class BusinessProvider extends ChangeNotifier {
   bool get needsOnboarding => !isLoading && business == null;
   String? get businessId => business?['id']?.toString();
 
+  /// Dashboard metrics are authoritative when the analytics endpoint responds.
+  /// The charger count fallback keeps the owner UI truthful during a partial
+  /// outage (for example, analytics unavailable while the fleet API is up).
+  int get displayedChargerCount => dashboard['chargers'] is num
+      ? (dashboard['chargers'] as num).toInt()
+      : chargers.length;
+
+  int get displayedActiveChargerCount {
+    if (dashboard['active_chargers'] is num) {
+      return (dashboard['active_chargers'] as num).toInt();
+    }
+    return chargers.where((charger) {
+      final status = charger['status']?.toString().toLowerCase();
+      final ports = (charger['ports'] as List<dynamic>? ?? const []);
+      return status == 'available' &&
+          ports.any(
+            (port) => port is Map && (port['is_active'] as bool? ?? true),
+          );
+    }).length;
+  }
+
   Future<void> load() async {
     isLoading = true;
     errorMessage = null;
@@ -48,27 +69,36 @@ class BusinessProvider extends ChangeNotifier {
   Future<void> _loadBusinessData() async {
     final id = businessId;
     if (id == null) return;
-    String? firstError;
+    String? requiredError;
     await Future.wait<void>([
       () async {
         try {
           chargers = _maps((await _api.getBusinessChargers(id)).data);
         } catch (error) {
-          firstError ??= _message(error);
+          requiredError ??= _message(error);
         }
       }(),
       () async {
         try {
-          bookings = _maps((await _api.getBusinessBookings(id)).data);
+          // The API enforces this filter as well. Keep the client defensive so
+          // an older server cannot accidentally show cancelled/expired work
+          // in the owner's actionable bookings list.
+          bookings = _maps((await _api.getBusinessBookings(id)).data)
+              .where(
+                (booking) =>
+                    booking['status']?.toString().toLowerCase() == 'confirmed',
+              )
+              .toList();
         } catch (error) {
-          firstError ??= _message(error);
+          requiredError ??= _message(error);
         }
       }(),
       () async {
         try {
           recommendations = _maps((await _api.getAnalytics(id)).data);
         } catch (error) {
-          firstError ??= _message(error);
+          // Recommendations are an enhancement. Keep the operational
+          // dashboard usable when the optional ML insight endpoint is absent.
         }
       }(),
       () async {
@@ -77,11 +107,11 @@ class BusinessProvider extends ChangeNotifier {
             (await _api.getBusinessDashboard(id)).data as Map,
           );
         } catch (error) {
-          firstError ??= _message(error);
+          requiredError ??= _message(error);
         }
       }(),
     ]);
-    errorMessage = firstError;
+    errorMessage = requiredError;
   }
 
   Future<bool> createBusiness({
@@ -112,22 +142,38 @@ class BusinessProvider extends ChangeNotifier {
     required double latitude,
     required double longitude,
     String? addressText,
+    int? connectorTypeId,
+    int? portNumber,
+    double? portMaxPowerKw,
+    String accessType = 'public',
   }) async {
     final id = businessId;
     if (id == null) return false;
     return _mutate(() async {
-      await _api.createCharger({
+      final payload = <String, dynamic>{
         'business_id': id,
         'name': name,
         'charger_type': chargerType,
         'power_kw': powerKw,
         'price_per_kwh': pricePerKwh,
         'status': 'available',
+        'access_type': accessType,
         'latitude': latitude,
         'longitude': longitude,
-        if (addressText != null && addressText.trim().isNotEmpty)
-          'address_text': addressText.trim(),
-      });
+      };
+      if (connectorTypeId != null) {
+        payload['connector_type_id'] = connectorTypeId;
+      }
+      if (portNumber != null) {
+        payload['port_number'] = portNumber;
+      }
+      if (portMaxPowerKw != null) {
+        payload['port_max_power_kw'] = portMaxPowerKw;
+      }
+      if (addressText != null && addressText.trim().isNotEmpty) {
+        payload['address_text'] = addressText.trim();
+      }
+      await _api.createCharger(payload);
       await _loadBusinessData();
     });
   }
