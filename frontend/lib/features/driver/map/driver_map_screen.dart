@@ -150,7 +150,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   // ─── OpenStreetMap ───
   Widget _buildMap(ChargerDiscoveryProvider discovery, latlong.LatLng center) {
     // Collect recommended charger IDs
-    final recIds = <int>{};
+    final recIds = <String>{};
     try {
       final planner = context.read<RoutePlannerProvider>();
       for (final r in planner.recommendations) {
