@@ -1,249 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/providers/business_provider.dart';
 import '../../../core/theme/colors.dart';
-import '../../../core/theme/typography.dart';
-import '../../../shared/widgets/widgets.dart';
 
-class PortDetailsScreen extends StatefulWidget {
-  final String chargerName;
-
-  const PortDetailsScreen({
-    super.key,
-    required this.chargerName,
-  });
-
-  @override
-  State<PortDetailsScreen> createState() => _PortDetailsScreenState();
-}
-
-class _PortDetailsScreenState extends State<PortDetailsScreen> {
-  final List<Map<String, dynamic>> ports = [
-    {
-      "id": "P1",
-      "connector": "CCS2",
-      "power": 60,
-      "status": "available",
-    },
-    {
-      "id": "P2",
-      "connector": "CCS2",
-      "power": 60,
-      "status": "occupied",
-    },
-    {
-      "id": "P3",
-      "connector": "Type 2",
-      "power": 22,
-      "status": "offline",
-    },
-    {
-      "id": "P4",
-      "connector": "CHAdeMO",
-      "power": 50,
-      "status": "available",
-    },
-  ];
-
-  Color getColor(String status) {
-    switch (status) {
-      case "available":
-        return AppColors.success;
-      case "occupied":
-        return AppColors.marigold;
-      case "offline":
-        return AppColors.error;
-      default:
-        return AppColors.warning;
-    }
-  }
+/// Live port details retained for deep links from older builds. It reads the
+/// selected station from the business API and never creates local port rows.
+class PortDetailsScreen extends StatelessWidget {
+  const PortDetailsScreen({super.key, this.chargerId, this.chargerName});
+  final String? chargerId;
+  final String? chargerName;
 
   @override
   Widget build(BuildContext context) {
+    final chargers = context.watch<BusinessProvider>().chargers;
+    final charger = chargers.cast<Map<String, dynamic>?>().firstWhere(
+          (item) => chargerId != null && item?['id']?.toString() == chargerId || chargerName != null && item?['name']?.toString() == chargerName,
+          orElse: () => null,
+        );
+    final ports = (charger?['ports'] as List<dynamic>? ?? const []).whereType<Map>().toList();
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        foregroundColor: AppColors.textPrimary,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Port Details",
-              style: AppTypography.headlineMedium.copyWith(
-                color: AppColors.textPrimary,
-              ),
+      appBar: AppBar(title: Text(charger?['name']?.toString() ?? chargerName ?? 'Port details')),
+      body: ports.isEmpty
+          ? const Center(child: Text('No live ports found for this charger.'))
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: ports.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final port = ports[index];
+                final active = port['is_active'] as bool? ?? true;
+                return Card(
+                  child: ListTile(
+                    leading: Icon(Icons.power_rounded, color: active ? AppColors.success : AppColors.textMuted),
+                    title: Text('Port ${port['port_number'] ?? index + 1}'),
+                    subtitle: Text('${port['connector_type'] ?? 'Connector'} • ${port['max_power_kw'] ?? '—'} kW'),
+                    trailing: Text(active ? 'ACTIVE' : 'INACTIVE'),
+                  ),
+                );
+              },
             ),
-            Text(
-              widget.chargerName,
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            GlassCard(
-              padding: const EdgeInsets.all(18),
-              borderRadius: 18,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: const [
-                  _TopMetric("4", "Ports"),
-                  _TopMetric("2", "Available"),
-                  _TopMetric("1", "In Use"),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Expanded(
-              child: ListView.builder(
-                itemCount: ports.length,
-                itemBuilder: (context, index) {
-                  final port = ports[index];
-
-                  return GlassCard(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(18),
-                    borderRadius: 18,
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              height: 52,
-                              width: 52,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: getColor(port["status"]).withValues(alpha: .12),
-                              ),
-                              child: const Icon(
-                                Icons.power,
-                                color: AppColors.onPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Port ${port["id"]}",
-                                    style: AppTypography.headlineSmall.copyWith(
-                                      color: AppColors.onPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    "${port["connector"]} • ${port["power"]} kW",
-                                    style: AppTypography.bodySmall.copyWith(
-                                      color: AppColors.onPrimary.withValues(alpha: 0.7),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.onPrimary.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              child: Text(
-                                port["status"].toUpperCase(),
-                                style: AppTypography.labelMedium.copyWith(
-                                  color: AppColors.onPrimary,
-                                ),
-                              ),
-                            )
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {},
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: AppColors.primary),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: Text(
-                                  "Schedule",
-                                  style: TextStyle(color: AppColors.primary),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  setState(() {
-                                    port["status"] =
-                                        port["status"] == "available"
-                                            ? "offline"
-                                            : "available";
-                                  });
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: AppColors.onPrimary,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: Text(
-                                  port["status"] == "offline"
-                                      ? "Enable"
-                                      : "Disable",
-                                ),
-                              ),
-                            )
-                          ],
-                        )
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TopMetric extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _TopMetric(this.value, this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: AppTypography.displaySmall.copyWith(
-            color: AppColors.onPrimary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTypography.bodySmall.copyWith(
-            color: AppColors.onPrimary.withValues(alpha: 0.7),
-          ),
-        ),
-      ],
     );
   }
 }
