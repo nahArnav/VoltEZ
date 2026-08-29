@@ -688,7 +688,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               Icons.directions_car_rounded,
               'My Vehicle',
               planner.selectedVehicle?.displayName ?? 'No vehicle saved',
-              () => context.go('/driver/onboarding'),
+              () => context.push(
+                '/driver/onboarding',
+                extra: planner.selectedVehicle,
+              ),
             ),
           ),
           _profileOption(
@@ -953,9 +956,8 @@ Future<void> _showDriverKycDialog(BuildContext context) async {
       ),
     ),
   );
-  docNumber.dispose();
-  rcNumber.dispose();
 }
+
 
 Future<void> _showPaymentMethodsDialog(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
@@ -1025,19 +1027,81 @@ Future<void> _showNotificationDialog(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
   if (!context.mounted) return;
   var enabled = prefs.getBool('voltez_notifications_enabled') ?? true;
+  List<Map<String, dynamic>> notifications = const [];
+  String? loadError;
+  try {
+    final response = await context.read<ApiService>().getNotifications();
+    final data = response.data;
+    if (data is List) {
+      notifications = data
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
+  } catch (error) {
+    loadError = 'Could not load server notifications. Pull to retry later.';
+  }
+  if (!context.mounted) return;
   await showDialog<void>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
         title: const Text('Notifications'),
-        content: SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Booking and session alerts'),
-          subtitle: const Text(
-            'Stored on this device and used by the app notification layer.',
+        content: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Booking and session alerts'),
+                  subtitle: const Text(
+                    'Also controls this device\'s local alert preference.',
+                  ),
+                  value: enabled,
+                  onChanged: (value) => setState(() => enabled = value),
+                ),
+                const Divider(),
+                if (loadError != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      loadError,
+                      style: const TextStyle(color: AppColors.textMuted),
+                    ),
+                  )
+                else if (notifications.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text('No notifications yet.'),
+                  )
+                else
+                  ...notifications.map(
+                    (notification) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        notification['status']?.toString() == 'unread'
+                            ? Icons.notifications_active_outlined
+                            : Icons.notifications_none_outlined,
+                        color: AppColors.primary,
+                      ),
+                      title: Text(
+                        notification['title']?.toString() ?? 'VoltEZ alert',
+                      ),
+                      subtitle: Text(notification['message']?.toString() ?? ''),
+                      isThreeLine: true,
+                      onTap: () {
+                        final id = notification['id']?.toString();
+                        if (id != null) {
+                          context.read<ApiService>().markNotificationRead(id);
+                        }
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
-          value: enabled,
-          onChanged: (value) => setState(() => enabled = value),
         ),
         actions: [
           FilledButton(

@@ -714,19 +714,20 @@ For reference, Person 1 has built:
 
 | Screen | Route | Status |
 |---|---|---|
-| Driver Home | `/driver/home` | ✅ Mock data |
-| Station Map | `/driver/map` | ✅ Google Maps (mobile) / fallback (web) |
-| Route Planner Input | `/driver/route-planner` | ✅ Mock API |
-| Route Recommendations | `/driver/recommendations` | ✅ Mock API |
-| Charger Details | `/driver/charger/:id` | ✅ From recommendations/discovery |
-| Booking (Slot Selection) | `/driver/booking` | ✅ Mock API |
-| Booking Confirmation | `/driver/booking-confirmation` | ✅ Mock API |
-| Payment | `/driver/payment` | ✅ Razorpay (mobile) / mock (web) |
-| Charging Session | `/driver/session` | ✅ Mock WebSocket |
-| Booking History | `/driver/history` | ✅ Mock API |
-| Driver Onboarding | `/driver/onboarding` | ✅ Vehicle setup |
+| Driver Home | `/driver/home` | ✅ Live API + empty states |
+| Station Map | `/driver/map` | ✅ OpenStreetMap + live chargers + place search |
+| Route Planner Input | `/driver/route-planner` | ✅ Coordinate-backed place suggestions |
+| Route Recommendations | `/driver/recommendations` | ✅ Live FastAPI/ML adapter |
+| Charger Details | `/driver/charger/:id` | ✅ Live charger/port data |
+| Booking (Slot Selection) | `/driver/booking` | ✅ Live availability + hold |
+| Booking Confirmation | `/driver/booking-confirmation` | ✅ Server-confirmed |
+| Payment | `/driver/payment` | ✅ Stripe Checkout preferred; Razorpay fallback |
+| Charging Session | `/driver/session` | ✅ Live API/WebSocket adapter |
+| Booking History | `/driver/history` | ✅ Live API |
+| Driver Onboarding | `/driver/onboarding` | ✅ Create/edit vehicle setup |
 
-All driver screens use mock adapters that are clearly named (e.g., `MockBookingApi`, `MockSessionApi`). You can study these as reference for your own mock→live pattern.
+The production screens use live adapters. Explicit `Mock*` classes remain only
+as test fixtures and are not selected by `main.dart`.
 
 ---
 

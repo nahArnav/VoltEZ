@@ -25,14 +25,17 @@ the current changes have not been committed or pushed.
 - `(backend/app/api/v1/session.py)` - Session energy/telemetry remains
   client-supplied/simulated. A real charger/OCPP/provider adapter is required
   before treating delivered energy as physical charging truth.
-- `(lib/core/network/razorpay_service.dart + web)` - The mobile Razorpay path
-  is implemented, but Flutter Razorpay has no web implementation. Web payment
-  requires a separate provider adapter if web checkout is in scope.
+- `(payments)` - Stripe hosted Checkout is now the preferred path when
+  `STRIPE_SECRET_KEY` is configured, with signed webhook and server-side
+  session verification; Razorpay remains the fallback. A real Stripe/Razorpay
+  account, webhook signing secret, return URLs, and phone smoke test are still
+  deployment tasks.
 - `(backend KYC endpoints)` - KYC values are validated/masked and persisted,
   but there is no external identity provider or human/admin review workflow.
-- `(location search)` - Charger registration and route search use the native OS
-  geocoder as a no-key fallback. It is not Google Places autocomplete and may
-  return fewer or less precise results in some regions.
+- `(location search)` - Charger registration, map search, and route search now
+  use the backend's debounced India-constrained geocoder with native OS fallback.
+  It is not Google Places autocomplete; a production Places provider/key may be
+  preferable for address-level ranking and must be configured separately.
 - `(backend/src/voltez_ml/route_energy + recommendation service)` - Model 5
   route-energy physics is packaged and tested, but the live recommendation
   endpoint still uses its bounded deterministic physics calculation; Model 5
@@ -72,6 +75,9 @@ the current changes have not been committed or pushed.
   with SHA-256 verification and used by recommendation/analytics inference;
   every prediction is recorded for auditability. Heuristic fallbacks remain
   available when development artifacts are absent.
+- `(notifications)` - Authenticated users can read and mark persisted
+  notifications through `/users/me/notifications`; OS push delivery still needs
+  FCM credentials and device-token registration.
 - `(backend/scripts/seed_demo.py)` - The deterministic demo seed is reconciled
   with the current ORM (UUID zone/connector references, normalized business
   hours and charger availability, current booking/session fields, and demand

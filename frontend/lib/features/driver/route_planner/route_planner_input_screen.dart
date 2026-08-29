@@ -279,16 +279,17 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.labelSmall.copyWith(
-          color: AppColors.textMuted,
-          fontSize: 11,
-        )),
+        Text(
+          label,
+          style: AppTypography.labelSmall.copyWith(
+            color: AppColors.textMuted,
+            fontSize: 11,
+          ),
+        ),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
-          style: AppTypography.bodyLarge.copyWith(
-            color: AppColors.textPrimary,
-          ),
+          style: AppTypography.bodyLarge.copyWith(color: AppColors.textPrimary),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: AppTypography.bodyMedium.copyWith(
@@ -306,7 +307,10 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: AppColors.primary, width: 1.5),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
             isDense: true,
             prefixIcon: Icon(icon, color: iconColor, size: 20),
             suffixIcon: trailing,
@@ -329,17 +333,36 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.border),
             ),
-            child: Column(
-              children: suggestions.map((suggestion) => ListTile(
-                dense: true,
-                leading: const Icon(Icons.place_outlined, color: AppColors.primary),
-                title: Text(suggestion.label, maxLines: 2, overflow: TextOverflow.ellipsis),
-                onTap: onSuggestionSelected == null ? null : () {
-                  onSuggestionSelected(suggestion);
-                  controller.text = suggestion.label;
-                  controller.selection = TextSelection.collapsed(offset: controller.text.length);
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: suggestions.length,
+                itemBuilder: (context, index) {
+                  final suggestion = suggestions[index];
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(
+                      Icons.place_outlined,
+                      color: AppColors.primary,
+                    ),
+                    title: Text(
+                      suggestion.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: onSuggestionSelected == null
+                        ? null
+                        : () {
+                            onSuggestionSelected(suggestion);
+                            controller.text = suggestion.label;
+                            controller.selection = TextSelection.collapsed(
+                              offset: controller.text.length,
+                            );
+                          },
+                  );
                 },
-              )).toList(),
+              ),
             ),
           ),
       ],
@@ -757,14 +780,18 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
       ),
     ];
 
-    return GridView.count(
-      crossAxisCount: 2,
+    return GridView.builder(
+      itemCount: prefs.length,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.8,
-      children: prefs.map((p) {
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        mainAxisExtent: 112,
+      ),
+      itemBuilder: (context, index) {
+        final p = prefs[index];
         final selected = planner.preference == p.$1;
         return GestureDetector(
           onTap: () => planner.setPreference(p.$1),
@@ -798,13 +825,15 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
                 ),
                 Text(
                   p.$4,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTypography.bodySmall.copyWith(fontSize: 10),
                 ),
               ],
             ),
           ),
         );
-      }).toList(),
+      },
     );
   }
 
@@ -814,6 +843,23 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
 
     return Column(
       children: [
+        if (planner.analysisError != null)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.error.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              planner.analysisError!,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.bodySmall.copyWith(color: AppColors.error),
+            ),
+          ),
         // Compatibility note
         if (planner.selectedVehicle != null)
           Padding(

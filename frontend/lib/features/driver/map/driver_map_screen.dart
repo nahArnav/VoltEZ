@@ -118,60 +118,101 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   // ─── Build ───
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Consumer<ChargerDiscoveryProvider>(
-        builder: (context, discovery, _) {
-          final center = discovery.currentPosition != null
-              ? latlong.LatLng(
-                  discovery.currentPosition!.latitude,
-                  discovery.currentPosition!.longitude,
-                )
-              : _defaultCenter;
-          if (discovery.currentPosition != null) {
-            _centerOnPosition(discovery.currentPosition!);
-          }
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) context.go('/driver/home');
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Consumer<ChargerDiscoveryProvider>(
+          builder: (context, discovery, _) {
+            final center = discovery.currentPosition != null
+                ? latlong.LatLng(
+                    discovery.currentPosition!.latitude,
+                    discovery.currentPosition!.longitude,
+                  )
+                : _defaultCenter;
+            if (discovery.currentPosition != null) {
+              _centerOnPosition(discovery.currentPosition!);
+            }
 
-          return Stack(
-            children: [
-              // ─── OpenStreetMap ───
-              _buildMap(discovery, center),
+            return Stack(
+              children: [
+                // ─── OpenStreetMap ───
+                _buildMap(discovery, center),
 
-              // ─── Search Bar ───
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 8,
-                left: 16,
-                right: 16,
-                child: _buildSearchBar(discovery),
-              ),
+                // ─── Search Bar ───
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 8,
+                  left: 64,
+                  right: 16,
+                  child: _buildSearchBar(discovery),
+                ),
 
-              // ─── Filter Chips Row ───
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 70,
-                left: 0,
-                right: 0,
-                child: _buildFilterRow(discovery),
-              ),
+                // A map is a nested destination in the driver flow. Provide an
+                // explicit back affordance so Android's system back does not
+                // leave the app when this is the root tab.
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 8,
+                  left: 16,
+                  child: Material(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(14),
+                    child: IconButton(
+                      tooltip: 'Back to home',
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/driver/home');
+                        }
+                      },
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
 
-              // ─── Location FAB ───
-              Positioned(
-                bottom: _sheetExpanded ? 300 : 140,
-                right: 16,
-                child: _buildLocationFab(discovery),
-              ),
+                // ─── Filter Chips Row ───
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 112,
+                  left: 0,
+                  right: 0,
+                  child: _buildFilterRow(discovery),
+                ),
 
-              // ─── Station Bottom Sheet ───
-              _buildStationSheet(discovery),
+                // Paint suggestions after the filter row so the dropdown is
+                // never hidden underneath the horizontal chip list.
+                if (discovery.locationSuggestions.isNotEmpty)
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 62,
+                    left: 64,
+                    right: 16,
+                    child: _buildLocationSuggestions(discovery),
+                  ),
 
-              // ─── Charger Count Badge ───
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 70,
-                right: 16,
-                child: _buildCountBadge(discovery),
-              ),
-            ],
-          );
-        },
+                // ─── Location FAB ───
+                Positioned(
+                  bottom: _sheetExpanded ? 320 : 140,
+                  right: 16,
+                  child: _buildLocationFab(discovery),
+                ),
+
+                // ─── Station Bottom Sheet ───
+                _buildStationSheet(discovery),
+
+                // ─── Charger Count Badge ───
+                if (discovery.locationSuggestions.isEmpty)
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 160,
+                    right: 16,
+                    child: _buildCountBadge(discovery),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -312,7 +353,10 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                 contentPadding: EdgeInsets.zero,
                 isDense: true,
               ),
-              onChanged: (value) => discovery.setSearchQuery(value),
+              onChanged: (value) {
+                discovery.setSearchQuery(value);
+                discovery.searchLocationSuggestions(value);
+              },
             ),
           ),
           if (_searchController.text.isNotEmpty)
@@ -320,6 +364,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
               onTap: () {
                 _searchController.clear();
                 discovery.setSearchQuery('');
+                discovery.clearLocationSuggestions();
               },
               child: Container(
                 padding: const EdgeInsets.all(6),
@@ -335,6 +380,84 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLocationSuggestions(ChargerDiscoveryProvider discovery) {
+    return Material(
+      color: AppColors.card,
+      elevation: 8,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 220),
+        child: ListView.separated(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          itemCount: discovery.locationSuggestions.length,
+          separatorBuilder: (_, _) => Divider(
+            height: 1,
+            color: AppColors.border.withValues(alpha: 0.7),
+          ),
+          itemBuilder: (context, index) {
+            final suggestion = discovery.locationSuggestions[index];
+            return ListTile(
+              dense: true,
+              leading: Icon(
+                suggestion.chargerId != null
+                    ? Icons.ev_station_outlined
+                    : Icons.location_on_outlined,
+                color: AppColors.primary,
+              ),
+              title: Text(
+                suggestion.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              onTap: () async {
+                _searchController.text = suggestion.label;
+                _searchController.selection = TextSelection.fromPosition(
+                  TextPosition(offset: _searchController.text.length),
+                );
+                discovery.clearLocationSuggestions();
+                discovery.setSearchQuery('');
+
+                // A station result is already in the live charger payload;
+                // select it directly instead of issuing a second spatial
+                // query. Place results continue through the normal nearby
+                // charger lookup below.
+                if (suggestion.chargerId != null) {
+                  final charger = discovery.allChargers.where(
+                    (item) => item.id == suggestion.chargerId,
+                  );
+                  if (charger.isNotEmpty) {
+                    final selected = charger.first;
+                    discovery.selectCharger(selected);
+                    _mapController.move(
+                      latlong.LatLng(selected.latitude, selected.longitude),
+                      15,
+                    );
+                    _animateSheet(true);
+                    return;
+                  }
+                }
+                await discovery.fetchChargersAt(
+                  suggestion.latitude,
+                  suggestion.longitude,
+                );
+                if (!mounted) return;
+                _mapController.move(
+                  latlong.LatLng(suggestion.latitude, suggestion.longitude),
+                  14,
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -599,7 +722,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     final statusCol = _statusColor(charger.status);
 
     return Container(
-      height: 260,
+      height: 300,
       decoration: const BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -664,34 +787,48 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   const SizedBox(height: 14),
 
                   // Metrics row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _sheetMetric(
-                        Icons.bolt_rounded,
-                        '${charger.powerKw.round()} kW',
-                        'Power',
-                        AppColors.primary,
-                      ),
-                      _sheetMetric(
-                        Icons.currency_rupee,
-                        '\u20B9${charger.pricePerKwh.round()}/kWh',
-                        'Price',
-                        AppColors.success,
-                      ),
-                      _sheetMetric(
-                        Icons.schedule_rounded,
-                        _waitTimeEstimate(charger.status),
-                        'Wait',
-                        _statusColor(charger.status),
-                      ),
-                      _sheetMetric(
-                        Icons.star_rounded,
-                        '${charger.rating}',
-                        'Rating',
-                        AppColors.warning,
-                      ),
-                    ],
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 86,
+                          child: _sheetMetric(
+                            Icons.bolt_rounded,
+                            '${charger.powerKw.round()} kW',
+                            'Power',
+                            AppColors.primary,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 86,
+                          child: _sheetMetric(
+                            Icons.currency_rupee,
+                            '\u20B9${charger.pricePerKwh.round()}/kWh',
+                            'Price',
+                            AppColors.success,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 110,
+                          child: _sheetMetric(
+                            Icons.schedule_rounded,
+                            _waitTimeEstimate(charger.status),
+                            'Wait',
+                            _statusColor(charger.status),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 86,
+                          child: _sheetMetric(
+                            Icons.star_rounded,
+                            '${charger.rating}',
+                            'Rating',
+                            AppColors.warning,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
 
                   const Spacer(),
@@ -700,31 +837,40 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   Row(
                     children: [
                       // Connector badges
-                      ...charger.connectorTypes.map(
-                        (ct) => Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              _connectorLabels[ct] ?? ct,
-                              style: AppTypography.labelMedium.copyWith(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: charger.connectorTypes
+                                .map(
+                                  (ct) => Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surface,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        _connectorLabels[ct] ?? ct,
+                                        style: AppTypography.labelMedium
+                                            .copyWith(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.5,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
                           ),
                         ),
                       ),
-
-                      const Spacer(),
+                      const SizedBox(width: 8),
 
                       // View Details button
                       GestureDetector(
@@ -733,7 +879,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
+                            horizontal: 12,
                             vertical: 10,
                           ),
                           decoration: BoxDecoration(
@@ -744,7 +890,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'View Details',
+                                'Details',
                                 style: AppTypography.buttonTextSmall.copyWith(
                                   color: AppColors.textOnPrimary,
                                 ),
@@ -790,149 +936,161 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
   // ─── Nearby Chargers List Sheet ───
   Widget _buildNearbyListSheet(ChargerDiscoveryProvider discovery) {
-    return Container(
-      height: 180,
-      decoration: const BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12),
-            decoration: BoxDecoration(
-              color: AppColors.textMuted,
-              borderRadius: BorderRadius.circular(2),
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: 224,
+        decoration: const BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12),
+              decoration: BoxDecoration(
+                color: AppColors.textMuted,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
 
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-            child: Row(
-              children: [
-                Text('Nearby Chargers', style: AppTypography.headlineMedium),
-                const Spacer(),
-                Text(
-                  '${discovery.filteredChargers.length} found',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.primary,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              child: Row(
+                children: [
+                  Text('Nearby Chargers', style: AppTypography.headlineMedium),
+                  const Spacer(),
+                  Text(
+                    '${discovery.filteredChargers.length} found',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.primary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-          Expanded(
-            child: discovery.filteredChargers.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.search_off_rounded,
-                          color: AppColors.textMuted,
-                          size: 32,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No chargers match filters',
-                          style: AppTypography.bodyMedium.copyWith(
+            Expanded(
+              child: discovery.filteredChargers.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.search_off_rounded,
                             color: AppColors.textMuted,
+                            size: 32,
                           ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 4,
-                    ),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: discovery.filteredChargers.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) {
-                      final charger = discovery.filteredChargers[index];
-                      final statusCol = _statusColor(charger.status);
+                          const SizedBox(height: 8),
+                          Text(
+                            'No chargers match filters',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 4,
+                      ),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: discovery.filteredChargers.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final charger = discovery.filteredChargers[index];
+                        final statusCol = _statusColor(charger.status);
 
-                      return GestureDetector(
-                        onTap: () {
-                          discovery.selectCharger(charger);
-                          _animateSheet(true);
-                          _mapController.move(
-                            latlong.LatLng(charger.latitude, charger.longitude),
-                            _mapController.camera.zoom,
-                          );
-                        },
-                        child: Container(
-                          width: 210,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      charger.name,
-                                      style: AppTypography.headlineSmall,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: statusCol,
-                                    ),
-                                  ),
-                                ],
+                        return GestureDetector(
+                          onTap: () {
+                            discovery.selectCharger(charger);
+                            _animateSheet(true);
+                            _mapController.move(
+                              latlong.LatLng(
+                                charger.latitude,
+                                charger.longitude,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                charger.address ?? '',
-                                style: AppTypography.bodySmall,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              _mapController.camera.zoom,
+                            );
+                          },
+                          child: SizedBox(
+                            width: 210,
+                            height: 156,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
                               ),
-                              const Spacer(),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.border),
+                              ),
+
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          charger.name,
+                                          style: AppTypography.headlineSmall,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: statusCol,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    '${charger.powerKw.round()} kW \u00B7 \u20B9${charger.pricePerKwh.round()}/kWh',
-                                    style: AppTypography.labelMedium.copyWith(
-                                      color: AppColors.primary,
-                                    ),
+                                    charger.address ?? '',
+                                    style: AppTypography.bodySmall,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 12,
-                                    color: AppColors.textMuted,
+                                  const Spacer(),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '${charger.powerKw.round()} kW \u00B7 \u20B9${charger.pricePerKwh.round()}/kWh',
+                                        style: AppTypography.labelMedium
+                                            .copyWith(color: AppColors.primary),
+                                      ),
+                                      Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        size: 12,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          const SizedBox(height: 12),
-        ],
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }

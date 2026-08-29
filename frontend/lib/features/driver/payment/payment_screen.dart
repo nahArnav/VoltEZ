@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
@@ -15,7 +16,9 @@ import '../../../shared/widgets/widgets.dart';
 /// In production, store this in a backend endpoint, not in client code.
 const String kRazorpayKeyId = String.fromEnvironment('RAZORPAY_KEY_ID');
 
-/// Payment screen — launches Razorpay checkout sheet, then verifies with backend.
+/// Payment screen — launches the configured gateway checkout, then verifies
+/// with the backend. Stripe hosted Checkout is preferred when configured;
+/// Razorpay remains supported for existing deployments.
 ///
 /// States: pending (select method + pay), processing (spinner),
 /// success (confirmation), failed (retry), cancelled, hold expired.
@@ -26,14 +29,26 @@ class PaymentScreen extends StatefulWidget {
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _PaymentScreenState extends State<PaymentScreen> {
+class _PaymentScreenState extends State<PaymentScreen>
+    with WidgetsBindingObserver {
   String _selectedMethod = 'UPI';
   RazorpayService? _razorpay;
+  bool _stripeCheckoutOpened = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _restoreDefaultPaymentMethod();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _stripeCheckoutOpened) {
+      _stripeCheckoutOpened = false;
+      final booking = context.read<BookingProvider>();
+      booking.processStripePayment();
+    }
   }
 
   Future<void> _restoreDefaultPaymentMethod() async {
@@ -72,6 +87,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _razorpay?.dispose();
     super.dispose();
   }
@@ -95,6 +111,39 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
     final order = booking.paymentOrder;
     if (order == null || order.orderId.isEmpty) return;
+    if (order.provider == 'stripe') {
+      final checkoutUrl = order.checkoutUrl;
+      if (checkoutUrl == null || checkoutUrl.isEmpty) {
+        booking.setPaymentError(
+          'Stripe did not return a checkout link. Please retry.',
+        );
+        return;
+      }
+      _stripeCheckoutOpened = true;
+      final launched = await launchUrl(
+        Uri.parse(checkoutUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        _stripeCheckoutOpened = false;
+        booking.setPaymentError(
+          'Could not open Stripe Checkout on this device.',
+        );
+        return;
+      }
+      if (!mounted) return;
+      // Hosted Checkout pauses this app. Verification is intentionally
+      // deferred until Android/iOS resumes it, after the user has completed
+      // (or cancelled) the payment in the browser.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Complete payment in the browser, then return to VoltEZ.',
+          ),
+        ),
+      );
+      return;
+    }
     if (kRazorpayKeyId.isEmpty) {
       booking.setPaymentError(
         'Razorpay is not configured for this build. Add the RAZORPAY_KEY_ID build setting.',
@@ -247,7 +296,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   );
                 }),
 
-                // Razorpay powered-by notice
+                // Gateway powered-by notice
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -258,7 +307,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Secured by Razorpay',
+                      'Secured by Stripe / Razorpay',
                       style: AppTypography.bodySmall.copyWith(
                         color: AppColors.textMuted,
                         fontSize: 11,

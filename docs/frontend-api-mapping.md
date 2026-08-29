@@ -95,11 +95,21 @@ FAILED | NO_SHOW | CHECKED_IN | CHARGING | COMPLETED
 |---|---|---|---|---|---|
 | `ApiService.createPaymentOrder()` | `POST /api/v1/payments/create-order` | POST | `{ booking_id, amount, currency, provider_order_id? }` | `PaymentResponse` | Bearer (Driver) |
 | `ApiService.verifyPayment()` | `POST /api/v1/payments/verify` | POST | `{ provider_order_id, provider_payment_id, ... }` | `PaymentResponse` | Bearer (Driver) |
+| `ApiService.verifyStripePayment()` | `POST /api/v1/payments/stripe/verify` | POST | `{ booking_id, checkout_session_id }` | `PaymentResponse` | Bearer (Driver) |
+| Stripe webhook | `POST /api/v1/payments/stripe/webhook` | POST | Signed Stripe event | `{ status: "ok" }` | Stripe signature |
 
 ### Payment Status Values
 ```
 pending | completed | failed | refunded
 ```
+
+## Location search and notifications
+
+| Frontend Method | Backend Endpoint | Method | Request | Response | Auth |
+|---|---|---|---|---|---|
+| `ApiService.searchLocations()` | `GET /api/v1/locations/search` | GET | `q`, `limit` | `LocationSearchResult[]` | Public geocoder proxy |
+| `ApiService.getNotifications()` | `GET /api/v1/users/me/notifications` | GET | — | `NotificationResponse[]` | Bearer |
+| `ApiService.markNotificationRead()` | `PATCH /api/v1/users/me/notifications/{id}` | PATCH | `{ status: "read" }` | `NotificationResponse` | Bearer |
 
 ## Charging Sessions
 

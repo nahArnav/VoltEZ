@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/network/api_service.dart';
 import '../../../core/providers/business_provider.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
@@ -91,6 +92,7 @@ class _OverviewPage extends StatelessWidget {
             title: (name == null || name.isEmpty) ? 'Your business' : name,
             subtitle: 'Live operations overview',
             icon: Icons.notifications_none_rounded,
+            onIconTap: () => _showBusinessNotifications(context),
           ),
           if (provider.errorMessage != null) ...[
             const SizedBox(height: 12),
@@ -122,7 +124,7 @@ class _OverviewPage extends StatelessWidget {
               _MetricCard(
                 label: 'ACTIVE CHARGERS',
                 value:
-                    '${_number(metrics['active_chargers'])}/${_number(metrics['chargers'])}',
+                    '${_number(provider.displayedActiveChargerCount)}/${_number(provider.displayedChargerCount)}',
                 icon: Icons.ev_station_rounded,
                 color: AppColors.secondary,
               ),
@@ -139,7 +141,7 @@ class _OverviewPage extends StatelessWidget {
           const SizedBox(height: 12),
           _ChargerList(provider.chargers),
           const SizedBox(height: 24),
-          const _SectionTitle('RECENT BOOKINGS'),
+          const _SectionTitle('RECENT CONFIRMED BOOKINGS'),
           const SizedBox(height: 12),
           _BookingList(provider.bookings, allowCancel: false),
           const SizedBox(height: 24),
@@ -199,7 +201,8 @@ class _BookingsPage extends StatelessWidget {
           const _PageHeader(
             eyebrow: 'RESERVATIONS',
             title: 'Bookings',
-            subtitle: 'Confirmations and cancellations from your fleet',
+            subtitle:
+                'Confirmed reservations currently actionable by your fleet',
             icon: Icons.calendar_today_rounded,
           ),
           const SizedBox(height: 18),
@@ -561,11 +564,13 @@ class _PageHeader extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
+    this.onIconTap,
   });
   final String eyebrow;
   final String title;
   final String subtitle;
   final IconData icon;
+  final VoidCallback? onIconTap;
   @override
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -587,11 +592,20 @@ class _PageHeader extends StatelessWidget {
           ],
         ),
       ),
-      CircleAvatar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.onPrimary,
-        child: Icon(icon),
-      ),
+      onIconTap == null
+          ? CircleAvatar(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.onPrimary,
+              child: Icon(icon),
+            )
+          : IconButton.filled(
+              onPressed: onIconTap,
+              style: IconButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+              ),
+              icon: Icon(icon),
+            ),
     ],
   );
 }
@@ -693,7 +707,10 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
     });
     if (value.trim().length < 3) return;
     _addressSearchTimer = Timer(const Duration(milliseconds: 350), () async {
-      final suggestions = await _searchAddressSuggestions(value.trim());
+      final suggestions = await _searchAddressSuggestions(
+        value.trim(),
+        api: context.read<ApiService>(),
+      );
       if (!mounted || token != _addressSearchToken) return;
       setState(() {
         _addressSuggestions = suggestions;
@@ -873,7 +890,31 @@ class _AddressSuggestion {
   final double longitude;
 }
 
-Future<List<_AddressSuggestion>> _searchAddressSuggestions(String query) async {
+Future<List<_AddressSuggestion>> _searchAddressSuggestions(
+  String query, {
+  ApiService? api,
+}) async {
+  // Use the backend's ranked, India-constrained geocoder first so every
+  // address field (business onboarding and charger registration) behaves the
+  // same way across Android/iOS. The OS geocoder is an offline fallback.
+  try {
+    final response = await (api ?? ApiService()).searchLocations(query);
+    final data = response.data;
+    if (data is List && data.isNotEmpty) {
+      return data
+          .whereType<Map>()
+          .map(
+            (item) => _AddressSuggestion(
+              label: item['display_name']?.toString() ?? query,
+              latitude: (item['latitude'] as num).toDouble(),
+              longitude: (item['longitude'] as num).toDouble(),
+            ),
+          )
+          .toList();
+    }
+  } catch (_) {
+    // Fall through to the native geocoder when the API/provider is offline.
+  }
   try {
     final locations = await locationFromAddress(query);
     final suggestions = <_AddressSuggestion>[];
@@ -886,17 +927,18 @@ Future<List<_AddressSuggestion>> _searchAddressSuggestions(String query) async {
         );
         if (placemarks.isNotEmpty) {
           final place = placemarks.first;
-          label = [
-            place.name,
-            place.street,
-            place.locality,
-            place.administrativeArea,
-          ]
-              .whereType<String>()
-              .map((value) => value.trim())
-              .where((value) => value.isNotEmpty)
-              .toSet()
-              .join(', ');
+          label =
+              [
+                    place.name,
+                    place.street,
+                    place.locality,
+                    place.administrativeArea,
+                  ]
+                  .whereType<String>()
+                  .map((value) => value.trim())
+                  .where((value) => value.isNotEmpty)
+                  .toSet()
+                  .join(', ');
         }
       } catch (_) {
         // Coordinates remain usable even when reverse labelling is unavailable.
@@ -917,12 +959,16 @@ Future<List<_AddressSuggestion>> _searchAddressSuggestions(String query) async {
 
 Future<void> _showAddCharger(BuildContext context) async {
   final name = TextEditingController();
-  final type = TextEditingController(text: 'DC');
   final power = TextEditingController();
-  final price = TextEditingController();
+  final price = TextEditingController(text: '15');
+  final portNumber = TextEditingController(text: '1');
+  final portPower = TextEditingController(text: '22');
   final location = TextEditingController();
   Timer? searchTimer;
   var searchToken = 0;
+  var chargerType = 'DC';
+  var connectorTypeId = 1;
+  var accessType = 'public';
   await showDialog<void>(
     context: context,
     builder: (dialogContext) {
@@ -932,7 +978,10 @@ Future<void> _showAddCharger(BuildContext context) async {
       double? selectedLatitude;
       double? selectedLongitude;
 
-      Future<void> search(String query, void Function(void Function()) setState) async {
+      Future<void> search(
+        String query,
+        void Function(void Function()) setState,
+      ) async {
         searchTimer?.cancel();
         final token = ++searchToken;
         if (query.trim().length < 3) {
@@ -945,7 +994,10 @@ Future<void> _showAddCharger(BuildContext context) async {
         searchTimer = Timer(const Duration(milliseconds: 350), () async {
           if (!dialogContext.mounted) return;
           setState(() => searching = true);
-          final results = await _searchAddressSuggestions(query.trim());
+          final results = await _searchAddressSuggestions(
+            query.trim(),
+            api: context.read<ApiService>(),
+          );
           if (!dialogContext.mounted || token != searchToken) return;
           setState(() {
             suggestions = results;
@@ -954,7 +1006,9 @@ Future<void> _showAddCharger(BuildContext context) async {
         });
       }
 
-      Future<void> useCurrentLocation(void Function(void Function()) setState) async {
+      Future<void> useCurrentLocation(
+        void Function(void Function()) setState,
+      ) async {
         searchTimer?.cancel();
         searchToken++;
         try {
@@ -1011,22 +1065,94 @@ Future<void> _showAddCharger(BuildContext context) async {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _dialogInput(name, 'Name'),
-                  _dialogInput(type, 'Type (AC/DC)'),
+                  DropdownButtonFormField<String>(
+                    initialValue: chargerType,
+                    decoration: const InputDecoration(
+                      labelText: 'Charging type',
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'AC', child: Text('AC charging')),
+                      DropdownMenuItem(
+                        value: 'DC',
+                        child: Text('DC fast charging'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => chargerType = value);
+                    },
+                  ),
                   _dialogInput(
                     power,
-                    'Power kW',
-                    keyboard: const TextInputType.numberWithOptions(decimal: true),
+                    'Station power (kW)',
+                    keyboard: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
+                  _dialogInput(
+                    portPower,
+                    'First port maximum power (kW)',
+                    keyboard: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
+                  _dialogInput(
+                    portNumber,
+                    'Port number',
+                    keyboard: TextInputType.number,
+                  ),
+                  DropdownButtonFormField<int>(
+                    initialValue: connectorTypeId,
+                    decoration: const InputDecoration(
+                      labelText: 'Connector standard',
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('CCS2')),
+                      DropdownMenuItem(value: 2, child: Text('Type 2')),
+                      DropdownMenuItem(value: 3, child: Text('CHAdeMO')),
+                      DropdownMenuItem(value: 4, child: Text('Bharat AC-001')),
+                      DropdownMenuItem(value: 5, child: Text('Bharat DC-001')),
+                      DropdownMenuItem(value: 6, child: Text('Type 1')),
+                      DropdownMenuItem(value: 7, child: Text('GB/T')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => connectorTypeId = value);
+                      }
+                    },
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: accessType,
+                    decoration: const InputDecoration(labelText: 'Access'),
+                    items: const [
+                      DropdownMenuItem(value: 'public', child: Text('Public')),
+                      DropdownMenuItem(
+                        value: 'controlled',
+                        child: Text('Controlled access'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'customer_only',
+                        child: Text('Customers only'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => accessType = value);
+                    },
                   ),
                   _dialogInput(
                     price,
                     'Base price per kWh (INR)',
-                    keyboard: const TextInputType.numberWithOptions(decimal: true),
+                    keyboard: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                   ),
                   const Padding(
                     padding: EdgeInsets.only(bottom: 10),
                     child: Text(
                       'VoltEZ applies a bounded peak/off-peak multiplier using live demand and availability signals.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                   TextField(
@@ -1084,7 +1210,10 @@ Future<void> _showAddCharger(BuildContext context) async {
                       padding: EdgeInsets.only(top: 6),
                       child: Text(
                         'Location selected. Coordinates will be saved automatically.',
-                        style: TextStyle(fontSize: 12, color: AppColors.success),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.success,
+                        ),
                       ),
                     ),
                 ],
@@ -1102,39 +1231,63 @@ Future<void> _showAddCharger(BuildContext context) async {
                   : () async {
                       final p = double.tryParse(power.text.trim());
                       final pr = double.tryParse(price.text.trim());
-                      if (name.text.trim().isEmpty || p == null || p <= 0 || pr == null || pr <= 0) {
+                      final pp = double.tryParse(portPower.text.trim());
+                      final pn = int.tryParse(portNumber.text.trim());
+                      if (name.text.trim().isEmpty ||
+                          p == null ||
+                          p <= 0 ||
+                          pp == null ||
+                          pp <= 0 ||
+                          pn == null ||
+                          pn <= 0 ||
+                          pr == null ||
+                          pr <= 0) {
                         ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          const SnackBar(content: Text('Enter a name, positive power, and base tariff.')),
+                          const SnackBar(
+                            content: Text(
+                              'Enter a name, positive power, and base tariff.',
+                            ),
+                          ),
                         );
                         return;
                       }
-                      if (selectedLatitude == null || selectedLongitude == null) {
+                      if (selectedLatitude == null ||
+                          selectedLongitude == null) {
                         ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          const SnackBar(content: Text('Select the charger address from the suggestions first.')),
+                          const SnackBar(
+                            content: Text(
+                              'Select the charger address from the suggestions first.',
+                            ),
+                          ),
                         );
                         return;
                       }
                       setState(() => saving = true);
-                      final ok = await context.read<BusinessProvider>().createCharger(
-                        name: name.text.trim(),
-                        chargerType: type.text.trim(),
-                        powerKw: p,
-                        pricePerKwh: pr,
-                        latitude: selectedLatitude!,
-                        longitude: selectedLongitude!,
-                        addressText: location.text.trim(),
-                      );
+                      final ok = await context
+                          .read<BusinessProvider>()
+                          .createCharger(
+                            name: name.text.trim(),
+                            chargerType: chargerType,
+                            powerKw: p,
+                            pricePerKwh: pr,
+                            latitude: selectedLatitude!,
+                            longitude: selectedLongitude!,
+                            addressText: location.text.trim(),
+                            connectorTypeId: connectorTypeId,
+                            portNumber: pn,
+                            portMaxPowerKw: pp,
+                            accessType: accessType,
+                          );
                       if (!dialogContext.mounted) return;
                       if (ok) {
                         Navigator.pop(dialogContext);
                       } else {
-                        final error = context
-                                .read<BusinessProvider>()
-                                .errorMessage ??
+                        final error =
+                            context.read<BusinessProvider>().errorMessage ??
                             'Charger could not be registered. Check your session and try again.';
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          SnackBar(content: Text(error)),
-                        );
+                        ScaffoldMessenger.of(
+                          dialogContext,
+                        ).showSnackBar(SnackBar(content: Text(error)));
                         setState(() => saving = false);
                       }
                     },
@@ -1147,9 +1300,10 @@ Future<void> _showAddCharger(BuildContext context) async {
   );
   searchTimer?.cancel();
   name.dispose();
-  type.dispose();
   power.dispose();
   price.dispose();
+  portNumber.dispose();
+  portPower.dispose();
   location.dispose();
 }
 
@@ -1237,8 +1391,6 @@ Future<void> _showAddPort(
       ),
     ),
   );
-  portNumber.dispose();
-  power.dispose();
 }
 
 Future<void> _showEditTariff(
@@ -1283,10 +1435,12 @@ Future<void> _showEditTariff(
               );
               return;
             }
-            final ok = await context.read<BusinessProvider>().updateChargerTariff(
-              chargerId: charger['id'].toString(),
-              pricePerKwh: value,
-            );
+            final ok = await context
+                .read<BusinessProvider>()
+                .updateChargerTariff(
+                  chargerId: charger['id'].toString(),
+                  pricePerKwh: value,
+                );
             if (!dialogContext.mounted) return;
             if (ok) {
               Navigator.pop(dialogContext);
@@ -1306,7 +1460,6 @@ Future<void> _showEditTariff(
       ],
     ),
   );
-  price.dispose();
 }
 
 Future<void> _showAvailability(
@@ -1409,8 +1562,6 @@ Future<void> _showAvailability(
       ),
     ),
   );
-  start.dispose();
-  end.dispose();
 }
 
 Future<void> _showBusinessKycDialog(
@@ -1517,10 +1668,6 @@ Future<void> _showBusinessKycDialog(
       ],
     ),
   );
-  gstin.dispose();
-  pan.dispose();
-  meter.dispose();
-  upi.dispose();
 }
 
 Widget _dialogInput(
@@ -1553,6 +1700,73 @@ String _minutes(dynamic value) {
 
 String _dateTime(DateTime value) =>
     '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
+Future<void> _showBusinessNotifications(BuildContext context) async {
+  List<Map<String, dynamic>> notifications = const [];
+  String? error;
+  try {
+    final response = await context.read<ApiService>().getNotifications();
+    final data = response.data;
+    if (data is List) {
+      notifications = data
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
+  } catch (_) {
+    error = 'Could not load notifications right now.';
+  }
+  if (!context.mounted) return;
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Notifications'),
+      content: SizedBox(
+        width: 360,
+        child: error != null
+            ? Text(error)
+            : notifications.isEmpty
+            ? const Text('No notifications yet.')
+            : SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: notifications
+                      .map(
+                        (item) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(
+                            Icons.notifications_outlined,
+                            color: AppColors.primary,
+                          ),
+                          title: Text(
+                            item['title']?.toString() ?? 'VoltEZ alert',
+                          ),
+                          subtitle: Text(item['message']?.toString() ?? ''),
+                          isThreeLine: true,
+                          onTap: () {
+                            final id = item['id']?.toString();
+                            if (id != null) {
+                              context.read<ApiService>().markNotificationRead(
+                                id,
+                              );
+                            }
+                          },
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('CLOSE'),
+        ),
+      ],
+    ),
+  );
+}
+
 Color _statusColor(String status) {
   switch (status.toLowerCase()) {
     case 'available':

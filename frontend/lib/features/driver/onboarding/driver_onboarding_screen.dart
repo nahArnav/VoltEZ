@@ -10,7 +10,9 @@ import '../../../shared/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
 
 class DriverOnboardingScreen extends StatefulWidget {
-  const DriverOnboardingScreen({super.key});
+  const DriverOnboardingScreen({super.key, this.vehicleToEdit});
+
+  final Vehicle? vehicleToEdit;
 
   @override
   State<DriverOnboardingScreen> createState() => _DriverOnboardingScreenState();
@@ -32,19 +34,70 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
   bool _saving = false;
   String? _saveError;
 
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.vehicleToEdit;
+    if (existing == null) return;
+    _selectedMake = existing.make;
+    _selectedModel = existing.model;
+    _batteryCapacity = existing.batteryKwh;
+    _estimatedRangeKm = existing.estimatedRangeKm ?? _estimatedRangeKm;
+    _connectorType = _connectorFromName(existing.primaryConnector);
+  }
+
   // Covers the major Indian EV catalogue, including the two-wheelers most
   // commonly seen on Indian roads. "Other" remains available for imports and
   // newly launched models without pretending this list is exhaustive.
   final _makes = [
-    'Tata', 'MG', 'Hyundai', 'Mahindra', 'Kia', 'BYD', 'Citroen', 'Volvo',
-    'BMW', 'Mercedes-Benz', 'Audi', 'Porsche', 'Ather', 'Ola', 'TVS', 'Bajaj',
-    'Revolt', 'Ultraviolette', 'Matter', 'Hero Electric', 'Ampere', 'Okinawa',
-    'Vida', 'Simple Energy', 'Oben', 'River', 'Tork', 'Joy e-bike', 'PURE EV',
-    'Komaki', 'EeVe', 'Bounce', 'BGauss', 'Lectrix', 'Raptee', 'Hop Electric',
-    'Odysse', 'Other',
+    'Tata',
+    'MG',
+    'Hyundai',
+    'Mahindra',
+    'Kia',
+    'BYD',
+    'Citroen',
+    'Volvo',
+    'BMW',
+    'Mercedes-Benz',
+    'Audi',
+    'Porsche',
+    'Ather',
+    'Ola',
+    'TVS',
+    'Bajaj',
+    'Revolt',
+    'Ultraviolette',
+    'Matter',
+    'Hero Electric',
+    'Ampere',
+    'Okinawa',
+    'Vida',
+    'Simple Energy',
+    'Oben',
+    'River',
+    'Tork',
+    'Joy e-bike',
+    'PURE EV',
+    'Komaki',
+    'EeVe',
+    'Bounce',
+    'BGauss',
+    'Lectrix',
+    'Raptee',
+    'Hop Electric',
+    'Odysse',
+    'Other',
   ];
   final _modelsByMake = {
-    'Tata': ['Tiago EV', 'Tigor EV', 'Nexon EV', 'Punch EV', 'Curvv EV', 'Harrier EV'],
+    'Tata': [
+      'Tiago EV',
+      'Tigor EV',
+      'Nexon EV',
+      'Punch EV',
+      'Curvv EV',
+      'Harrier EV',
+    ],
     'MG': ['Comet EV', 'ZS EV', 'Windsor EV', 'Cyberster'],
     'Hyundai': ['Kona Electric', 'Ioniq 5', 'Creta Electric'],
     'Mahindra': ['eVerito', 'XUV400', 'BE 6', 'XEV 9e'],
@@ -65,13 +118,29 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     'Matter': ['Aera 5000', 'Aera 5000+'],
     'Hero Electric': ['Optima', 'NYX', 'Photon', 'Atria', 'Dash'],
     'Ampere': ['Magnus EX', 'Magnus Neo', 'Primus', 'Nexus', 'Zeal EX', 'Reo'],
-    'Okinawa': ['Ridge+', 'PraisePro', 'iPraise+', 'Okhi90', 'R30', 'Lite', 'Dual 100', 'Cruiser'],
+    'Okinawa': [
+      'Ridge+',
+      'PraisePro',
+      'iPraise+',
+      'Okhi90',
+      'R30',
+      'Lite',
+      'Dual 100',
+      'Cruiser',
+    ],
     'Vida': ['V1 Plus', 'V1 Pro', 'V2', 'VX2'],
     'Simple Energy': ['One', 'Dot One'],
     'Oben': ['Rorr', 'Rorr EZ'],
     'River': ['Indie'],
     'Tork': ['Kratos R', 'Kratos R Urban'],
-    'Joy e-bike': ['Beast', 'Hurricane', 'Mihos', 'Wolf', 'Wolf+', 'Gen Next Nanu'],
+    'Joy e-bike': [
+      'Beast',
+      'Hurricane',
+      'Mihos',
+      'Wolf',
+      'Wolf+',
+      'Gen Next Nanu',
+    ],
     'PURE EV': ['ePluto 7G', 'eTrance Neo', 'eTron+'],
     'Komaki': ['Ranger', 'Venice', 'XGT VP', 'Flora'],
     'EeVe': ['Ahava', 'Xeniaa', 'Wind', 'Atreo'],
@@ -110,41 +179,82 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     });
 
     try {
-      await context.read<ApiService>().createVehicle({
+      final payload = <String, dynamic>{
         'make': make,
         'model': model,
         'vehicle_class': _vehicleClass,
         'battery_kwh': _batteryCapacity,
         'connector_type_ids': [_connectorId(connector)],
         'max_ac_kw': _vehicleClass == 'two_wheeler' ? 3.3 : 7.2,
-        if (_vehicleClass != 'two_wheeler') 'max_dc_kw': _vehicleClass == 'three_wheeler' ? 15.0 : 60.0,
+        if (_vehicleClass != 'two_wheeler')
+          'max_dc_kw': _vehicleClass == 'three_wheeler' ? 15.0 : 60.0,
         'estimated_range_km': _estimatedRangeKm,
-      });
+      };
+      final response = widget.vehicleToEdit == null
+          ? await context.read<ApiService>().createVehicle(payload)
+          : await context.read<ApiService>().updateVehicle(
+              widget.vehicleToEdit!.id,
+              payload,
+            );
       if (!mounted) return;
-      context.read<RoutePlannerProvider>().loadVehicles();
-      context.go('/driver/home');
+      final savedId = (response.data as Map<String, dynamic>)['id']?.toString();
+      await context.read<RoutePlannerProvider>().loadVehicles(
+        selectedVehicleId: savedId ?? widget.vehicleToEdit?.id,
+      );
+      if (mounted) context.go('/driver/home');
     } on DioException catch (error) {
       if (!mounted) return;
       final detail = error.response?.data;
-      setState(() => _saveError = detail is Map && detail['detail'] is String
-          ? detail['detail'] as String
-          : 'Vehicle could not be saved. Check your connection and try again.');
+      setState(
+        () => _saveError = detail is Map && detail['detail'] is String
+            ? detail['detail'] as String
+            : 'Vehicle could not be saved. Check your connection and try again.',
+      );
     } catch (_) {
-      if (mounted) setState(() => _saveError = 'Vehicle could not be saved. Check your connection and try again.');
+      if (mounted) {
+        setState(
+          () => _saveError =
+              'Vehicle could not be saved. Check your connection and try again.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
   int _connectorId(ConnectorType connector) => switch (connector) {
-        ConnectorType.ccs2 => 1,
-        ConnectorType.type2 => 2,
-        ConnectorType.chademo => 3,
-        ConnectorType.gbT => 7,
-        ConnectorType.type1 => 6,
-        ConnectorType.bharatAc => 4,
-        ConnectorType.bharatDc => 5,
-      };
+    ConnectorType.ccs2 => 1,
+    ConnectorType.type2 => 2,
+    ConnectorType.chademo => 3,
+    ConnectorType.gbT => 7,
+    ConnectorType.type1 => 6,
+    ConnectorType.bharatAc => 4,
+    ConnectorType.bharatDc => 5,
+  };
+
+  ConnectorType _connectorFromName(String value) {
+    switch (value.toLowerCase().replaceAll('-', '').replaceAll(' ', '')) {
+      case 'ccs2':
+        return ConnectorType.ccs2;
+      case 'type2':
+        return ConnectorType.type2;
+      case 'chademo':
+        return ConnectorType.chademo;
+      case 'gb/t':
+      case 'gbt':
+        return ConnectorType.gbT;
+      case 'type1':
+        return ConnectorType.type1;
+      case 'bharatac':
+      case 'bharatac001':
+        return ConnectorType.bharatAc;
+      case 'bharatdc':
+      case 'bharatdc001':
+        return ConnectorType.bharatDc;
+      default:
+        return ConnectorType.type2;
+    }
+  }
 
   void _back() {
     if (_step > 0) {
@@ -162,13 +272,16 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
     }
   }
 
-
   bool get _canProceed {
     switch (_step) {
-      case 0: return _selectedMake != null && _selectedModel != null;
-      case 1: return _connectorType != null;
-      case 2: return true;
-      default: return false;
+      case 0:
+        return _selectedMake != null && _selectedModel != null;
+      case 1:
+        return _connectorType != null;
+      case 2:
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -192,20 +305,28 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 children: [
                   IconButton(
                     onPressed: _back,
-                    icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   Expanded(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(3, (i) => Container(
-                        width: i == _step ? 32 : 8,
-                        height: 4,
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        decoration: BoxDecoration(
-                          color: i <= _step ? AppColors.primary : AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(2),
+                      children: List.generate(
+                        3,
+                        (i) => Container(
+                          width: i == _step ? 32 : 8,
+                          height: 4,
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: BoxDecoration(
+                            color: i <= _step
+                                ? AppColors.primary
+                                : AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                      )),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 48),
@@ -229,8 +350,12 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
             // ─── Bottom Button ───
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: PrimaryButton(
-                text: _saving ? 'SAVING…' : _step == 2 ? 'COMPLETE SETUP' : 'CONTINUE',
+              child: PrimaryButton(
+                text: _saving
+                    ? 'SAVING…'
+                    : _step == 2
+                    ? 'COMPLETE SETUP'
+                    : 'CONTINUE',
                 onPressed: _canProceed && !_saving ? _next : null,
                 isExpanded: true,
               ),
@@ -238,7 +363,11 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
             if (_saveError != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
-                child: Text(_saveError!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.error)),
+                child: Text(
+                  _saveError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.error),
+                ),
               ),
           ],
         ),
@@ -253,11 +382,17 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('STEP 1', style: AppTypography.labelSmall.copyWith(color: AppColors.primary)),
+          Text(
+            'STEP 1',
+            style: AppTypography.labelSmall.copyWith(color: AppColors.primary),
+          ),
           const SizedBox(height: 8),
           Text('Select your vehicle', style: AppTypography.displaySmall),
           const SizedBox(height: 6),
-          Text('Choose your EV make and model for personalised charging.', style: AppTypography.bodyMedium),
+          Text(
+            'Choose your EV make and model for personalised charging.',
+            style: AppTypography.bodyMedium,
+          ),
           const SizedBox(height: 28),
 
           Text('Vehicle type', style: AppTypography.labelLarge),
@@ -265,26 +400,44 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              ('car', 'Car (hatchback / sedan / SUV)'),
-              ('two_wheeler', 'Bike / scooter'),
-              ('three_wheeler', 'Auto / 3-wheeler'),
-            ].map((item) {
-              final selected = _vehicleClass == item.$1;
-              return GestureDetector(
-                onTap: () => setState(() => _vehicleClass = item.$1),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: selected ? AppColors.primary.withValues(alpha: 0.14) : AppColors.card,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: selected ? AppColors.primary : AppColors.border),
-                  ),
-                  child: Text(item.$2, style: TextStyle(color: selected ? AppColors.primary : AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                ),
-              );
-            }).toList(),
+            children:
+                [
+                  ('car', 'Car (hatchback / sedan / SUV)'),
+                  ('two_wheeler', 'Bike / scooter'),
+                  ('three_wheeler', 'Auto / 3-wheeler'),
+                ].map((item) {
+                  final selected = _vehicleClass == item.$1;
+                  return GestureDetector(
+                    onTap: () => setState(() => _vehicleClass = item.$1),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? AppColors.primary.withValues(alpha: 0.14)
+                            : AppColors.card,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.border,
+                        ),
+                      ),
+                      child: Text(
+                        item.$2,
+                        style: TextStyle(
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
           ),
           const SizedBox(height: 20),
 
@@ -303,9 +456,14 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 }),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: selected ? AppColors.primary.withValues(alpha: 0.15) : AppColors.card,
+                    color: selected
+                        ? AppColors.primary.withValues(alpha: 0.15)
+                        : AppColors.card,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: selected ? AppColors.primary : AppColors.border,
@@ -314,7 +472,9 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                   child: Text(
                     make,
                     style: TextStyle(
-                      color: selected ? AppColors.primary : AppColors.textSecondary,
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
                       fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     ),
                   ),
@@ -336,7 +496,9 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: selected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.card,
+                      color: selected
+                          ? AppColors.primary.withValues(alpha: 0.12)
+                          : AppColors.card,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: selected ? AppColors.primary : AppColors.border,
@@ -345,14 +507,20 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                     child: Row(
                       children: [
                         Icon(
-                          selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                          color: selected ? AppColors.primary : AppColors.textMuted,
+                          selected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textMuted,
                         ),
                         const SizedBox(width: 14),
                         Text(
                           model,
                           style: TextStyle(
-                            color: selected ? AppColors.textPrimary : AppColors.textSecondary,
+                            color: selected
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -375,11 +543,17 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('STEP 2', style: AppTypography.labelSmall.copyWith(color: AppColors.primary)),
+          Text(
+            'STEP 2',
+            style: AppTypography.labelSmall.copyWith(color: AppColors.primary),
+          ),
           const SizedBox(height: 8),
           Text('Connector type', style: AppTypography.displaySmall),
           const SizedBox(height: 6),
-          Text('What connector does your vehicle use?', style: AppTypography.bodyMedium),
+          Text(
+            'What connector does your vehicle use?',
+            style: AppTypography.bodyMedium,
+          ),
           const SizedBox(height: 28),
 
           ...ConnectorType.values.map((type) {
@@ -391,7 +565,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               ConnectorType.chademo => 'DC fast charging (Japanese)',
               ConnectorType.gbT => 'Chinese standard',
               ConnectorType.type1 => 'AC charging (North America)',
-              ConnectorType.bharatAc => 'Bharat AC-001 for two-wheelers and light EVs',
+              ConnectorType.bharatAc =>
+                'Bharat AC-001 for two-wheelers and light EVs',
               ConnectorType.bharatDc => 'Bharat DC-001 fast charging',
             };
 
@@ -402,7 +577,9 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: selected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.card,
+                    color: selected
+                        ? AppColors.primary.withValues(alpha: 0.12)
+                        : AppColors.card,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: selected ? AppColors.primary : AppColors.border,
@@ -414,12 +591,16 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: selected ? AppColors.primary.withValues(alpha: 0.2) : AppColors.surface,
+                          color: selected
+                              ? AppColors.primary.withValues(alpha: 0.2)
+                              : AppColors.surface,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Icon(
                           Icons.power_rounded,
-                          color: selected ? AppColors.primary : AppColors.textMuted,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textMuted,
                           size: 26,
                         ),
                       ),
@@ -428,16 +609,25 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(name, style: AppTypography.headlineSmall.copyWith(
-                              color: selected ? AppColors.primary : AppColors.textPrimary,
-                            )),
+                            Text(
+                              name,
+                              style: AppTypography.headlineSmall.copyWith(
+                                color: selected
+                                    ? AppColors.primary
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
                             const SizedBox(height: 3),
                             Text(description, style: AppTypography.bodySmall),
                           ],
                         ),
                       ),
                       if (selected)
-                        Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 24),
+                        Icon(
+                          Icons.check_circle_rounded,
+                          color: AppColors.primary,
+                          size: 24,
+                        ),
                     ],
                   ),
                 ),
@@ -456,11 +646,17 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('STEP 3', style: AppTypography.labelSmall.copyWith(color: AppColors.primary)),
+          Text(
+            'STEP 3',
+            style: AppTypography.labelSmall.copyWith(color: AppColors.primary),
+          ),
           const SizedBox(height: 8),
           Text('Battery settings', style: AppTypography.displaySmall),
           const SizedBox(height: 6),
-          Text('Set your battery details for accurate range estimates.', style: AppTypography.bodyMedium),
+          Text(
+            'Set your battery details for accurate range estimates.',
+            style: AppTypography.bodyMedium,
+          ),
           const SizedBox(height: 32),
 
           // Battery Capacity
@@ -477,7 +673,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
 
           _sliderSection(
             title: 'Estimated real-world range',
-            subtitle: 'Use the range you normally get, not the brochure maximum.',
+            subtitle:
+                'Use the range you normally get, not the brochure maximum.',
             value: _estimatedRangeKm,
             min: 40,
             max: 800,
@@ -497,8 +694,8 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
             color: _currentBattery > 50
                 ? AppColors.success
                 : _currentBattery > 20
-                    ? AppColors.warning
-                    : AppColors.error,
+                ? AppColors.warning
+                : AppColors.error,
             onChanged: (v) => setState(() => _currentBattery = v),
           ),
           const SizedBox(height: 32),
@@ -522,12 +719,20 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
             decoration: BoxDecoration(
               color: AppColors.card,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.2),
+              ),
             ),
             child: Column(
               children: [
-                _summaryRow('Vehicle', '${_selectedMake ?? ''} ${_selectedModel ?? ''}'),
-                _summaryRow('Connector', _connectorType?.name.toUpperCase().replaceAll('_', ' ') ?? ''),
+                _summaryRow(
+                  'Vehicle',
+                  '${_selectedMake ?? ''} ${_selectedModel ?? ''}',
+                ),
+                _summaryRow(
+                  'Connector',
+                  _connectorType?.name.toUpperCase().replaceAll('_', ' ') ?? '',
+                ),
                 _summaryRow('Capacity', '${_batteryCapacity.round()} kWh'),
                 _summaryRow('Vehicle type', _vehicleClass.replaceAll('_', ' ')),
                 _summaryRow('Range', '${_estimatedRangeKm.round()} km'),
@@ -566,7 +771,11 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
               ),
               child: Text(
                 '${value.round()} $unit',
-                style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 16),
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
               ),
             ),
           ],
@@ -593,7 +802,12 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: AppTypography.bodyMedium),
-          Text(value, style: AppTypography.headlineSmall.copyWith(color: AppColors.primary)),
+          Text(
+            value,
+            style: AppTypography.headlineSmall.copyWith(
+              color: AppColors.primary,
+            ),
+          ),
         ],
       ),
     );

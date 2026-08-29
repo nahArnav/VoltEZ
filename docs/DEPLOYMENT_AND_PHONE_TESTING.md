@@ -5,7 +5,7 @@ Compose deployment, the local web build, and the native phone prerequisites.
 
 ## What is verified in this branch
 
-- Backend unit/contract suite: 136 tests passed with integration tests excluded.
+- Backend unit/contract suite: 138 tests passed with integration tests excluded.
 - Python compilation, fatal Ruff checks, and a single Alembic head: passed.
 - Flutter static analyzer: 0 issues found.
 - Dynamic pricing bounds and tariff-lock behavior have focused regression tests.
@@ -184,16 +184,20 @@ Google Maps, and payment SDKs are more reliable from an HTTPS staging URL.
 
 - Set `ENVIRONMENT=production`; use a 32+ character random `SECRET_KEY`.
 - Set explicit HTTPS `CORS_ORIGINS`; wildcard CORS is rejected in production.
-- Configure Razorpay server secret/webhook values and only expose the public key
-  ID to the mobile build.
+- Configure Stripe server secret and success/cancel URLs for the preferred
+  hosted Checkout path (`STRIPE_SECRET_KEY`, `STRIPE_SUCCESS_URL`,
+  `STRIPE_CANCEL_URL`, and `STRIPE_WEBHOOK_SECRET`). Razorpay credentials remain a supported fallback; only
+  its public key ID belongs in a mobile build. Never commit either provider's
+  secret or webhook signing secret.
 - Use HTTPS for REST and WSS for realtime; terminate TLS at a reverse proxy or
   managed load balancer.
 - If a paid map/geocoding provider is enabled, restrict its keys by
   package/bundle ID and API usage; do not commit keys.
 - Configure Postgres backups, Redis persistence/alerts, log retention, and a
   deployment health check for `/health/ready`.
-- Replace the current FCM/mock notification adapter and simulated session
-  telemetry with the real provider/device integration before claiming a
+- Configure FCM credentials and device-token registration for OS push delivery;
+  the API now persists and serves in-app notifications, but push delivery and
+  simulated session telemetry still require provider/device integration before claiming a
   production charging network.
 - Add release Android signing and App Store provisioning; the current machine
   has no Android SDK, complete Xcode install, or CocoaPods, so native release
