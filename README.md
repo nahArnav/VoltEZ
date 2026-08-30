@@ -7,9 +7,10 @@
 > handoff and some examples below describe the pre-integration/mock state.
 > For the current live API, database, ML, Compose, and phone workflow, use
 > [`docs/DEPLOYMENT_AND_PHONE_TESTING.md`](docs/DEPLOYMENT_AND_PHONE_TESTING.md),
-> [`docs/frontend-api-mapping.md`](docs/frontend-api-mapping.md), and the
-> backend/ML documentation index. Do not copy the legacy mock adapters or old
-> integer-ID examples into new code.
+> [`docs/frontend-api-mapping.md`](docs/frontend-api-mapping.md),
+> [`docs/SPONSOR_INTEGRATION_PLAN.md`](docs/SPONSOR_INTEGRATION_PLAN.md), and
+> the backend/ML documentation index. Do not copy the legacy mock adapters or
+> old integer-ID examples into new code.
 
 ---
 

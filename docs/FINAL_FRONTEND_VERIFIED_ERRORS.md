@@ -33,9 +33,10 @@ the current changes have not been committed or pushed.
 - `(backend KYC endpoints)` - KYC values are validated/masked and persisted,
   but there is no external identity provider or human/admin review workflow.
 - `(location search)` - Charger registration, map search, and route search now
-  use the backend's debounced India-constrained geocoder with native OS fallback.
-  It is not Google Places autocomplete; a production Places provider/key may be
-  preferable for address-level ranking and must be configured separately.
+  use the backend's debounced India-constrained search. When
+  `GOOGLE_MAPS_API_KEY` is configured it uses Places Autocomplete + Details for
+  coordinate-backed suggestions; without that key it falls back to the
+  India-constrained Nominatim adapter and native OS geocoding.
 - `(backend/src/voltez_ml/route_energy + recommendation service)` - Model 5
   route-energy physics is packaged and tested, but the live recommendation
   endpoint still uses its bounded deterministic physics calculation; Model 5
@@ -78,6 +79,10 @@ the current changes have not been committed or pushed.
 - `(notifications)` - Authenticated users can read and mark persisted
   notifications through `/users/me/notifications`; OS push delivery still needs
   FCM credentials and device-token registration.
+- `(sponsor evidence)` - Concrete runtime/development usage, credential
+  boundaries, fallbacks, and demo evidence are recorded in
+  `docs/SPONSOR_INTEGRATION_PLAN.md`. Optional providers are intentionally not
+  described as enabled until their credentials and evidence exist.
 - `(backend/scripts/seed_demo.py)` - The deterministic demo seed is reconciled
   with the current ORM (UUID zone/connector references, normalized business
   hours and charger availability, current booking/session fields, and demand

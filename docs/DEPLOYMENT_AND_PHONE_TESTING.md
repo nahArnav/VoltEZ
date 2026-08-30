@@ -189,6 +189,12 @@ Google Maps, and payment SDKs are more reliable from an HTTPS staging URL.
   `STRIPE_CANCEL_URL`, and `STRIPE_WEBHOOK_SECRET`). Razorpay credentials remain a supported fallback; only
   its public key ID belongs in a mobile build. Never commit either provider's
   secret or webhook signing secret.
+- For Google-style address suggestions, set `GOOGLE_MAPS_API_KEY` on the
+  backend and enable Places API (Autocomplete + Details). Restrict the key to
+  the required APIs and server IPs; do not put it in Flutter or commit it.
+  Routes/FCM credentials are separate if ETA geometry or OS push delivery is
+  enabled. Without the Places key, the checked-in India-constrained Nominatim
+  fallback remains available but has lower ranking/rate limits.
 - Use HTTPS for REST and WSS for realtime; terminate TLS at a reverse proxy or
   managed load balancer.
 - If a paid map/geocoding provider is enabled, restrict its keys by
@@ -199,6 +205,9 @@ Google Maps, and payment SDKs are more reliable from an HTTPS staging URL.
   the API now persists and serves in-app notifications, but push delivery and
   simulated session telemetry still require provider/device integration before claiming a
   production charging network.
+- See [`SPONSOR_INTEGRATION_PLAN.md`](SPONSOR_INTEGRATION_PLAN.md) for the
+  concrete use, credential boundary, fallback and demo evidence required for
+  every sponsor. Do not claim a sponsor integration based on a logo alone.
 - Add release Android signing and App Store provisioning; the current machine
   has no Android SDK, complete Xcode install, or CocoaPods, so native release
   artifacts are still an environment task.

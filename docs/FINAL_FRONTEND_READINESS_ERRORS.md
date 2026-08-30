@@ -1,4 +1,10 @@
-# VoltEZ final-frontend Readiness Review
+# VoltEZ final-frontend Readiness Review (historical)
+
+> **Superseded report.** This snapshot was produced before the current
+> integration work and intentionally records defects that have since been
+> addressed. For the current branch status, read
+> [`FINAL_FRONTEND_VERIFIED_ERRORS.md`](FINAL_FRONTEND_VERIFIED_ERRORS.md) and
+> [`DEPLOYMENT_AND_PHONE_TESTING.md`](DEPLOYMENT_AND_PHONE_TESTING.md).
 
 Reviewed branch: `origin/final-frontend`
 
