@@ -7,6 +7,8 @@ import pytest
 
 from app.api.v1 import payments
 
+pytestmark = pytest.mark.integration
+
 
 async def _register_and_login(client, role: str) -> dict[str, str]:
     password = "SecurePassword123!"

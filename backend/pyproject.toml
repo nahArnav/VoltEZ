@@ -64,6 +64,9 @@ ignore = ["E501", "B905", "B008", "E402", "B904", "E741", "F841"]
 addopts = "-ra --strict-markers --strict-config"
 pythonpath = [".", "src"]
 testpaths = ["tests"]
+markers = [
+    "integration: tests that require reachable PostGIS/Redis services",
+]
 
 [tool.mypy]
 python_version = "3.12"

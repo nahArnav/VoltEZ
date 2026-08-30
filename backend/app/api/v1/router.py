@@ -10,6 +10,7 @@ from .locations import router as locations_router
 from .payments import router as payments_router
 from .recommendations import router as recommendations_router
 from .session import router as session_router
+from .sponsors import router as sponsors_router
 from .users import router as users_router
 from .vehicles import router as vehicles_router
 from .ws import router as ws_router
@@ -31,3 +32,5 @@ api_router.include_router(availability_router)
 api_router.include_router(payments_router)
 api_router.include_router(ws_router)
 api_router.include_router(analytics_router)
+api_router.include_router(sponsors_router)
+

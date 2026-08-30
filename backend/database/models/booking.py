@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID, ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import expression
@@ -27,6 +27,10 @@ class Booking(Base):
         CheckConstraint(
             "end_at > start_at",
             name="ck_bookings_end_after_start",
+        ),
+        CheckConstraint(
+            "cash_otp_attempts >= 0",
+            name="ck_bookings_cash_otp_attempts_nonnegative",
         ),
         {"schema": "app"},
     )
@@ -95,6 +99,31 @@ class Booking(Base):
     )
 
     hold_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    # Cash reservations use a short-lived, server-generated code.  Only the
+    # keyed hash is persisted; the plaintext is returned once to the driver
+    # after cash checkout and is never included in booking responses.
+    cash_otp_hash: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+    )
+
+    cash_otp_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    cash_otp_attempts: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
+    cash_otp_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

@@ -2,17 +2,20 @@ from datetime import timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from geoalchemy2 import Geometry as GeometryType
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user_id
 from app.db.session import get_db
 from app.schemas.booking import BookingCreate, BookingResponse
 from app.services.booking import booking_service
+from app.services.cash import get_booking_start_code
 from database.models.booking import Booking
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
 from database.models.connector import ConnectorType
+from database.models.payment import Payment
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -23,30 +26,44 @@ async def _with_charger_context(db: AsyncSession, booking: Booking) -> dict:
         select(
             Charger.name,
             Charger.address_text,
+            func.ST_Y(Charger.location.cast(GeometryType)).label("latitude"),
+            func.ST_X(Charger.location.cast(GeometryType)).label("longitude"),
             Charger.price_per_kwh,
             Booking.quoted_price_per_kwh,
             ChargerPort.max_power_kw,
             ConnectorType.display_name,
+            Payment.method,
+            Payment.status,
         )
         .select_from(Booking)
         .join(ChargerPort, Booking.charger_port_id == ChargerPort.id)
         .join(Charger, ChargerPort.charger_id == Charger.id)
         .join(ConnectorType, ChargerPort.connector_type_id == ConnectorType.id)
+        .outerjoin(Payment, Payment.booking_id == Booking.id)
         .where(Booking.id == booking.id)
     )
+
     row = context.one_or_none()
     payload = BookingResponse.model_validate(booking).model_dump()
+    start_code = get_booking_start_code(booking)
+    payload["start_code"] = start_code
     if row is not None:
-        name, address, price, quoted_price, power, connector = row
+        name, address, lat, lng, price, quoted_price, power, connector, payment_method, payment_status = row
         payload.update(
             charger_name=name,
             charger_address=address,
+            charger_latitude=float(lat) if lat is not None else None,
+            charger_longitude=float(lng) if lng is not None else None,
             price_per_kwh=float(quoted_price or price),
             quoted_price_per_kwh=float(quoted_price) if quoted_price is not None else None,
             power_kw=float(power),
             connector_type=connector,
+            payment_method=payment_method,
+            payment_status=payment_status,
+            cash_otp_verified_at=booking.cash_otp_verified_at,
         )
     return payload
+
 
 
 @router.get("/", response_model=list[BookingResponse])

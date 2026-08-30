@@ -17,7 +17,13 @@ from app.schemas.business import (
     BusinessResponse,
     BusinessUpdate,
 )
+from app.schemas.cash import (
+    CashOtpVerificationResponse,
+    CashOtpVerifyRequest,
+    CashSettlementResponse,
+)
 from app.schemas.enums import BookingStatus, UserRole
+from app.services.cash_flow import cash_flow_service
 from database.models.booking import Booking
 from database.models.booking_event import BookingEvent
 from database.models.business import Business
@@ -161,6 +167,74 @@ async def list_business_bookings(
         await _with_charger_context(db, booking)
         for booking in result.scalars().all()
     ]
+
+
+@router.post(
+    "/{business_id}/bookings/{booking_id}/cash-verify",
+    response_model=CashOtpVerificationResponse,
+)
+async def verify_cash_booking_otp(
+    business_id: UUID,
+    booking_id: UUID,
+    otp_in: CashOtpVerifyRequest,
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Host verifies the driver's one-time cash code and starts charging."""
+
+    business = await business_repo.get(db, id=business_id)
+    if business is None or (
+        current_user.role != UserRole.ADMIN and business.owner_id != current_user.id
+    ):
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    booking, session = await cash_flow_service.verify_otp_and_start(
+        db,
+        business_id=business_id,
+        booking_id=booking_id,
+        code=otp_in.code,
+    )
+    return CashOtpVerificationResponse(
+        booking_id=booking.id,
+        session_id=session.id,
+        booking_status=booking.status,
+        session_status=session.status,
+        started_at=session.started_at,
+    )
+
+
+@router.post(
+    "/{business_id}/bookings/{booking_id}/cash-settle",
+    response_model=CashSettlementResponse,
+)
+async def settle_cash_booking(
+    business_id: UUID,
+    booking_id: UUID,
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Host records receipt of cash after the driver finishes charging."""
+
+    business = await business_repo.get(db, id=business_id)
+    if business is None or (
+        current_user.role != UserRole.ADMIN and business.owner_id != current_user.id
+    ):
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    payment = await cash_flow_service.settle_cash(
+        db,
+        business_id=business_id,
+        booking_id=booking_id,
+        actor_id=current_user.id,
+    )
+    return CashSettlementResponse(
+        payment_id=payment.id,
+        booking_id=payment.booking_id,
+        amount=float(payment.amount),
+        currency=payment.currency,
+        status=payment.status,
+        verified_at=payment.verified_at,
+    )
 
 
 @router.post("/{business_id}/bookings/{booking_id}/cancel", response_model=BookingResponse)

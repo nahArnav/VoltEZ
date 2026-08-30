@@ -11,6 +11,7 @@ from app.repositories.booking import booking_repo
 from app.repositories.charger import charger_port_repo
 from app.repositories.session import session_repo
 from app.schemas.enums import BookingStatus
+from app.services.cash import matches_cash_otp
 from app.services.fcm import fcm_service
 from app.services.trust import trust_service
 from app.websockets.manager import manager
@@ -32,6 +33,18 @@ class SessionService:
         booking_user_id = booking.user_id
         if booking_user_id != user_id:
             raise ForbiddenError(message="Not authorized to check in for this booking.")
+
+        # Owner OTP verification may have already created/started the session
+        # while the driver was on the confirmation screen. Treat a subsequent
+        # driver tap as an idempotent read instead of rejecting a valid cash
+        # booking because its status is now CHARGING.
+        existing_session = await session_repo.get_by_booking(db, booking_id=booking.id)
+        if existing_session is not None and existing_session.status in {
+            "reserved",
+            "charging",
+            "completed",
+        }:
+            return existing_session
 
         booking_status = BookingStatus(cast(str, booking.status))
         if booking_status != BookingStatus.CONFIRMED:
@@ -111,7 +124,7 @@ class SessionService:
         return new_session
 
     @staticmethod
-    async def start_charging(db: AsyncSession, session_id: UUID, user_id: UUID) -> ChargingSession:
+    async def start_charging(db: AsyncSession, session_id: UUID, user_id: UUID, otp: str | None = None) -> ChargingSession:
         """Mark that charging has actually begun (plug connected, power flowing)."""
 
         session = await session_repo.get(db, id=session_id)
@@ -130,8 +143,32 @@ class SessionService:
             raise ForbiddenError(message="Not authorized for this session.")
 
         booking_user_id = booking.user_id
+        is_owner = False
+        
+        # Check if user is the business owner
         if booking_user_id != user_id:
+            port = await charger_port_repo.get(db, id=booking.charger_port_id)
+            if port:
+                charger = await db.get(Charger, port.charger_id)
+                if charger and charger.business_id:
+                    from database.models.business import Business
+                    business = await db.get(Business, charger.business_id)
+                    if business and business.owner_id == user_id:
+                        is_owner = True
+                        
+        if booking_user_id != user_id and not is_owner:
             raise ForbiddenError(message="Not authorized for this session.")
+
+        # If it's a cash booking, verify OTP
+        if booking.cash_otp_hash:
+            if not otp:
+                raise BadRequestError(message="Cash payment requires an OTP to start charging.")
+            if not matches_cash_otp(booking, otp):
+                booking.cash_otp_attempts += 1
+                db.add(booking)
+                await db.commit()
+                raise BadRequestError(message="Invalid OTP.")
+            booking.cash_otp_verified_at = datetime.now(UTC)
 
         # 1. Update session
         now = datetime.now(UTC)

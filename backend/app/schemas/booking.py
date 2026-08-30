@@ -45,8 +45,16 @@ class BookingResponse(BookingBase):
     created_at: datetime
     charger_name: str | None = None
     charger_address: str | None = None
+    charger_latitude: float | None = None
+    charger_longitude: float | None = None
     connector_type: str | None = None
     power_kw: float | None = None
     price_per_kwh: float | None = None
+    payment_method: str | None = None
+    payment_status: str | None = None
+    cash_otp_verified_at: datetime | None = None
+    start_code: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+

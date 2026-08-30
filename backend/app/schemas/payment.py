@@ -57,6 +57,10 @@ class PaymentResponse(PaymentBase):
     created_at: datetime
     provider: str | None = None
     checkout_url: str | None = None
+    # Returned only from the cash create-order response. It is intentionally
+    # absent from booking reads and payment-history responses.
+    cash_otp: str | None = None
+    cash_otp_expires_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

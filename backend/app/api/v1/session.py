@@ -58,6 +58,12 @@ class CheckInRequest(BaseModel):
     booking_id: UUID
 
 
+class StartSessionRequest(BaseModel):
+    """Business owner or driver starts the session. Cash bookings require an OTP."""
+
+    otp: str | None = None
+
+
 class CompleteSessionRequest(BaseModel):
     """Final telemetry sent when the driver unplugs. Cost is calculated server-side."""
 
@@ -107,6 +113,7 @@ async def check_in(
 @router.post("/{session_id}/start", response_model=ChargingSessionResponse)
 async def start_charging(
     session_id: UUID,
+    request: StartSessionRequest | None = None,
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -114,7 +121,8 @@ async def start_charging(
     Mark that charging has begun (plug connected, power flowing).
     Transitions session from checked_in → charging.
     """
-    session = await session_service.start_charging(db=db, session_id=session_id, user_id=user_id)
+    otp = request.otp if request else None
+    session = await session_service.start_charging(db=db, session_id=session_id, user_id=user_id, otp=otp)
     return await _with_charger_context(db, session)
 
 

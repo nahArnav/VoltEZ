@@ -2,6 +2,8 @@ from uuid import uuid4
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 async def test_recommendations_endpoint(client):

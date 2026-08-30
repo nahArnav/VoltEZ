@@ -70,7 +70,9 @@ class RecommendationService:
         # 3. Process each candidate
         for charger in candidates:
             # We hard-filter inactive chargers
-            if str(charger.status) != "available":
+            # Status values are persisted as lowercase, but normalising here
+            # keeps legacy/imported rows from being silently excluded.
+            if str(charger.status).lower() != "available":
                 continue
 
             # Safely get dynamically attached lat/lon

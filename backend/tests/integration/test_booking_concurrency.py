@@ -4,6 +4,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 
 async def _auth(client, role: str) -> dict[str, str]:
     email = f"lock-{role}-{uuid4()}@example.com"

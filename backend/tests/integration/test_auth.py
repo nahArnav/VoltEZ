@@ -2,6 +2,8 @@ from uuid import uuid4
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 
 # We mark this test as 'asyncio' because our FastAPI app is asynchronous
 @pytest.mark.asyncio

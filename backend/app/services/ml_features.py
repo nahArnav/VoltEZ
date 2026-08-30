@@ -151,7 +151,7 @@ async def build_demand_features(
     active_sessions = list(session_result.scalars().all())
     available_ports = (
         sum(1 for _, is_active in port_records if is_active)
-        if getattr(charger, "status", "") == "available"
+        if str(getattr(charger, "status", "")).lower() == "available"
         else 0
     )
 

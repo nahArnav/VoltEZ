@@ -15,10 +15,27 @@ class Settings(BaseSettings):
     # ML Integrations
     ML_MODEL_API_URL: str = "http://localhost:8001"
 
-    # Location search. When present, the backend uses Google's Places
-    # autocomplete + details APIs for high-quality, coordinate-backed
-    # suggestions. Without a key we fall back to the no-key Nominatim adapter.
+    # Location search. When present, the backend uses Google Places API (New)
+    # and Routes API for high-quality coordinate-backed suggestions & live ETAs.
     GOOGLE_MAPS_API_KEY: str = ""
+
+    # Sponsor Integrations
+    GEMINI_API_KEY: str = ""
+    TAVILY_API_KEY: str = ""
+    LYZR_API_KEY: str = ""
+    LYZR_AGENT_ID: str = ""
+    STARTUPED_API_KEY: str = ""
+    SWYTCHCODE_API_KEY: str = ""
+    N8N_BASE_URL: str = ""
+    N8N_API_KEY: str = ""
+    N8N_WEBHOOK_SECRET: str = ""
+
+    # Firebase Cloud Messaging
+    FIREBASE_PROJECT_ID: str = ""
+    FIREBASE_CLIENT_EMAIL: str = ""
+    FIREBASE_PRIVATE_KEY: str = ""
+    FCM_VAPID_KEY: str = ""
+
 
     # Razorpay Integration
     RAZORPAY_KEY_ID: str = "rzp_test_placeholder"
@@ -33,6 +50,8 @@ class Settings(BaseSettings):
     STRIPE_CANCEL_URL: str = "https://example.invalid/payment/cancel"
     BOOKING_HOLD_FEE_INR: float = 50.0
     DEFAULT_PRICE_PER_KWH_INR: float = 15.0
+    CASH_OTP_TTL_MINUTES: int = 1440
+    CASH_OTP_MAX_ATTEMPTS: int = 5
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -80,8 +99,9 @@ class Settings(BaseSettings):
             raise ValueError("SECRET_KEY must contain at least 32 characters in production")
         if self.CORS_ORIGINS.strip() == "*":
             raise ValueError("CORS_ORIGINS must list explicit origins in production")
-        if not (self.stripe_is_configured or self.razorpay_is_configured):
-            raise ValueError("Stripe or Razorpay credentials must be configured in production")
+        # Cash pay-at-charger is a valid production mode. Gateway credentials
+        # are required only when card/UPI checkout is enabled, not to boot the
+        # application or accept cash reservations.
         if self.stripe_is_configured and (
             "example.invalid" in self.STRIPE_SUCCESS_URL
             or "example.invalid" in self.STRIPE_CANCEL_URL

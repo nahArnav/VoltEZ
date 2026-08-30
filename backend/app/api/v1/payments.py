@@ -23,6 +23,7 @@ from app.schemas.payment import (
     PaymentVerifyRequest,
     StripeVerifyRequest,
 )
+from app.services.cash import issue_cash_otp
 from database.models.booking_event import BookingEvent
 from database.models.user import User
 
@@ -90,10 +91,31 @@ async def create_order(
     Create a Razorpay order and save the pending payment to the database.
     """
     booking = await _require_owned_booking(db, payment_in.booking_id, current_user)
-    _require_payable_booking(booking)
     existing = await payment_repo.get_by_booking(db, booking_id=booking.id)
     if existing and existing.status == "completed":
         return existing
+
+    # A driver may reopen checkout after the app was backgrounded. For an
+    # already-confirmed cash booking, rotate the one-time code and return it
+    # again rather than rejecting the retry as non-payable.
+    if (
+        payment_in.method == "cash"
+        and existing is not None
+        and existing.status == "pending"
+        and existing.method == "cash"
+        and booking.status == BookingStatus.CONFIRMED.value
+    ):
+        cash_otp, cash_otp_expires_at = issue_cash_otp(booking)
+        db.add(booking)
+        await db.commit()
+        await db.refresh(existing)
+        response = PaymentResponse.model_validate(existing)
+        response.provider = "cash"
+        response.cash_otp = cash_otp
+        response.cash_otp_expires_at = cash_otp_expires_at
+        return response
+
+    _require_payable_booking(booking)
 
     # A booking has one auditable payment row. If the driver changes method
     # before completing checkout, reuse that row instead of violating the
@@ -111,6 +133,7 @@ async def create_order(
     # charging session completes (or an owner verifies cash collection).
     if payment_in.method == "cash":
         old_status = booking.status
+        cash_otp, cash_otp_expires_at = issue_cash_otp(booking)
         if existing is None:
             payment = await payment_repo.create(
                 db,
@@ -132,19 +155,24 @@ async def create_order(
             payment.provider_payment_id = None
             payment.verified_at = None
         booking.status = BookingStatus.CONFIRMED.value
-        db.add(
-            BookingEvent(
-                booking_id=booking.id,
-                old_status=old_status,
-                new_status=BookingStatus.CONFIRMED.value,
-                actor="user:cash-pay-at-charger",
-                metadata_={"payment_method": "cash"},
+        if old_status != BookingStatus.CONFIRMED.value:
+            db.add(
+                BookingEvent(
+                    booking_id=booking.id,
+                    old_status=old_status,
+                    new_status=BookingStatus.CONFIRMED.value,
+                    actor="user:cash-pay-at-charger",
+                    metadata_={"payment_method": "cash"},
+                )
             )
-        )
         db.add(booking)
         await db.commit()
         await db.refresh(payment)
-        return payment
+        response = PaymentResponse.model_validate(payment)
+        response.provider = "cash"
+        response.cash_otp = cash_otp
+        response.cash_otp_expires_at = cash_otp_expires_at
+        return response
 
     if settings.active_payment_provider == "stripe":
         if stripe is None or not settings.stripe_is_configured:
