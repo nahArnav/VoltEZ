@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:provider/provider.dart';
 
+
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/providers/charger_discovery_provider.dart';
@@ -37,6 +38,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   // Base-map center only; no charger data is fabricated when GPS/API access
   // is unavailable.
   static const latlong.LatLng _defaultCenter = latlong.LatLng(18.5204, 73.8567);
+
 
   // Connector type display labels (backend uses plain strings)
   static const Map<String, String> _connectorLabels = {
@@ -137,6 +139,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
               _centerOnPosition(discovery.currentPosition!);
             }
 
+
             return Stack(
               children: [
                 // ─── OpenStreetMap ───
@@ -230,8 +233,6 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           13,
         );
       } catch (_) {
-        // The map controller may not be attached on the first frame; the next
-        // location refresh will retry without affecting charger data.
         _lastCenteredPosition = null;
       }
     });
@@ -259,13 +260,13 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
         },
       ),
       children: [
-        // OpenStreetMap tile layer — dark themed
+        // OpenStreetMap tile layer
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.voltzez.app',
+          userAgentPackageName: 'com.voltez.app',
         ),
 
-        // Marker layer with charger pins
+        // Marker layer with high-visibility station pins
         MarkerLayer(
           markers: discovery.filteredChargers.map((charger) {
             final isRecommended = recIds.contains(charger.id);
@@ -273,8 +274,8 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
             return Marker(
               point: latlong.LatLng(charger.latitude, charger.longitude),
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               child: GestureDetector(
                 onTap: () {
                   discovery.selectCharger(charger);
@@ -288,16 +289,16 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   decoration: BoxDecoration(
                     color: isRecommended ? AppColors.secondary : statusCol,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: Colors.white, width: 2.5),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
+                        color: Colors.black.withValues(alpha: 0.35),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.ev_station_rounded,
                     color: Colors.white,
                     size: 22,
@@ -308,7 +309,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           }).toList(),
         ),
 
-        // Attribution
+        // OpenStreetMap attribution
         RichAttributionWidget(
           attributions: [
             TextSourceAttribution('OpenStreetMap contributors', onTap: () {}),
@@ -317,6 +318,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
       ],
     );
   }
+
 
   // ─── Search Bar ───
   Widget _buildSearchBar(ChargerDiscoveryProvider discovery) {
@@ -455,6 +457,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   14,
                 );
               },
+
             );
           },
         ),
@@ -673,6 +676,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
           discovery.refreshLocation();
         }
       },
+
       child: Container(
         width: 48,
         height: 48,
@@ -1019,6 +1023,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                               _mapController.camera.zoom,
                             );
                           },
+
                           child: SizedBox(
                             width: 210,
                             height: 156,

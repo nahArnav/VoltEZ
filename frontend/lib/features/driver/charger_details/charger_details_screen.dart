@@ -7,8 +7,10 @@ import '../../../core/theme/typography.dart';
 import '../../../core/providers/booking_provider.dart';
 import '../../../core/providers/route_planner_provider.dart';
 import '../../../core/providers/charger_discovery_provider.dart';
+import '../../../core/utils/navigation_utils.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/widgets.dart';
+
 
 /// Charger Details — shown when driver taps a recommended charger
 /// or charger card from the map.
@@ -591,7 +593,26 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               ),
             ],
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.navigation_rounded, color: AppColors.primary),
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.all(14),
+            ),
+            onPressed: () {
+              NavigationUtils.openMapsNavigation(
+                latitude: charger.latitude,
+                longitude: charger.longitude,
+                title: charger.name,
+                context: context,
+              );
+            },
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: PrimaryButton(
               text: 'SELECT SLOT',
@@ -608,6 +629,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       ),
     );
   }
+
 
   // ─── Helpers ───
   Color _statusColor(String status) {

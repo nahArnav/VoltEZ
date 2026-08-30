@@ -6,7 +6,9 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/providers/booking_provider.dart';
 import '../../../core/providers/session_provider.dart';
+import '../../../core/utils/navigation_utils.dart';
 import '../../../shared/widgets/widgets.dart';
+
 
 /// Booking Confirmation — shown after successful payment verification.
 ///
@@ -169,6 +171,84 @@ class BookingConfirmationScreen extends StatelessWidget {
                         '₹${confirmed.estimatedCost.round()}',
                         highlight: true,
                       ),
+                      if (confirmed.startCode != null || booking.paymentOrder?.cashOtp != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.key_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'CHECK-IN START CODE / OTP',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      confirmed.startCode ??
+                                          booking.paymentOrder?.cashOtp ??
+                                          '------',
+                                      style: AppTypography.displaySmall.copyWith(
+                                        color: Colors.white,
+                                        letterSpacing: 3,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.copy_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  final code = confirmed.startCode ??
+                                      booking.paymentOrder?.cashOtp;
+                                  if (code != null) {
+                                    NavigationUtils.copyCode(
+                                      context,
+                                      code,
+                                      label: 'Check-in Code',
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -220,8 +300,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Please arrive 5 minutes before your slot. '
-                          'A 5-min grace period is provided.',
+                          'Show the 6-digit Start Code to the host or enter it on the charger screen to activate power.',
                           style: AppTypography.bodySmall.copyWith(
                             color: AppColors.textSecondary,
                             height: 1.4,
@@ -238,11 +317,17 @@ class BookingConfirmationScreen extends StatelessWidget {
                 PrimaryButton(
                   text: 'NAVIGATE TO CHARGER',
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            'Opening navigation to charger…'),
-                      ),
+                    final lat = confirmed.latitude ??
+                        booking.selectedCharger?.latitude ??
+                        18.5204;
+                    final lng = confirmed.longitude ??
+                        booking.selectedCharger?.longitude ??
+                        73.8567;
+                    NavigationUtils.openMapsNavigation(
+                      latitude: lat,
+                      longitude: lng,
+                      title: confirmed.chargerName,
+                      context: context,
                     );
                   },
                   isExpanded: true,
@@ -267,14 +352,15 @@ class BookingConfirmationScreen extends StatelessWidget {
 
                 // ─── View Booking CTA ───
                 SecondaryButton(
-                  text: 'VIEW BOOKING',
+                  text: 'VIEW ALL BOOKINGS',
                   onPressed: () {
                     booking.resetToSlots();
-                    context.go('/driver/booking');
+                    context.go('/driver/history');
                   },
                   isExpanded: true,
                   icon: Icons.receipt_long_rounded,
                 ),
+
                 const SizedBox(height: 12),
                 GestureDetector(
                   onTap: () => context.go('/driver/home'),

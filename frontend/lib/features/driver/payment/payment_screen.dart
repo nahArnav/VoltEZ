@@ -474,6 +474,35 @@ class _PaymentScreenState extends State<PaymentScreen>
               '₹${booking.holdResult?.estimatedCost.round() ?? 0} hold · ${booking.paymentMethod == 'cash' ? 'pay at charger' : booking.paymentMethod.toUpperCase()}',
               style: AppTypography.bodyMedium,
             ),
+            if (booking.paymentMethod == 'cash' && booking.paymentOrder?.cashOtp != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    Text('Start Code (OTP)', style: AppTypography.labelSmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      booking.paymentOrder!.cashOtp!,
+                      style: AppTypography.displaySmall.copyWith(
+                        letterSpacing: 4.0,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Show this code to the host to start charging',
+                style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+              ),
+            ],
             if (booking.razorpayPaymentId != null) ...[
               const SizedBox(height: 4),
               Text(
@@ -484,7 +513,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                 ),
               ),
             ],
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Text('Booking confirmed', style: AppTypography.bodySmall),
             const SizedBox(height: 24),
             PrimaryButton(

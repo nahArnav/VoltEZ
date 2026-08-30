@@ -4,12 +4,14 @@ import 'package:provider/provider.dart';
 
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
+import '../../../core/providers/booking_provider.dart';
 import '../../../core/providers/session_provider.dart';
+import '../../../core/network/booking_api.dart';
 import '../../../core/network/session_api.dart';
+import '../../../core/utils/navigation_utils.dart';
 import '../../../shared/widgets/widgets.dart';
 
-/// Driver History — shows all past charging sessions and bookings.
-/// Data comes from [SessionProvider.history].
+/// Driver History & Active Bookings — shows all active bookings, OTP codes, and past sessions.
 class DriverHistoryScreen extends StatefulWidget {
   const DriverHistoryScreen({super.key});
 
@@ -18,66 +20,171 @@ class DriverHistoryScreen extends StatefulWidget {
 }
 
 class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
-  String _filter = 'all'; // all, completed, confirmed, cancelled
+  String _filter = 'active'; // active, completed, all
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SessionProvider>().loadHistory();
+      _refresh();
     });
+  }
+
+  Future<void> _refresh() async {
+    await Future.wait([
+      context.read<BookingProvider>().loadHistory(),
+      context.read<SessionProvider>().loadHistory(),
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: VoltAppBar(title: 'History'),
+      appBar: VoltAppBar(
+        title: 'My Bookings & History',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+            onPressed: _refresh,
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: Consumer<SessionProvider>(
-          builder: (context, session, _) {
-            if (session.historyLoading) {
+        child: Consumer2<BookingProvider, SessionProvider>(
+          builder: (context, bookingProvider, sessionProvider, _) {
+            final isLoading =
+                bookingProvider.historyLoading || sessionProvider.historyLoading;
+            final bookings = bookingProvider.bookingHistory;
+            final sessions = sessionProvider.history;
+
+            final activeBookings = bookings.where((b) {
+              final s = b.status.toLowerCase();
+              return s == 'confirmed' ||
+                  s == 'held' ||
+                  s == 'pending' ||
+                  s == 'payment_pending' ||
+                  s == 'checked_in' ||
+                  s == 'charging';
+            }).toList();
+
+            final completedItems = sessions.where((s) => s.status == 'completed').toList();
+
+            if (isLoading && bookings.isEmpty && sessions.isEmpty) {
               return _buildSkeleton();
             }
 
-            if (session.history.isEmpty) {
-              return _buildEmpty();
-            }
-
-            final filtered = session.history.where((item) {
-              if (_filter == 'all') return true;
-              return item.status == _filter;
-            }).toList();
-
-            return Column(
-              children: [
-                const SizedBox(height: 8),
-
-                // Stats bar
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildStatsBar(session.history),
+            return RefreshIndicator(
+              onRefresh: _refresh,
+              color: AppColors.primary,
+              backgroundColor: AppColors.card,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
                 ),
-                const SizedBox(height: 12),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ─── Stats Bar ───
+                          _buildStatsBar(
+                            activeCount: activeBookings.length,
+                            completedCount: completedItems.length,
+                            totalSpent: completedItems.fold<double>(
+                              0,
+                              (sum, i) => sum + i.amountPaid,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
 
-                // Filter chips
-                _buildFilterChips(),
-                const SizedBox(height: 12),
+                          // ─── Segment Filter Chips ───
+                          _buildFilterChips(
+                            activeCount: activeBookings.length,
+                            completedCount: completedItems.length,
+                            totalCount: bookings.length + sessions.length,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
 
-                // History list
-                Expanded(
-                  child: filtered.isEmpty
-                      ? _buildFilterEmpty()
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 4),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, index) {
-                            return _buildHistoryCard(filtered[index]);
-                          },
+                  // ─── Content List ───
+                  if (_filter == 'active') ...[
+                    if (activeBookings.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _buildEmptyState(
+                          title: 'No active reservations',
+                          subtitle:
+                              'Book a fast charging slot from the map to view your Start Code here.',
+                          actionText: 'FIND A CHARGER',
+                          onAction: () => context.go('/driver/map'),
                         ),
-                ),
-              ],
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => _buildBookingCard(
+                              activeBookings[index],
+                              bookingProvider,
+                            ),
+                            childCount: activeBookings.length,
+                          ),
+                        ),
+                      ),
+                  ] else if (_filter == 'completed') ...[
+                    if (completedItems.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _buildEmptyState(
+                          title: 'No completed sessions yet',
+                          subtitle:
+                              'Completed charging receipts with cryptographic proof will appear here.',
+                          actionText: 'EXPLORE STATIONS',
+                          onAction: () => context.go('/driver/home'),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) =>
+                                _buildSessionCard(completedItems[index]),
+                            childCount: completedItems.length,
+                          ),
+                        ),
+                      ),
+                  ] else ...[
+                    // ALL tab
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            if (index < bookings.length) {
+                              return _buildBookingCard(
+                                bookings[index],
+                                bookingProvider,
+                              );
+                            }
+                            final sessionIndex = index - bookings.length;
+                            return _buildSessionCard(sessions[sessionIndex]);
+                          },
+                          childCount: bookings.length + sessions.length,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                ],
+              ),
             );
           },
         ),
@@ -86,57 +193,60 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
   }
 
   // ─── Stats Bar ───
-  Widget _buildStatsBar(List<DriverHistoryItem> items) {
-    final completed =
-        items.where((i) => i.status == 'completed').toList();
-    final totalSpent =
-        completed.fold<double>(0, (sum, i) => sum + i.amountPaid);
-    final totalKwh =
-        completed.fold<double>(0, (sum, i) => sum + i.energyKwh);
-
-
+  Widget _buildStatsBar({
+    required int activeCount,
+    required int completedCount,
+    required double totalSpent,
+  }) {
     return Row(
       children: [
-        _stat('${items.length}', 'Total', AppColors.primary),
-        const SizedBox(width: 12),
-        _stat('${completed.length}', 'Completed', AppColors.success),
-        const SizedBox(width: 12),
-        _stat(
-          '₹${totalSpent.round()}',
-          'Spent',
-          AppColors.warning,
-        ),
-        const SizedBox(width: 12),
-        _stat(
-          '${totalKwh.toStringAsFixed(1)}\nkWh',
-          'Charged',
-          AppColors.secondary,
-        ),
+        _statItem('$activeCount', 'Active Slots', AppColors.primary, Icons.schedule_rounded),
+        const SizedBox(width: 10),
+        _statItem('$completedCount', 'Completed', AppColors.success, Icons.check_circle_rounded),
+        const SizedBox(width: 10),
+        _statItem('₹${totalSpent.round()}', 'Total Spent', AppColors.warning, Icons.currency_rupee_rounded),
       ],
     );
   }
 
-  Widget _stat(String value, String label, Color color) {
+  Widget _statItem(String value, String label, Color color, IconData icon) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 6),
             Text(
               value,
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.w900,
-                fontSize: 14,
+                fontSize: 16,
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 2),
-            Text(label, style: AppTypography.labelSmall),
+            Text(
+              label,
+              style: AppTypography.labelSmall.copyWith(
+                color: AppColors.textMuted,
+                fontSize: 11,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
@@ -144,39 +254,35 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
   }
 
   // ─── Filter Chips ───
-  Widget _buildFilterChips() {
+  Widget _buildFilterChips({
+    required int activeCount,
+    required int completedCount,
+    required int totalCount,
+  }) {
     final filters = [
-      ('all', 'All'),
-      ('completed', 'Completed'),
-      ('confirmed', 'Upcoming'),
-      ('cancelled', 'Cancelled'),
+      ('active', 'Active & Upcoming ($activeCount)'),
+      ('completed', 'Completed ($completedCount)'),
+      ('all', 'All ($totalCount)'),
     ];
 
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: filters.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final (key, label) = filters[index];
-          final selected = _filter == key;
-          return GestureDetector(
+    return Row(
+      children: filters.map((f) {
+        final (key, label) = f;
+        final selected = _filter == key;
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: GestureDetector(
             onTap: () => setState(() => _filter = key),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: selected
                     ? AppColors.primary
                     : AppColors.card,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: selected
-                      ? AppColors.primary
-                      : AppColors.border,
+                  color: selected ? AppColors.primary : AppColors.border,
                 ),
               ),
               child: Text(
@@ -184,35 +290,327 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                 style: TextStyle(
                   color: selected
                       ? AppColors.textOnPrimary
-                      : AppColors.textMuted,
+                      : AppColors.textSecondary,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                 ),
               ),
             ),
-          );
-        },
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // ─── Active Booking Card (With Start Code & Navigation) ───
+  Widget _buildBookingCard(
+    ConfirmedBooking booking,
+    BookingProvider provider,
+  ) {
+    final status = booking.status.toLowerCase();
+    final isCancelled = status == 'cancelled';
+    final isConfirmed = status == 'confirmed' || status == 'held';
+
+    final (statusLabel, statusColor) = _bookingStatusMeta(status);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isCancelled
+              ? AppColors.error.withValues(alpha: 0.3)
+              : AppColors.primary.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Station header + Status badge
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.ev_station_rounded,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      booking.chargerName,
+                      style: AppTypography.headlineSmall.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      booking.chargerAddress,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 14),
+
+          // Time slot & Power specs
+          Row(
+            children: [
+              _infoBadge(
+                Icons.calendar_month_rounded,
+                '${booking.date} · ${booking.startTime} - ${booking.endTime}',
+                AppColors.textPrimary,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _infoBadge(
+                Icons.bolt_rounded,
+                '${booking.powerKw.round()} kW',
+                AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              _infoBadge(
+                Icons.power_rounded,
+                booking.connectorType,
+                AppColors.secondary,
+              ),
+              const SizedBox(width: 8),
+              _infoBadge(
+                Icons.currency_rupee_rounded,
+                'Est. ₹${booking.estimatedCost.round()}',
+                AppColors.success,
+              ),
+            ],
+          ),
+
+          // ─── START CODE / CHECK-IN OTP BANNER ───
+          if (booking.startCode != null && !isCancelled) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.18),
+                    AppColors.secondary.withValues(alpha: 0.08),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.45),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.key_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'START CODE / CHECK-IN OTP',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          booking.startCode!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 4,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => NavigationUtils.copyCode(
+                      context,
+                      booking.startCode!,
+                      label: 'Check-in Code',
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.copy_rounded,
+                            color: AppColors.primary,
+                            size: 14,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'COPY',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // ─── ACTION BUTTONS: NAVIGATE & CHECK IN ───
+          if (isConfirmed && !isCancelled) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                // Turn-by-Turn Navigation
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      final lat = booking.latitude ?? 18.5204;
+                      final lng = booking.longitude ?? 73.8567;
+                      NavigationUtils.openMapsNavigation(
+                        latitude: lat,
+                        longitude: lng,
+                        title: booking.chargerName,
+                        context: context,
+                      );
+                    },
+                    icon: const Icon(Icons.navigation_rounded, size: 18),
+                    label: const Text('NAVIGATE'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.6),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // Check In CTA
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      context
+                          .read<SessionProvider>()
+                          .setBookingId(booking.bookingId);
+                      context.go('/driver/session');
+                    },
+                    icon: const Icon(Icons.bolt_rounded, size: 18),
+                    label: const Text('CHECK IN'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textOnPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  // ─── History Card ───
-  Widget _buildHistoryCard(DriverHistoryItem item) {
-    final (statusLabel, statusColor) = _statusInfo(item.status);
-    final isCompleted = item.status == 'completed';
-    final isCancelled = item.status == 'cancelled';
-
+  // ─── Completed Session Card ───
+  Widget _buildSessionCard(DriverHistoryItem item) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCancelled
-              ? AppColors.error.withValues(alpha: 0.2)
-              : AppColors.border,
-        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,36 +621,42 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
+                  color: AppColors.success.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.ev_station_rounded,
-                    color: AppColors.primary, size: 22),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.success,
+                  size: 22,
+                ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.chargerName,
-                        style: AppTypography.headlineSmall),
+                    Text(
+                      item.chargerName,
+                      style: AppTypography.headlineSmall,
+                    ),
                     const SizedBox(height: 2),
-                    Text(item.chargerAddress,
-                        style: AppTypography.bodySmall),
+                    Text(
+                      '${item.date} · ${item.startTime} - ${item.endTime}',
+                      style: AppTypography.bodySmall,
+                    ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
+                  color: AppColors.success.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
-                  statusLabel,
+                child: const Text(
+                  'COMPLETED',
                   style: TextStyle(
-                    color: statusColor,
+                    color: AppColors.success,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                   ),
@@ -260,131 +664,70 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-
-          // Details row
+          const SizedBox(height: 12),
           Row(
             children: [
-              _detailChip(
-                Icons.calendar_today_rounded,
-                '${item.date} · ${item.startTime} – ${item.endTime}',
+              _metricChip(
+                Icons.bolt_rounded,
+                '${item.energyKwh.toStringAsFixed(1)} kWh',
+                AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              _metricChip(
+                Icons.speed_rounded,
+                '${item.durationMinutes} min',
+                AppColors.secondary,
+              ),
+              const SizedBox(width: 8),
+              _metricChip(
+                Icons.currency_rupee_rounded,
+                '₹${item.amountPaid.round()}',
+                AppColors.success,
               ),
             ],
           ),
-          if (isCompleted) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _metricChip(Icons.bolt_rounded,
-                    '${item.energyKwh.toStringAsFixed(1)} kWh', AppColors.primary),
-                const SizedBox(width: 8),
-                _metricChip(Icons.speed_rounded,
-                    '${item.durationMinutes} min', AppColors.secondary),
-                const SizedBox(width: 8),
-                _metricChip(Icons.power_rounded,
-                    '${item.connectorType} · ${item.powerKw.round()} kW', AppColors.textMuted),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _metricChip(Icons.currency_rupee,
-                    '₹${item.amountPaid.round()}', AppColors.success),
-                const Spacer(),
-                if (item.rating != null)
-                  Row(
-                    children: List.generate(5, (i) {
-                      return Icon(
-                        i < item.rating!
-                            ? Icons.star_rounded
-                            : Icons.star_outline_rounded,
-                        size: 16,
-                        color: i < item.rating!
-                            ? AppColors.warning
-                            : AppColors.textMuted,
-                      );
-                    }),
-                  ),
-              ],
-            ),
-          ],
-          if (!isCompleted && !isCancelled) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _metricChip(Icons.currency_rupee,
-                    '₹${item.amountPaid.round()}', AppColors.success),
-                const SizedBox(width: 8),
-                _metricChip(Icons.power_rounded,
-                    '${item.connectorType} · ${item.powerKw.round()} kW', AppColors.textMuted),
-                const Spacer(),
-                if (item.status == 'confirmed')
-                  GestureDetector(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Booking details coming soon'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(
-                        'VIEW',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(
+                Icons.verified_rounded,
+                color: AppColors.secondary,
+                size: 14,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Swytchcode verified audit proof',
+                style: TextStyle(
+                  color: AppColors.secondary.withValues(alpha: 0.9),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _detailChip(IconData icon, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: AppColors.textMuted, size: 14),
-        const SizedBox(width: 4),
-        Text(text,
-            style: AppTypography.bodySmall
-                .copyWith(fontSize: 11)),
-      ],
-    );
-  }
-
-  Widget _metricChip(IconData icon, String text, Color color) {
+  Widget _infoBadge(IconData icon, String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 12),
-          const SizedBox(width: 4),
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 6),
           Text(
             text,
             style: TextStyle(
               color: color,
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -393,107 +736,111 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     );
   }
 
-  (String, Color) _statusInfo(String status) => switch (status) {
-        'completed' => ('COMPLETED', AppColors.success),
-        'confirmed' => ('CONFIRMED', AppColors.primary),
-        'active' => ('ACTIVE', AppColors.primary),
-        'cancelled' => ('CANCELLED', AppColors.error),
-        _ => ('PENDING', AppColors.warning),
-      };
-
-  // ─── Empty State ───
-  Widget _buildEmpty() {
-    return Center(
-      child: Column(
+  Widget _metricChip(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.history_rounded,
-              size: 56,
-              color: AppColors.textMuted.withValues(alpha: 0.3)),
-          const SizedBox(height: 20),
-          Text('No charging sessions yet', style: AppTypography.headlineMedium),
-          const SizedBox(height: 8),
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 4),
           Text(
-            'Your bookings and sessions will appear here',
-            style: AppTypography.bodyMedium
-                .copyWith(color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 24),
-          PrimaryButton(
-            text: 'FIND A CHARGER',
-            onPressed: () => context.go('/driver/map'),
-            icon: Icons.map_rounded,
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFilterEmpty() {
+  Widget _buildEmptyState({
+    required String title,
+    required String subtitle,
+    required String actionText,
+    required VoidCallback onAction,
+  }) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.filter_list_off_rounded,
-              size: 48,
-              color: AppColors.textMuted.withValues(alpha: 0.3)),
-          const SizedBox(height: 16),
-          Text(
-            'No $_filter sessions',
-            style: AppTypography.headlineMedium,
-          ),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () => setState(() => _filter = 'all'),
-            child: Text(
-              'Show all',
-              style: TextStyle(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.ev_station_rounded,
                 color: AppColors.primary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+                size: 36,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(title, style: AppTypography.headlineMedium),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 24),
+            PrimaryButton(
+              text: actionText,
+              onPressed: onAction,
+              icon: Icons.search_rounded,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ─── Skeleton ───
   Widget _buildSkeleton() {
-    return Padding(
+    return ListView.builder(
       padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Stats skeleton
-          Row(
-            children: List.generate(
-              4,
-              (i) => Expanded(
-                child: Container(
-                  margin: EdgeInsets.only(right: i < 3 ? 12 : 0),
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // List skeleton
-          ...List.generate(4, (i) => Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                height: 120,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              )),
-        ],
+      itemCount: 4,
+      itemBuilder: (_, _) => Container(
+        height: 140,
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(18),
+        ),
       ),
     );
+  }
+
+  (String, Color) _bookingStatusMeta(String status) {
+    switch (status) {
+      case 'confirmed':
+        return ('CONFIRMED', AppColors.success);
+      case 'held':
+        return ('HELD (WAITING)', AppColors.warning);
+      case 'payment_pending':
+        return ('PAYMENT PENDING', AppColors.warning);
+      case 'checked_in':
+        return ('CHECKED IN', AppColors.primary);
+      case 'charging':
+        return ('CHARGING', AppColors.secondary);
+      case 'completed':
+        return ('COMPLETED', AppColors.success);
+      case 'cancelled':
+        return ('CANCELLED', AppColors.error);
+      default:
+        return (status.toUpperCase(), AppColors.textMuted);
+    }
   }
 }

@@ -93,6 +93,7 @@ class PaymentOrder {
     required this.bookingId,
     this.provider = 'razorpay',
     this.checkoutUrl,
+    this.cashOtp,
   });
 
   final String orderId;
@@ -100,6 +101,7 @@ class PaymentOrder {
   final String bookingId;
   final String provider;
   final String? checkoutUrl;
+  final String? cashOtp;
 }
 
 /// Final confirmed booking data from the backend.
@@ -115,6 +117,11 @@ class ConfirmedBooking {
     required this.powerKw,
     required this.estimatedCost,
     required this.status,
+    this.startCode,
+    this.latitude,
+    this.longitude,
+    this.paymentMethod,
+    this.paymentStatus,
   });
 
   final String bookingId;
@@ -127,7 +134,13 @@ class ConfirmedBooking {
   final double powerKw;
   final double estimatedCost;
   final String status;
+  final String? startCode;
+  final double? latitude;
+  final double? longitude;
+  final String? paymentMethod;
+  final String? paymentStatus;
 }
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Abstract API
@@ -292,27 +305,36 @@ class LiveBookingApi implements BookingApi {
       bookingId: json['booking_id']?.toString() ?? bookingId,
       provider: json['provider']?.toString() ?? 'razorpay',
       checkoutUrl: json['checkout_url']?.toString(),
+      cashOtp: json['cash_otp']?.toString(),
+    );
+  }
+
+  ConfirmedBooking _confirmedFromJson(Map<String, dynamic> json) {
+    final start = DateTime.parse(json['start_at'] as String).toLocal();
+    final end = DateTime.parse(json['end_at'] as String).toLocal();
+    return ConfirmedBooking(
+      bookingId: json['id'].toString(),
+      chargerName: json['charger_name']?.toString() ?? 'VoltEZ Station',
+      chargerAddress: json['charger_address']?.toString() ?? 'Charging Point',
+      date: '${start.day}/${start.month}/${start.year}',
+      startTime: _clock(start),
+      endTime: _clock(end),
+      connectorType: json['connector_type']?.toString() ?? 'CCS2',
+      powerKw: (json['power_kw'] as num?)?.toDouble() ?? 22.0,
+      estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status']?.toString() ?? 'confirmed',
+      startCode: json['start_code']?.toString(),
+      latitude: (json['charger_latitude'] as num?)?.toDouble(),
+      longitude: (json['charger_longitude'] as num?)?.toDouble(),
+      paymentMethod: json['payment_method']?.toString(),
+      paymentStatus: json['payment_status']?.toString(),
     );
   }
 
   @override
   Future<ConfirmedBooking> confirmCashPayment(String bookingId) async {
     final response = await _api.getBooking(bookingId);
-    final json = response.data as Map<String, dynamic>;
-    final start = DateTime.parse(json['start_at'] as String).toLocal();
-    final end = DateTime.parse(json['end_at'] as String).toLocal();
-    return ConfirmedBooking(
-      bookingId: json['id'].toString(),
-      chargerName: json['charger_name']?.toString() ?? 'Unknown charger',
-      chargerAddress: json['charger_address']?.toString() ?? 'Unknown location',
-      date: '${start.day}/${start.month}/${start.year}',
-      startTime: _clock(start),
-      endTime: _clock(end),
-      connectorType: json['connector_type']?.toString() ?? 'Unknown connector',
-      powerKw: (json['power_kw'] as num?)?.toDouble() ?? 0,
-      estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0,
-      status: json['status']?.toString() ?? 'confirmed',
-    );
+    return _confirmedFromJson(response.data as Map<String, dynamic>);
   }
 
   @override
@@ -329,21 +351,7 @@ class LiveBookingApi implements BookingApi {
       'provider_signature': signature,
     });
     final response = await _api.getBooking(bookingId);
-    final json = response.data as Map<String, dynamic>;
-    final start = DateTime.parse(json['start_at'] as String).toLocal();
-    final end = DateTime.parse(json['end_at'] as String).toLocal();
-    return ConfirmedBooking(
-      bookingId: json['id'].toString(),
-      chargerName: json['charger_name']?.toString() ?? 'Unknown charger',
-      chargerAddress: json['charger_address']?.toString() ?? 'Unknown location',
-      date: '${start.day}/${start.month}/${start.year}',
-      startTime: _clock(start),
-      endTime: _clock(end),
-      connectorType: json['connector_type']?.toString() ?? 'Unknown connector',
-      powerKw: (json['power_kw'] as num?)?.toDouble() ?? 0,
-      estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0,
-      status: json['status']?.toString() ?? 'confirmed',
-    );
+    return _confirmedFromJson(response.data as Map<String, dynamic>);
   }
 
   @override
@@ -356,21 +364,7 @@ class LiveBookingApi implements BookingApi {
       'checkout_session_id': checkoutSessionId,
     });
     final response = await _api.getBooking(bookingId);
-    final json = response.data as Map<String, dynamic>;
-    final start = DateTime.parse(json['start_at'] as String).toLocal();
-    final end = DateTime.parse(json['end_at'] as String).toLocal();
-    return ConfirmedBooking(
-      bookingId: json['id'].toString(),
-      chargerName: json['charger_name']?.toString() ?? 'Unknown charger',
-      chargerAddress: json['charger_address']?.toString() ?? 'Unknown location',
-      date: '${start.day}/${start.month}/${start.year}',
-      startTime: _clock(start),
-      endTime: _clock(end),
-      connectorType: json['connector_type']?.toString() ?? 'Unknown connector',
-      powerKw: (json['power_kw'] as num?)?.toDouble() ?? 0,
-      estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0,
-      status: json['status']?.toString() ?? 'confirmed',
-    );
+    return _confirmedFromJson(response.data as Map<String, dynamic>);
   }
 
   @override
@@ -382,25 +376,10 @@ class LiveBookingApi implements BookingApi {
   Future<List<ConfirmedBooking>> getBookingHistory() async {
     final response = await _api.getDriverBookings();
     return (response.data as List<dynamic>).map((item) {
-      final json = item as Map<String, dynamic>;
-      final start = DateTime.parse(json['start_at'] as String).toLocal();
-      final end = DateTime.parse(json['end_at'] as String).toLocal();
-      return ConfirmedBooking(
-        bookingId: json['id'].toString(),
-        chargerName: json['charger_name']?.toString() ?? 'Unknown charger',
-        chargerAddress:
-            json['charger_address']?.toString() ?? 'Unknown location',
-        date: '${start.day}/${start.month}/${start.year}',
-        startTime: _clock(start),
-        endTime: _clock(end),
-        connectorType:
-            json['connector_type']?.toString() ?? 'Unknown connector',
-        powerKw: (json['power_kw'] as num?)?.toDouble() ?? 0,
-        estimatedCost: (json['estimated_amount'] as num?)?.toDouble() ?? 0,
-        status: json['status']?.toString() ?? 'held',
-      );
+      return _confirmedFromJson(item as Map<String, dynamic>);
     }).toList();
   }
+
 
   static String _connectorName(int id) {
     return const <int, String>{

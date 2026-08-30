@@ -221,6 +221,15 @@ class BusinessProvider extends ChangeNotifier {
     });
   }
 
+  Future<bool> verifyCashCode(String bookingId, String code) async {
+    final id = businessId;
+    if (id == null) return false;
+    return _mutate(() async {
+      await _api.verifyCashBookingOtp(id, bookingId, code);
+      await _loadBusinessData();
+    });
+  }
+
   Future<bool> submitKyc({
     required String businessId,
     String? gstin,

@@ -123,7 +123,15 @@ class SessionProvider extends ChangeNotifier {
 
     try {
       _sessionData = await _api.checkIn(_bookingId!);
-      _phase = SessionPhase.checkedIn;
+      // A host may have verified the cash OTP and started the session before
+      // the driver taps CHECK IN. Reflect the server status immediately so the
+      // driver is taken to the live charging view instead of seeing a second
+      // "START CHARGING" action that would fail.
+      _phase = _sessionData!.status == SessionStatus.charging
+          ? SessionPhase.charging
+          : _sessionData!.status == SessionStatus.completed
+          ? SessionPhase.complete
+          : SessionPhase.checkedIn;
       // Connect WebSocket for live updates
       await _connectWebSocket(_sessionData!.sessionId);
     } on SessionApiException catch (e) {
@@ -139,6 +147,7 @@ class SessionProvider extends ChangeNotifier {
 
   /// Start the charging session (transition from checkedIn to charging).
   Future<void> startCharging() async {
+    if (_phase == SessionPhase.charging) return;
     if (_phase != SessionPhase.checkedIn) return;
     if (_sessionData == null) return;
     _errorMessage = null;

@@ -457,20 +457,84 @@ class _BookingList extends StatelessWidget {
             subtitle: Text(
               '${start == null ? 'Time unavailable' : _dateTime(start)} • ${booking['connector_type'] ?? 'Unknown connector'}',
             ),
-            trailing: allowCancel && cancellable
-                ? IconButton(
-                    tooltip: 'Cancel booking',
-                    icon: const Icon(
-                      Icons.cancel_outlined,
-                      color: AppColors.error,
-                    ),
-                    onPressed: () =>
-                        provider.cancelBooking(booking['id'].toString()),
+                trailing: allowCancel && cancellable
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (status.toLowerCase() == 'confirmed' || status.toLowerCase() == 'checked_in')
+                        TextButton(
+                          onPressed: () => _showVerifyCashCode(context, provider, booking),
+                          child: const Text('VERIFY CODE'),
+                        ),
+                      IconButton(
+                        tooltip: 'Cancel booking',
+                        icon: const Icon(
+                          Icons.cancel_outlined,
+                          color: AppColors.error,
+                        ),
+                        onPressed: () =>
+                            provider.cancelBooking(booking['id'].toString()),
+                      ),
+                    ],
                   )
                 : Chip(label: Text(status.toUpperCase())),
           ),
         );
       }).toList(),
+    );
+  }
+
+  void _showVerifyCashCode(
+    BuildContext context,
+    BusinessProvider provider,
+    Map<String, dynamic> booking,
+  ) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Verify Cash Booking'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter the 6-digit start code from the driver\'s app to confirm payment and start charging.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'OTP Code',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCEL'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (controller.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              final success = await provider.verifyCashCode(
+                booking['id'].toString(),
+                controller.text.trim(),
+              );
+              if (success && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Charging started successfully!')),
+                );
+              }
+            },
+            child: const Text('START CHARGING'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -958,12 +1022,17 @@ Future<List<_AddressSuggestion>> _searchAddressSuggestions(
 }
 
 Future<void> _showAddCharger(BuildContext context) async {
+  final biz = context.read<BusinessProvider>().business;
+  final defaultAddress = biz?['address_text']?.toString() ?? '';
+  final defaultLat = (biz?['latitude'] as num?)?.toDouble() ?? 18.5204;
+  final defaultLng = (biz?['longitude'] as num?)?.toDouble() ?? 73.8567;
+
   final name = TextEditingController();
   final power = TextEditingController();
   final price = TextEditingController(text: '15');
   final portNumber = TextEditingController(text: '1');
   final portPower = TextEditingController(text: '22');
-  final location = TextEditingController();
+  final location = TextEditingController(text: defaultAddress);
   Timer? searchTimer;
   var searchToken = 0;
   var chargerType = 'DC';
@@ -975,8 +1044,9 @@ Future<void> _showAddCharger(BuildContext context) async {
       var suggestions = <_AddressSuggestion>[];
       var searching = false;
       var saving = false;
-      double? selectedLatitude;
-      double? selectedLongitude;
+      double? selectedLatitude = defaultLat;
+      double? selectedLongitude = defaultLng;
+
 
       Future<void> search(
         String query,
@@ -1251,33 +1321,42 @@ Future<void> _showAddCharger(BuildContext context) async {
                         );
                         return;
                       }
+                      final api = context.read<ApiService>();
+                      final businessProvider = context.read<BusinessProvider>();
                       if (selectedLatitude == null ||
                           selectedLongitude == null) {
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Select the charger address from the suggestions first.',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-                      setState(() => saving = true);
-                      final ok = await context
-                          .read<BusinessProvider>()
-                          .createCharger(
-                            name: name.text.trim(),
-                            chargerType: chargerType,
-                            powerKw: p,
-                            pricePerKwh: pr,
-                            latitude: selectedLatitude!,
-                            longitude: selectedLongitude!,
-                            addressText: location.text.trim(),
-                            connectorTypeId: connectorTypeId,
-                            portNumber: pn,
-                            portMaxPowerKw: pp,
-                            accessType: accessType,
+                        if (location.text.trim().isNotEmpty) {
+                          final results = await _searchAddressSuggestions(
+                            location.text.trim(),
+                            api: api,
                           );
+                          if (results.isNotEmpty) {
+                            selectedLatitude = results.first.latitude;
+                            selectedLongitude = results.first.longitude;
+                          }
+                        }
+                        selectedLatitude ??= defaultLat;
+                        selectedLongitude ??= defaultLng;
+                      }
+                      if (!dialogContext.mounted) return;
+                      setState(() => saving = true);
+                      final ok = await businessProvider.createCharger(
+                        name: name.text.trim(),
+                        chargerType: chargerType,
+                        powerKw: p,
+                        pricePerKwh: pr,
+                        latitude: selectedLatitude!,
+                        longitude: selectedLongitude!,
+                        addressText: location.text.trim().isNotEmpty
+                            ? location.text.trim()
+                            : defaultAddress,
+                        connectorTypeId: connectorTypeId,
+                        portNumber: pn,
+                        portMaxPowerKw: pp,
+                        accessType: accessType,
+                      );
+
+
                       if (!dialogContext.mounted) return;
                       if (ok) {
                         Navigator.pop(dialogContext);

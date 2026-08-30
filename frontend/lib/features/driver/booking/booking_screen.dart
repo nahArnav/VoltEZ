@@ -5,9 +5,12 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/providers/booking_provider.dart';
+import '../../../core/providers/session_provider.dart';
 import '../../../core/network/booking_api.dart';
+import '../../../core/utils/navigation_utils.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/widgets.dart';
+
 
 /// Slot selection + hold countdown + booking history.
 ///
@@ -683,25 +686,113 @@ class _BookingScreenState extends State<BookingScreen> {
                     '₹${b.estimatedCost.round()} · ${b.connectorType} · ${b.powerKw.round()} kW',
                     style: AppTypography.bodySmall,
                   ),
-                  if (b.status == 'completed')
-                    TextButton(
-                      onPressed: () {},
-                      child: Text(
-                        'Rate',
+                ],
+              ),
+              if (b.startCode != null && b.status != 'cancelled') ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.key_rounded, color: AppColors.primary, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Start Code: ',
                         style: TextStyle(
-                          color: AppColors.warning,
-                          fontSize: 12,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        b.startCode!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          letterSpacing: 2,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      const Spacer(),
+                      InkWell(
+                        onTap: () => NavigationUtils.copyCode(
+                          context,
+                          b.startCode!,
+                          label: 'Start Code',
+                        ),
+                        child: const Icon(
+                          Icons.copy_rounded,
+                          color: AppColors.primary,
+                          size: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (b.status == 'confirmed' || b.status == 'held') ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final lat = b.latitude ?? 18.5204;
+                          final lng = b.longitude ?? 73.8567;
+                          NavigationUtils.openMapsNavigation(
+                            latitude: lat,
+                            longitude: lng,
+                            title: b.chargerName,
+                            context: context,
+                          );
+                        },
+                        icon: const Icon(Icons.navigation_rounded, size: 16),
+                        label: const Text('NAVIGATE'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.5),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
                         ),
                       ),
                     ),
-                ],
-              ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          context
+                              .read<SessionProvider>()
+                              .setBookingId(b.bookingId);
+                          context.go('/driver/session');
+                        },
+                        icon: const Icon(Icons.bolt_rounded, size: 16),
+                        label: const Text('CHECK IN'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.textOnPrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         );
       },
     );
   }
+
 
   (String, Color) _historyStatus(String status) {
     switch (status) {
