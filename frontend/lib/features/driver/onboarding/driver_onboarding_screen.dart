@@ -515,15 +515,18 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
                               : AppColors.textMuted,
                         ),
                         const SizedBox(width: 14),
-                        Text(
-                          model,
-                          style: TextStyle(
-                            color: selected
-                                ? AppColors.textPrimary
-                                : AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            model,
+                            style: TextStyle(
+                              color: selected
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
+
                       ],
                     ),
                   ),
@@ -762,7 +765,15 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(title, style: AppTypography.headlineMedium),
+            Expanded(
+              child: Text(
+                title,
+                style: AppTypography.headlineMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
@@ -780,6 +791,7 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
             ),
           ],
         ),
+
         if (subtitle != null) ...[
           const SizedBox(height: 4),
           Text(subtitle, style: AppTypography.bodySmall),
@@ -801,15 +813,28 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTypography.bodyMedium),
-          Text(
-            value,
-            style: AppTypography.headlineSmall.copyWith(
-              color: AppColors.primary,
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.bodyMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: AppTypography.headlineSmall.copyWith(
+                color: AppColors.primary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
       ),
+
     );
   }
 }
