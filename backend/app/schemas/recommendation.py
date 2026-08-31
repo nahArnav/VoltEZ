@@ -34,6 +34,16 @@ class RecommendationRequest(BaseModel):
     preferences: dict | None = Field(
         None, description="Optional user preferences (e.g. prioritize_cost, prioritize_speed)"
     )
+    route_distance_km: float | None = Field(
+        None,
+        ge=0.0,
+        description="Driving distance for the direct origin-to-destination route",
+    )
+    route_duration_minutes: int | None = Field(
+        None,
+        ge=0,
+        description="Driving ETA for the direct origin-to-destination route",
+    )
 
     @model_validator(mode="after")
     def validate_destination_pair(self):

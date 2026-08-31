@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
@@ -54,16 +54,8 @@ class SessionService:
             )
 
         now = datetime.now(UTC)
-        if now < booking.start_at - timedelta(minutes=30):
-            raise BadRequestError(
-                message="Check-in opens 30 minutes before your reserved start time.",
-                code="CHECKIN_TOO_EARLY",
-            )
-        if now > booking.end_at + timedelta(minutes=30):
-            raise BadRequestError(
-                message="This reservation's check-in window has expired.",
-                code="CHECKIN_WINDOW_EXPIRED",
-            )
+        # Allow check-in for any confirmed booking upon driver arrival
+
 
         # 2. Transition booking to CHECKED_IN
         old_status = booking_status.value

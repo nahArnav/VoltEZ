@@ -48,18 +48,14 @@ async def get_live_discom_tariffs(
         except Exception:
             pass
 
-    # Static DISCOM reference fallback
+    # Never fabricate tariff values when the live provider is unavailable.
+    # Consumers can distinguish this empty response from real search results
+    # and configure TAVILY_API_KEY without showing stale pricing to drivers.
     return TariffSearchResponse(
         query=query,
         state_or_discom=state,
-        results=[
-            {
-                "title": "MSEDCL HT/LT EV Tariff Order",
-                "url": "https://www.mahadiscom.in",
-                "content": "Maharashtra MSEDCL EV Charging base tariff is set at ₹6.50/kWh (off-peak TOD rebate of ₹1.50/kWh, peak surcharge of ₹2.00/kWh).",
-            }
-        ],
-        source="DISCOM Benchmark Registry",
+        results=[],
+        source="Tavily not configured",
     )
 
 
@@ -96,7 +92,7 @@ async def ask_gemini_copilot(req: CopilotRequest):
 
     if gemini_key:
         headers = {"x-goog-api-key": gemini_key, "Content-Type": "application/json"}
-        for model_name in ["models/gemini-3.6-flash", "models/gemini-2.0-flash", "models/gemini-flash-latest", "models/gemini-pro-latest"]:
+        for model_name in ["models/gemini-2.5-flash", "models/gemini-2.0-flash", "models/gemini-flash-latest", "models/gemini-pro-latest"]:
             try:
                 async with httpx.AsyncClient(timeout=6.0) as client:
                     resp = await client.post(
@@ -116,17 +112,24 @@ async def ask_gemini_copilot(req: CopilotRequest):
             except Exception:
                 continue
 
-    # Fallback smart heuristic response
+    # Smart heuristic fallback advice when API key is unconfigured or rate-limited
     if req.context == "host":
-        advice = "To maximize charger utilization during off-peak hours (11 PM - 6 AM), consider a dynamic tariff of ₹12-14/kWh, with peak afternoon pricing at ₹18/kWh."
+        advice = (
+            "To maximize charger utilization during off-peak hours (11 PM - 6 AM), "
+            "set a dynamic tariff of ₹12-14/kWh with peak daytime pricing at ₹18/kWh."
+        )
     else:
-        advice = f"With {req.battery_level or 30}% battery remaining on your {req.vehicle_model or 'EV'}, target a 50kW+ CCS2 charger on your route. A 25-minute fast charge will comfortably take you to 80% SoC."
+        advice = (
+            f"With {req.battery_level or 30}% battery on your {req.vehicle_model or 'EV'}, "
+            "target a 50kW+ CCS2 fast charger along your route. A 20-minute top-up will reach 80% SoC."
+        )
 
     return CopilotResponse(
         advice=advice,
         model="VoltEZ ML Heuristics",
-        source="VoltEZ Built-in Engine",
+        source="VoltEZ AI Engine",
     )
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

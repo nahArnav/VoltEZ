@@ -30,6 +30,16 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
+def _road_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Conservative road-distance estimate when a route metric is absent.
+
+    The multiplier approximates urban road winding and keeps reachability and
+    detour scores from being over-optimistic when Google Routes is not
+    configured. A live route distance supplied by the planner takes priority.
+    """
+    return _haversine(lat1, lon1, lat2, lon2) * 1.3
+
+
 def get_float(obj: Any, attr: str, default: float = 0.0) -> float:
     """Helper to safely extract float values from SQLAlchemy ORM instances for Pyright."""
     val = getattr(obj, attr, None)
@@ -60,7 +70,7 @@ class RecommendationService:
 
         direct_route_km = None
         if req.destination_latitude is not None and req.destination_longitude is not None:
-            direct_route_km = _haversine(
+            direct_route_km = req.route_distance_km or _road_distance_km(
                 req.latitude,
                 req.longitude,
                 req.destination_latitude,
@@ -80,10 +90,10 @@ class RecommendationService:
             charger_lon = get_float(charger, "longitude")
 
             # Calculate Distance
-            dist_km = _haversine(req.latitude, req.longitude, charger_lat, charger_lon)
+            dist_km = _road_distance_km(req.latitude, req.longitude, charger_lat, charger_lon)
             detour_km = 0.0
             if direct_route_km is not None:
-                via_charger_km = dist_km + _haversine(
+                via_charger_km = dist_km + _road_distance_km(
                     charger_lat,
                     charger_lon,
                     req.destination_latitude,

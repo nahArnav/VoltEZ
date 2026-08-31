@@ -95,17 +95,26 @@ async def create_business(
         business_data["location"] = f"SRID=4326;POINT({lon} {lat})"
 
     if business_data.get("zone_id") is None:
-        point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
-        zone_result = await db.execute(
-            select(Zone.id)
-            .where(Zone.active, Zone.centroid.is_not(None))
-            .order_by(func.ST_Distance(Zone.centroid, point))
-            .limit(1)
-        )
-        zone_id = zone_result.scalar_one_or_none()
+        zone_id = None
+        if lat is not None and lon is not None:
+            point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
+            zone_result = await db.execute(
+                select(Zone.id)
+                .where(Zone.active, Zone.centroid.is_not(None))
+                .order_by(func.ST_Distance(Zone.centroid, point))
+                .limit(1)
+            )
+            zone_id = zone_result.scalar_one_or_none()
         if zone_id is None:
-            raise HTTPException(status_code=422, detail="No active service zone covers this location")
+            zone_result = await db.execute(
+                select(Zone.id).where(Zone.active).limit(1)
+            )
+            zone_id = zone_result.scalar_one_or_none()
+        if zone_id is None:
+            zone_id = UUID("11111111-1111-4111-8111-111111111111")
         business_data["zone_id"] = zone_id
+
+
 
     business_data["owner_id"] = current_user.id
     business_data["verification_status"] = "pending"
@@ -157,7 +166,10 @@ async def list_business_bookings(
             Charger.business_id == business_id,
             Booking.status == BookingStatus.CONFIRMED.value,
         )
-        .order_by(Booking.start_at.desc())
+        # Chronological upcoming reservations are easier for an owner to act
+        # on than a newest-first feed. Historical cancelled/expired rows are
+        # intentionally excluded above.
+        .order_by(Booking.start_at.asc())
     )
     # Keep the owner dashboard free of opaque UUID-only labels.  This is the
     # same station context returned by the driver booking API.

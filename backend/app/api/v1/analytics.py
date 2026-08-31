@@ -175,7 +175,17 @@ async def get_business_dashboard(
         select(ChargingSession).where(ChargingSession.charger_port_id.in_(port_ids))
     )
     sessions = list(sessions_result.scalars().all())
-    total_earnings = sum(float(session.amount or 0) for session in sessions if session.status == "completed")
+    session_earnings = sum(
+        float(session.amount or 0)
+        for session in sessions
+        if session.status == "completed"
+    )
+    booking_earnings = sum(
+        float(booking.total_price or 0)
+        for booking in bookings
+        if str(booking.status).upper() in ("CONFIRMED", "COMPLETED", "CHECKED_IN")
+    )
+    total_earnings = session_earnings + booking_earnings
     active_minutes = sum(
         max(0.0, (session.ended_at - session.started_at).total_seconds() / 60.0)
         for session in sessions
@@ -200,9 +210,10 @@ async def get_business_dashboard(
         active_chargers=active_chargers,
         sessions=len(sessions),
         bookings=len(bookings),
-        confirmed_bookings=sum(1 for booking in bookings if booking.status == "confirmed"),
+        confirmed_bookings=sum(1 for booking in bookings if str(booking.status).upper() in ("CONFIRMED", "CHECKED_IN", "COMPLETED")),
         total_earnings=round(total_earnings, 2),
         active_minutes=round(active_minutes, 1),
+
         average_rating=round(average_rating, 2) if average_rating is not None else None,
         reviews=reviews,
     )
