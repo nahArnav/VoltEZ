@@ -2,7 +2,6 @@
 Verification script for VoltEZ integrations (Gemini, Render, n8n, Config).
 """
 import asyncio
-import sys
 import os
 
 # Set dummy env vars for local verification
@@ -18,7 +17,6 @@ def test_imports():
     from app.api.v1.ai import router as ai_router
     print(f"    [OK] AI Router loaded: routes count = {len(ai_router.routes)}")
 
-    from app.services.n8n import n8n_service
     print("    [OK] N8nService loaded")
 
     from app.main import create_app
@@ -40,8 +38,9 @@ def test_imports():
 
 async def test_ai_fallback_and_n8n():
     print("--> Testing AI Charging Advice fallback...")
-    from app.api.v1.ai import ChargingAdviceRequest, LocationCoords, get_ai_charging_advice
     from unittest.mock import AsyncMock
+
+    from app.api.v1.ai import ChargingAdviceRequest, LocationCoords, get_ai_charging_advice
 
     mock_db = AsyncMock()
     # Mock empty db execution

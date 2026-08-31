@@ -1,6 +1,7 @@
 import asyncio
 from datetime import UTC, datetime
 from typing import Any
+
 import httpx
 
 from app.core.config import settings

@@ -1,14 +1,13 @@
 import json
 import math
 from typing import Any
-from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
+from geoalchemy2 import Geometry as GeometryType
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from geoalchemy2 import Geometry as GeometryType
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -16,8 +15,6 @@ from app.db.session import get_db
 from app.services.n8n import n8n_service
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
-from database.models.charging_session import ChargingSession
-from database.models.business import Business
 
 logger = get_logger("ai_copilot")
 router = APIRouter(prefix="/ai", tags=["AI & Copilot"])
