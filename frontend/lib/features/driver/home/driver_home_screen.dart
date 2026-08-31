@@ -805,9 +805,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 children: const [
                   Icon(Icons.auto_awesome_rounded, color: AppColors.primary),
                   SizedBox(width: 10),
-                  Text('VoltEZ AI Copilot'),
+                  Expanded(child: Text('VoltEZ AI Copilot')),
                 ],
               ),
+
               content: SizedBox(
                 width: double.maxFinite,
                 child: Column(
@@ -931,9 +932,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 children: const [
                   Icon(Icons.insights_rounded, color: AppColors.secondary),
                   SizedBox(width: 10),
-                  Text('DISCOM Grid Tariffs'),
+                  Expanded(child: Text('DISCOM Grid Tariffs')),
                 ],
               ),
+
               content: SizedBox(
                 width: double.maxFinite,
                 child: loading
@@ -1007,9 +1009,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             children: const [
               Icon(Icons.hub_rounded, color: AppColors.primary),
               SizedBox(width: 10),
-              Text('VoltEZ Partner Ecosystem'),
+              Expanded(child: Text('VoltEZ Partner Ecosystem')),
             ],
           ),
+
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
