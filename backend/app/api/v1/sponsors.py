@@ -95,11 +95,13 @@ async def ask_gemini_copilot(req: CopilotRequest):
     )
 
     if gemini_key:
-        for model_name in ["models/gemini-flash-latest", "models/gemini-pro-latest"]:
+        headers = {"x-goog-api-key": gemini_key, "Content-Type": "application/json"}
+        for model_name in ["models/gemini-3.6-flash", "models/gemini-2.0-flash", "models/gemini-flash-latest", "models/gemini-pro-latest"]:
             try:
                 async with httpx.AsyncClient(timeout=6.0) as client:
                     resp = await client.post(
                         f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={gemini_key}",
+                        headers=headers,
                         json={"contents": [{"parts": [{"text": user_prompt}]}]},
                     )
                     if resp.status_code == 200:

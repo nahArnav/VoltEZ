@@ -76,11 +76,16 @@ async def _call_gemini(prompt: str) -> str | None:
     if not gemini_key:
         return None
 
+    headers = {
+        "x-goog-api-key": gemini_key,
+        "Content-Type": "application/json",
+    }
+
     # Try preferred Gemini models in order
     for model_name in [
-        "models/gemini-2.5-flash",
+        "models/gemini-3.6-flash",
+        "models/gemini-2.0-flash",
         "models/gemini-flash-latest",
-        "models/gemini-1.5-flash",
         "models/gemini-pro-latest",
     ]:
         try:
@@ -88,6 +93,7 @@ async def _call_gemini(prompt: str) -> str | None:
             async with httpx.AsyncClient(timeout=8.0) as client:
                 resp = await client.post(
                     url,
+                    headers=headers,
                     json={
                         "contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {"temperature": 0.2, "maxOutputTokens": 500},
@@ -101,6 +107,8 @@ async def _call_gemini(prompt: str) -> str | None:
                         parts = content.get("parts", [])
                         if parts and "text" in parts[0]:
                             return parts[0]["text"].strip()
+                else:
+                    logger.debug("Gemini %s responded with HTTP %d: %s", model_name, resp.status_code, resp.text[:150])
         except Exception as exc:
             logger.warning("Gemini API call to %s failed: %s", model_name, exc)
             continue
