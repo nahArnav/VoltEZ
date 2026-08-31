@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:provider/provider.dart';
+import 'dart:math' as math;
 
 
 import '../../../core/theme/colors.dart';
@@ -238,6 +239,17 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     });
   }
 
+  void _focusCharger(Charger charger) {
+    final target = latlong.LatLng(charger.latitude, charger.longitude);
+    context.read<ChargerDiscoveryProvider>().selectCharger(charger);
+    _animateSheet(true);
+    // A selected station should be visually obvious even when the user was
+    // zoomed far out. Preserve a closer existing zoom, but never focus below
+    // street-level detail.
+    final zoom = math.max(_mapController.camera.zoom, 15.0).toDouble();
+    _mapController.move(target, zoom);
+  }
+
   // ─── OpenStreetMap ───
   Widget _buildMap(ChargerDiscoveryProvider discovery, latlong.LatLng center) {
     // Collect recommended charger IDs
@@ -278,12 +290,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
               height: 44,
               child: GestureDetector(
                 onTap: () {
-                  discovery.selectCharger(charger);
-                  _animateSheet(true);
-                  _mapController.move(
-                    latlong.LatLng(charger.latitude, charger.longitude),
-                    _mapController.camera.zoom,
-                  );
+                  _focusCharger(charger);
                 },
                 child: Container(
                   decoration: BoxDecoration(
@@ -1013,15 +1020,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
                         return GestureDetector(
                           onTap: () {
-                            discovery.selectCharger(charger);
-                            _animateSheet(true);
-                            _mapController.move(
-                              latlong.LatLng(
-                                charger.latitude,
-                                charger.longitude,
-                              ),
-                              _mapController.camera.zoom,
-                            );
+                            _focusCharger(charger);
                           },
 
                           child: SizedBox(
@@ -1073,11 +1072,16 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        '${charger.powerKw.round()} kW \u00B7 \u20B9${charger.pricePerKwh.round()}/kWh',
-                                        style: AppTypography.labelMedium
-                                            .copyWith(color: AppColors.primary),
+                                      Expanded(
+                                        child: Text(
+                                          '${charger.powerKw.round()} kW \u00B7 \u20B9${charger.pricePerKwh.round()}/kWh',
+                                          style: AppTypography.labelMedium
+                                              .copyWith(color: AppColors.primary),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
+                                      const SizedBox(width: 6),
                                       Icon(
                                         Icons.arrow_forward_ios_rounded,
                                         size: 12,
@@ -1145,21 +1149,27 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('7 kW', style: AppTypography.labelSmall),
-                      Text(
-                        '${discovery.powerRange.start.round()} kW',
-                        style: AppTypography.labelMedium.copyWith(
-                          color: AppColors.secondary,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
                         ),
-                      ),
-                      Text(
-                        '${discovery.powerRange.end.round()} kW',
-                        style: AppTypography.labelMedium.copyWith(
-                          color: AppColors.secondary,
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${discovery.powerRange.start.round()} - ${discovery.powerRange.end.round()} kW',
+                          style: AppTypography.labelMedium.copyWith(
+                            color: AppColors.secondary,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       Text('150 kW', style: AppTypography.labelSmall),
                     ],
                   ),
+
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
