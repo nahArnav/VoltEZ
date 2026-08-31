@@ -1,8 +1,7 @@
-```python
 import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 
 
 def test_gemini():
@@ -15,7 +14,6 @@ def test_gemini():
         return
 
     models = [
-        "models/gemini-3.6-flash",
         "models/gemini-2.0-flash",
         "models/gemini-2.0-flash-exp",
         "models/gemini-flash-latest",
@@ -77,4 +75,3 @@ def test_gemini():
 
 if __name__ == "__main__":
     test_gemini()
-```
