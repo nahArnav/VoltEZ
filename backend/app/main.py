@@ -141,7 +141,24 @@ def create_app() -> FastAPI:
     # 5. Mount feature routers under /api/v1
     app.include_router(api_router, prefix=settings.API_V1_STR)
 
+    # 5b. Mount /api/ai alias for direct compatibility with external integrations
+    from app.api.v1.ai import router as direct_ai_router
+    app.include_router(direct_ai_router, prefix="/api")
+
     # 6. System deployment endpoints
+    @app.get("/", tags=["System"])
+    async def root():
+        return {
+            "status": "ok",
+            "service": settings.PROJECT_NAME,
+            "version": settings.VERSION,
+            "environment": settings.ENVIRONMENT,
+        }
+
+    @app.get("/health", tags=["System"])
+    async def health():
+        return {"status": "ok"}
+
     @app.get("/health/live", tags=["System"])
     async def liveness():
         return {"status": "alive"}

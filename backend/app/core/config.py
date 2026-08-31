@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     STARTUPED_API_KEY: str = ""
     SWYTCHCODE_API_KEY: str = ""
     N8N_BASE_URL: str = ""
+    N8N_WEBHOOK_URL: str = ""
     N8N_API_KEY: str = ""
     N8N_WEBHOOK_SECRET: str = ""
 

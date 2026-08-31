@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.schemas.booking import BookingCreate, BookingResponse
 from app.services.booking import booking_service
 from app.services.cash import get_booking_start_code
+from app.services.n8n import n8n_service
 from database.models.booking import Booking
 from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
@@ -125,6 +126,17 @@ async def create_booking(
 
         await db.commit()
         await db.refresh(booking)
+
+        # Notify n8n automation workflow asynchronously
+        n8n_service.fire_and_forget_booking_notification(
+            booking_id=str(booking.id),
+            user_id=str(user_id),
+            status=str(booking.status),
+            quoted_price_per_kwh=float(booking.quoted_price_per_kwh) if booking.quoted_price_per_kwh is not None else None,
+            start_at=booking.start_at.isoformat() if booking.start_at else None,
+            end_at=booking.end_at.isoformat() if booking.end_at else None,
+        )
+
         return await _with_charger_context(db, booking)
     except Exception:
         # If DB creation fails (e.g. overlap check fails), release the lock

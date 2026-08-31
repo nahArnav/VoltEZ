@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from .ai import router as ai_router
 from .analytics import router as analytics_router
 from .auth import router as auth_router
 from .availability import router as availability_router
@@ -19,6 +20,7 @@ from .ws import router as ws_router
 api_router = APIRouter()
 
 # Plug in the routes
+api_router.include_router(ai_router)
 api_router.include_router(auth_router)
 api_router.include_router(booking_router)
 api_router.include_router(charger_router)
