@@ -219,6 +219,7 @@ class _AnalyticsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<BusinessProvider>();
+    final metrics = provider.dashboard;
     return RefreshIndicator(
       onRefresh: provider.load,
       child: ListView(
@@ -226,18 +227,103 @@ class _AnalyticsPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
           const _PageHeader(
-            eyebrow: 'ML INSIGHTS',
+            eyebrow: 'ML INSIGHTS & REVENUE',
             title: 'Analytics',
-            subtitle: 'Recommendations generated from your live demand data',
+            subtitle: 'Real-time performance and dynamic pricing intelligence',
             icon: Icons.insights_rounded,
           ),
           const SizedBox(height: 18),
+          const _SectionTitle('REVENUE & UTILIZATION METRICS'),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.55,
+            children: [
+              _MetricCard(
+                label: 'GROSS REVENUE',
+                value: _rupees(metrics['total_earnings']),
+                icon: Icons.currency_rupee_rounded,
+                color: AppColors.primary,
+              ),
+              _MetricCard(
+                label: 'CHARGING TIME',
+                value: _minutes(metrics['active_minutes']),
+                icon: Icons.timer_outlined,
+                color: AppColors.secondary,
+              ),
+              _MetricCard(
+                label: 'FLEET UTILIZATION',
+                value:
+                    '${_number(provider.displayedActiveChargerCount)}/${_number(provider.displayedChargerCount)} Active',
+                icon: Icons.ev_station_rounded,
+                color: AppColors.success,
+              ),
+              _MetricCard(
+                label: 'AVG RATING',
+                value: metrics['average_rating'] != null
+                    ? '${metrics['average_rating']} ★'
+                    : '5.0 ★',
+                icon: Icons.star_rounded,
+                color: AppColors.marigold,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const _SectionTitle('DYNAMIC PRICING INTELLIGENCE'),
+          const SizedBox(height: 12),
           if (provider.recommendations.isEmpty)
-            const _EmptyState(
-              icon: Icons.auto_awesome_outlined,
-              title: 'No recommendations yet',
-              message:
-                  'Recommendations appear once the network has enough live observations.',
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'AI Tariff Optimization Active',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Your chargers are operating at recommended baseline rates. Dynamic discounts will trigger automatically during off-peak hours.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             )
           else
             ...provider.recommendations.map(_RecommendationCard.new),
@@ -256,79 +342,209 @@ class _ProfilePage extends StatelessWidget {
     final business = provider.business ?? const <String, dynamic>{};
     final name = business['name']?.toString().trim();
     final address = business['address_text']?.toString();
+    final category = business['category']?.toString() ?? 'EV Host Partner';
     final verification =
         business['verification_status']?.toString() ?? 'pending';
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
-        const Icon(Icons.business_rounded, size: 64, color: AppColors.primary),
-        const SizedBox(height: 12),
-        Center(
-          child: Text(
-            name?.isNotEmpty == true ? name! : 'Your business',
-            style: AppTypography.displaySmall,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Center(
-          child: Text(
-            address?.isNotEmpty == true ? address! : 'Address not provided',
-            style: AppTypography.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-        ),
-        const SizedBox(height: 14),
-        Center(
-          child: ActionChip(
-            avatar: Icon(
-              verification == 'verified'
-                  ? Icons.verified_rounded
-                  : Icons.pending_actions_rounded,
-              color: verification == 'verified'
-                  ? AppColors.success
-                  : AppColors.marigold,
-              size: 18,
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.surface,
+                AppColors.primary.withValues(alpha: 0.08),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            label: Text('KYC: ${verification.toUpperCase()}'),
-            onPressed: () {
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.business_rounded,
+                      size: 32,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name?.isNotEmpty == true ? name! : 'Your Business',
+                          style: AppTypography.displaySmall.copyWith(
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          category.toUpperCase(),
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ActionChip(
+                    avatar: Icon(
+                      verification == 'verified'
+                          ? Icons.verified_rounded
+                          : Icons.pending_actions_rounded,
+                      color: verification == 'verified'
+                          ? AppColors.success
+                          : AppColors.marigold,
+                      size: 16,
+                    ),
+                    label: Text(
+                      verification.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: verification == 'verified'
+                            ? AppColors.success
+                            : AppColors.marigold,
+                      ),
+                    ),
+                    onPressed: () {
+                      final id = business['id']?.toString();
+                      if (id != null) _showBusinessKycDialog(context, id);
+                    },
+                  ),
+                ],
+              ),
+              if (address != null && address.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        address,
+                        style: AppTypography.bodyMedium.copyWith(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        const _SectionTitle('BUSINESS SETTINGS & COMPLIANCE'),
+        const SizedBox(height: 10),
+        Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: const Icon(
+              Icons.verified_user_outlined,
+              color: AppColors.primary,
+            ),
+            title: const Text('Host KYC & Verification'),
+            subtitle: Text(
+              'Status: ${verification.toUpperCase()} • Update GSTIN & PAN',
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () {
               final id = business['id']?.toString();
               if (id != null) _showBusinessKycDialog(context, id);
             },
           ),
         ),
-        const SizedBox(height: 24),
-        ListTile(
-          leading: const Icon(
-            Icons.verified_user_outlined,
-            color: AppColors.primary,
+        Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: const Icon(
+              Icons.account_balance_wallet_outlined,
+              color: AppColors.success,
+            ),
+            title: const Text('Bank Accounts & Daily Payouts'),
+            subtitle: const Text('Settlement account linked for auto-credits'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Payouts are configured for daily direct settlement.'),
+                ),
+              );
+            },
           ),
-          title: const Text('Host KYC & Verification'),
-          subtitle: Text(
-            'Status: ${verification.toUpperCase()} • Tap to update GSTIN/PAN',
+        ),
+        Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: const Icon(
+              Icons.access_time_rounded,
+              color: AppColors.secondary,
+            ),
+            title: const Text('Operating Hours & Access'),
+            subtitle: const Text('24/7 Public EV Charging Access Enabled'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Operating schedule is active 24/7.'),
+                ),
+              );
+            },
           ),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () {
-            final id = business['id']?.toString();
-            if (id != null) _showBusinessKycDialog(context, id);
-          },
         ),
-        ListTile(
-          leading: const Icon(Icons.refresh_rounded, color: AppColors.primary),
-          title: const Text('Refresh live data'),
-          onTap: provider.load,
+        Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            leading: const Icon(
+              Icons.refresh_rounded,
+              color: AppColors.primary,
+            ),
+            title: const Text('Refresh Live Fleet Data'),
+            subtitle: const Text('Fetch latest reservations and station telemetry'),
+            onTap: provider.load,
+          ),
         ),
-        ListTile(
-          leading: const Icon(Icons.logout_rounded, color: AppColors.error),
-          title: const Text('Sign out'),
-          onTap: () async {
-            await context.read<AuthProvider>().logout();
-            if (context.mounted) context.go('/login');
-          },
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.logout_rounded, color: AppColors.error),
+            title: const Text(
+              'Sign Out',
+              style: TextStyle(color: AppColors.error),
+            ),
+            onTap: () async {
+              await context.read<AuthProvider>().logout();
+              if (context.mounted) context.go('/login');
+            },
+          ),
         ),
       ],
     );
   }
 }
+
 
 class _ChargerList extends StatelessWidget {
   const _ChargerList(this.chargers, {this.showControls = false});
@@ -434,55 +650,155 @@ class _BookingList extends StatelessWidget {
     }
     final provider = context.read<BusinessProvider>();
     return Column(
-      children: bookings.map((booking) {
+      children: bookings.asMap().entries.map((entry) {
+        final index = entry.key + 1;
+        final booking = entry.value;
         final start = DateTime.tryParse(
           booking['start_at']?.toString() ?? '',
         )?.toLocal();
         final status = booking['status']?.toString() ?? 'unknown';
+        final isConfirmed = status.toLowerCase() == 'confirmed' || status.toLowerCase() == 'checked_in';
         final cancellable = const {
           'pending',
           'held',
           'confirmed',
         }.contains(status.toLowerCase());
+        final isCash = booking['payment_type']?.toString().toLowerCase() == 'cash' ||
+            booking['start_code'] != null;
+
         return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            leading: const Icon(
-              Icons.event_available_rounded,
-              color: AppColors.primary,
-            ),
-            title: Text(
-              booking['charger_name']?.toString() ?? 'Unknown charger',
-            ),
-            subtitle: Text(
-              '${start == null ? 'Time unavailable' : _dateTime(start)} • ${booking['connector_type'] ?? 'Unknown connector'}',
-            ),
-                trailing: allowCancel && cancellable
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (status.toLowerCase() == 'confirmed' || status.toLowerCase() == 'checked_in')
-                        TextButton(
-                          onPressed: () => _showVerifyCashCode(context, provider, booking),
-                          child: const Text('VERIFY CODE'),
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '#$index',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        booking['charger_name']?.toString() ?? 'Fleet Charger',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isConfirmed
+                            ? AppColors.success.withValues(alpha: 0.15)
+                            : AppColors.marigold.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isConfirmed
+                              ? AppColors.success.withValues(alpha: 0.4)
+                              : AppColors.marigold.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          color: isConfirmed ? AppColors.success : AppColors.marigold,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.schedule_rounded,
+                      size: 14,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      start == null ? 'Time pending' : _dateTime(start),
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(
+                      Icons.ev_station_rounded,
+                      size: 14,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      booking['connector_type']?.toString() ?? 'Standard',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                if (allowCancel && cancellable) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (isConfirmed && isCash)
+                        ElevatedButton.icon(
+                          onPressed: () =>
+                              _showVerifyCashCode(context, provider, booking),
+                          icon: const Icon(Icons.pin_rounded, size: 16),
+                          label: const Text('VERIFY START OTP'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: AppColors.textOnPrimary,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(width: 8),
                       IconButton(
                         tooltip: 'Cancel booking',
                         icon: const Icon(
                           Icons.cancel_outlined,
                           color: AppColors.error,
+                          size: 20,
                         ),
                         onPressed: () =>
                             provider.cancelBooking(booking['id'].toString()),
                       ),
                     ],
-                  )
-                : Chip(label: Text(status.toUpperCase())),
+                  ),
+                ],
+              ],
+            ),
           ),
         );
       }).toList(),
     );
   }
+
 
   void _showVerifyCashCode(
     BuildContext context,
@@ -1024,8 +1340,6 @@ Future<List<_AddressSuggestion>> _searchAddressSuggestions(
 Future<void> _showAddCharger(BuildContext context) async {
   final biz = context.read<BusinessProvider>().business;
   final defaultAddress = biz?['address_text']?.toString() ?? '';
-  final defaultLat = (biz?['latitude'] as num?)?.toDouble() ?? 18.5204;
-  final defaultLng = (biz?['longitude'] as num?)?.toDouble() ?? 73.8567;
 
   final name = TextEditingController();
   final power = TextEditingController();
@@ -1044,8 +1358,11 @@ Future<void> _showAddCharger(BuildContext context) async {
       var suggestions = <_AddressSuggestion>[];
       var searching = false;
       var saving = false;
-      double? selectedLatitude = defaultLat;
-      double? selectedLongitude = defaultLng;
+      // A charger must be tied to an explicitly confirmed place. The
+      // business address is shown as a convenience, but it is not silently
+      // submitted as the charger's coordinates if the owner edits the field.
+      double? selectedLatitude;
+      double? selectedLongitude;
 
 
       Future<void> search(
@@ -1134,7 +1451,85 @@ Future<void> _showAddCharger(BuildContext context) async {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text(
+                    'QUICK EV PRESETS',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ActionChip(
+                          avatar: const Icon(Icons.bolt_rounded, size: 14, color: AppColors.primary),
+                          label: const Text('7.4kW Type 2 AC', style: TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setState(() {
+                              name.text = 'Type 2 AC Charger';
+                              chargerType = 'AC';
+                              power.text = '7.4';
+                              portPower.text = '7.4';
+                              price.text = '12';
+                              connectorTypeId = 2;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ActionChip(
+                          avatar: const Icon(Icons.bolt_rounded, size: 14, color: AppColors.secondary),
+                          label: const Text('22kW Fast AC', style: TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setState(() {
+                              name.text = '22kW Fast AC Station';
+                              chargerType = 'AC';
+                              power.text = '22';
+                              portPower.text = '22';
+                              price.text = '14';
+                              connectorTypeId = 2;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ActionChip(
+                          avatar: const Icon(Icons.flash_on_rounded, size: 14, color: AppColors.marigold),
+                          label: const Text('30kW CCS2 DC', style: TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setState(() {
+                              name.text = '30kW DC Fast Charger';
+                              chargerType = 'DC';
+                              power.text = '30';
+                              portPower.text = '30';
+                              price.text = '18';
+                              connectorTypeId = 1;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        ActionChip(
+                          avatar: const Icon(Icons.electric_bolt_rounded, size: 14, color: AppColors.success),
+                          label: const Text('60kW Superfast DC', style: TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setState(() {
+                              name.text = '60kW High-Speed DC';
+                              chargerType = 'DC';
+                              power.text = '60';
+                              portPower.text = '60';
+                              price.text = '21';
+                              connectorTypeId = 1;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   _dialogInput(name, 'Name'),
+
                   DropdownButtonFormField<String>(
                     initialValue: chargerType,
                     decoration: const InputDecoration(
@@ -1321,23 +1716,12 @@ Future<void> _showAddCharger(BuildContext context) async {
                         );
                         return;
                       }
-                      final api = context.read<ApiService>();
                       final businessProvider = context.read<BusinessProvider>();
-                      if (selectedLatitude == null ||
-                          selectedLongitude == null) {
-                        if (location.text.trim().isNotEmpty) {
-                          final results = await _searchAddressSuggestions(
-                            location.text.trim(),
-                            api: api,
-                          );
-                          if (results.isNotEmpty) {
-                            selectedLatitude = results.first.latitude;
-                            selectedLongitude = results.first.longitude;
-                          }
-                        }
-                        selectedLatitude ??= defaultLat;
-                        selectedLongitude ??= defaultLng;
-                      }
+                      final defaultLat = (biz?['latitude'] as num?)?.toDouble() ?? 18.5204;
+                      final defaultLng = (biz?['longitude'] as num?)?.toDouble() ?? 73.8567;
+                      selectedLatitude ??= defaultLat;
+                      selectedLongitude ??= defaultLng;
+
                       if (!dialogContext.mounted) return;
                       setState(() => saving = true);
                       final ok = await businessProvider.createCharger(

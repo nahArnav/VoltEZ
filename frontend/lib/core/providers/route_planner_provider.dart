@@ -56,6 +56,9 @@ class RoutePlannerProvider extends ChangeNotifier {
   bool _isAnalyzing = false;
   bool _hasSearched = false;
   String? _analysisError;
+  double? _routeDistanceKm;
+  int? _routeDurationMinutes;
+  bool _routeMetricsLoading = false;
 
   Timer? _originSearchTimer;
   Timer? _destinationSearchTimer;
@@ -83,6 +86,9 @@ class RoutePlannerProvider extends ChangeNotifier {
   bool get isAnalyzing => _isAnalyzing;
   bool get hasSearched => _hasSearched;
   String? get analysisError => _analysisError;
+  double? get routeDistanceKm => _routeDistanceKm;
+  int? get routeDurationMinutes => _routeDurationMinutes;
+  bool get routeMetricsLoading => _routeMetricsLoading;
   List<LocationSuggestion> get originSuggestions => _originSuggestions;
   List<LocationSuggestion> get destinationSuggestions =>
       _destinationSuggestions;
@@ -153,6 +159,7 @@ class RoutePlannerProvider extends ChangeNotifier {
     _originLat = lat;
     _originLng = lng;
     _usingCurrentLocation = false;
+    _clearRouteMetrics();
     if (lat == null || lng == null) _originSuggestions = const [];
     notifyListeners();
   }
@@ -180,6 +187,7 @@ class RoutePlannerProvider extends ChangeNotifier {
       _originLat = _currentPosition!.latitude;
       _originLng = _currentPosition!.longitude;
       _usingCurrentLocation = true;
+      _clearRouteMetrics();
       notifyListeners();
     } catch (_) {
       // Location fetch failed silently
@@ -190,6 +198,7 @@ class RoutePlannerProvider extends ChangeNotifier {
     _destinationName = name;
     _destinationLat = lat;
     _destinationLng = lng;
+    _clearRouteMetrics();
     if (lat == null || lng == null) _destinationSuggestions = const [];
     notifyListeners();
   }
@@ -385,6 +394,7 @@ class RoutePlannerProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _loadRouteMetrics();
       final request = RouteRecommendationRequest(
         originLat: _originLat!,
         originLng: _originLng!,
@@ -400,6 +410,8 @@ class RoutePlannerProvider extends ChangeNotifier {
         originName: _originName,
         destinationName: _destinationName,
         vehicleId: _selectedVehicle!.id,
+        routeDistanceKm: _routeDistanceKm,
+        routeDurationMinutes: _routeDurationMinutes,
       );
 
       final results = await _api.getRecommendations(request);
@@ -429,6 +441,51 @@ class RoutePlannerProvider extends ChangeNotifier {
     _isAnalyzing = false;
     _hasSearched = true;
     notifyListeners();
+  }
+
+  void _clearRouteMetrics() {
+    _routeDistanceKm = null;
+    _routeDurationMinutes = null;
+  }
+
+  /// Ask the backend for a driving route before ranking charging stops. The
+  /// backend uses Google Routes when configured and returns a clearly-marked
+  /// road-distance estimate otherwise; both are better than treating a city
+  /// trip as a straight line.
+  Future<void> _loadRouteMetrics() async {
+    if (_originLat == null ||
+        _originLng == null ||
+        _destinationLat == null ||
+        _destinationLng == null) {
+      return;
+    }
+    _routeMetricsLoading = true;
+    notifyListeners();
+    try {
+      final response = await _apiService.computeRoute(
+        originLat: _originLat!,
+        originLng: _originLng!,
+        destLat: _destinationLat!,
+        destLng: _destinationLng!,
+      );
+      final data = response.data;
+      if (data is Map) {
+        final distance = data['distance_meters'];
+        final duration = data['duration_seconds'];
+        if (distance is num) _routeDistanceKm = distance.toDouble() / 1000;
+        if (duration is num) {
+          _routeDurationMinutes = (duration.toDouble() / 60).ceil();
+        }
+      }
+    } catch (_) {
+      // Recommendation ranking still works using the backend's documented
+      // road-distance fallback when the route provider is temporarily down.
+      _routeDistanceKm = null;
+      _routeDurationMinutes = null;
+    } finally {
+      _routeMetricsLoading = false;
+      notifyListeners();
+    }
   }
 
   // ─── Reset ───

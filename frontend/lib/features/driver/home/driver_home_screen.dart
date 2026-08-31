@@ -201,7 +201,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'VOLTEZ / DRIVER',
+                'VOLTEZ / USER',
                 style: AppTypography.labelSmall.copyWith(
                   color: AppColors.primary,
                 ),
@@ -218,17 +218,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ],
           ),
         ),
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
+        Semantics(
+          button: true,
+          label: 'Open notifications',
+          child: Material(
             color: AppColors.primary,
             borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.notifications_none_rounded,
-            color: AppColors.textOnPrimary,
-            size: 23,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => _showNotificationDialog(context),
+              child: const SizedBox(
+                width: 46,
+                height: 46,
+                child: Icon(
+                  Icons.notifications_none_rounded,
+                  color: AppColors.textOnPrimary,
+                  size: 23,
+                ),
+              ),
+            ),
           ),
         ),
       ],
@@ -881,7 +889,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     } catch (e) {
                       setState(() {
                         advice =
-                            'With current battery levels, target a 50kW+ CCS2 fast charger along your route for optimal charging efficiency.';
+                            'Live Gemini advice is unavailable right now. Configure GEMINI_API_KEY on the backend or try again later.';
                         loading = false;
                       });
                     }
@@ -957,8 +965,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           const SizedBox(height: 10),
                           if (tariffs.isEmpty)
                             const Text(
-                              'Standard MSEDCL EV Commercial Tariff: ₹6.50/kWh (Base) + ₹1.50/kWh Peak Multiplier',
-                              style: TextStyle(color: Colors.white),
+                              'No live tariff results are available. Configure TAVILY_API_KEY on the backend to enable this search.',
+                              style: TextStyle(color: AppColors.textSecondary),
                             )
                           else
                             ...tariffs.take(3).map((t) {
@@ -991,135 +999,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           },
         );
       },
-    );
-  }
-
-  Future<void> _showSponsorsEcosystemDialog(BuildContext context) async {
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
-          ),
-          title: Row(
-            children: const [
-              Icon(Icons.hub_rounded, color: AppColors.primary),
-              SizedBox(width: 10),
-              Expanded(child: Text('VoltEZ Partner Ecosystem')),
-            ],
-          ),
-
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _sponsorItem(
-                  'Google for Developers',
-                  'Places API (New) Autocomplete & Routes API real-time distance/ETA.',
-                  Icons.map_rounded,
-                  AppColors.primary,
-                ),
-                _sponsorItem(
-                  'Google Gemini AI',
-                  'AI Driver Copilot & Host dynamic pricing revenue maximization advisor.',
-                  Icons.psychology_rounded,
-                  AppColors.secondary,
-                ),
-                _sponsorItem(
-                  'Tavily Search',
-                  'Live state DISCOM electricity tariff extraction & green energy radar.',
-                  Icons.travel_explore_rounded,
-                  AppColors.success,
-                ),
-                _sponsorItem(
-                  'Lyzr Autonomous AI',
-                  'Autonomous multi-agent orchestration for fleet and station dispatch.',
-                  Icons.smart_toy_rounded,
-                  AppColors.warning,
-                ),
-                _sponsorItem(
-                  'StartupEd',
-                  'EV Host Entrepreneurship Program & Partner Academy Certification.',
-                  Icons.school_rounded,
-                  AppColors.primary,
-                ),
-                _sponsorItem(
-                  'Swytchcode',
-                  'Cryptographic smart meter auditing & verifiable green session certificates.',
-                  Icons.verified_user_rounded,
-                  AppColors.secondary,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('CLOSE'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _sponsorItem(
-    String name,
-    String desc,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  desc,
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1159,7 +1038,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             },
           ),
           const SizedBox(height: 4),
-          const Text('Driver', style: AppTypography.bodyMedium),
+          const Text('User', style: AppTypography.bodyMedium),
           const SizedBox(height: 32),
 
           // Profile options
@@ -1204,12 +1083,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             'Help & Support',
             'FAQs, contact us',
             () => _showHelpDialog(context),
-          ),
-          _profileOption(
-            Icons.hub_rounded,
-            'Sponsor & Partner Ecosystem',
-            'Google, Gemini, Tavily, Lyzr, StartupEd, Swytchcode',
-            () => _showSponsorsEcosystemDialog(context),
           ),
           _profileOption(
             Icons.info_outline_rounded,
@@ -1510,10 +1383,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           title: const Text('Notifications'),
           content: SizedBox(
             width: double.maxFinite,
+            height: MediaQuery.sizeOf(context).height * 0.42,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
                   title: const Text('Enable Notifications'),
                   value: enabled,
                   onChanged: (val) {
@@ -1522,29 +1396,47 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   },
                 ),
                 const Divider(),
-                if (loadError != null)
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(loadError, style: const TextStyle(color: Colors.red)),
-                  )
-                else
-                  Expanded(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: notifications.length,
-                      itemBuilder: (ctx, i) => ListTile(
-                        title: Text(notifications[i]['title'] ?? ''),
-                        subtitle: Text(notifications[i]['message'] ?? ''),
-                      ),
-                    ),
-                  ),
+                Expanded(
+                  child: loadError != null
+                      ? Center(
+                          child: Text(
+                            loadError,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        )
+                      : notifications.isEmpty
+                      ? const Center(child: Text('No notifications yet.'))
+                      : ListView.separated(
+                          itemCount: notifications.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (ctx, i) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              notifications[i]['title']?.toString() ?? '',
+                            ),
+                            subtitle: Text(
+                              notifications[i]['message']?.toString() ?? '',
+                            ),
+                          ),
+                        ),
+                ),
               ],
             ),
+
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('CLOSE'),
+            ),
+          ],
         ),
       ),
     );
   }
+
+
 
   Future<void> _showHelpDialog(BuildContext context) async {
     await showDialog<void>(
@@ -1601,4 +1493,3 @@ class _HomeInfoCard extends StatelessWidget {
     ),
   );
 }
-

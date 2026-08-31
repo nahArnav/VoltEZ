@@ -311,6 +311,12 @@ class _ChargingSessionScreenState extends State<ChargingSessionScreen>
   Widget _buildCheckedIn(BuildContext context, SessionProvider session) {
     final data = session.sessionData;
     if (data == null) return const SizedBox.shrink();
+    final isCashBooking = context
+            .read<BookingProvider>()
+            .confirmedBooking
+            ?.paymentMethod
+            ?.toLowerCase() ==
+        'cash';
 
     return Center(
       child: SingleChildScrollView(
@@ -344,13 +350,30 @@ class _ChargingSessionScreenState extends State<ChargingSessionScreen>
             _buildSessionInfoCard(data),
             const SizedBox(height: 32),
 
-            PrimaryButton(
-              text: 'START CHARGING',
-              onPressed: () => session.startCharging(),
-              isExpanded: true,
-              icon: Icons.bolt_rounded,
-              height: 56,
-            ),
+            if (isCashBooking) ...[
+              Text(
+                'Show your start code to the host. Charging begins after they verify it.',
+                textAlign: TextAlign.center,
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(height: 12),
+              PrimaryButton(
+                text: 'REFRESH STATUS',
+                onPressed: () => session.refreshStatus(),
+                isExpanded: true,
+                icon: Icons.refresh_rounded,
+                height: 52,
+              ),
+            ] else
+              PrimaryButton(
+                text: 'START CHARGING',
+                onPressed: () => session.startCharging(),
+                isExpanded: true,
+                icon: Icons.bolt_rounded,
+                height: 56,
+              ),
           ],
         ),
       ),

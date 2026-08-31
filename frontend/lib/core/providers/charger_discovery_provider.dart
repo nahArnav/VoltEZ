@@ -54,6 +54,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   Timer? _locationSearchTimer;
   int _locationSearchToken = 0;
   List<MapLocationSuggestion> _locationSuggestions = const [];
+  Future<void>? _initializationFuture;
 
   Set<String> get selectedConnectors => _selectedConnectorStrings;
   RangeValues get powerRange => _powerRange;
@@ -95,6 +96,14 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
 
   // ─── Init ───
   Future<void> init() async {
+    // Home and Map can both request discovery during the same frame. Reuse
+    // one in-flight initialization so the user receives a single permission
+    // prompt and we do not race two nearby-charger requests.
+    _initializationFuture ??= _initialize();
+    await _initializationFuture;
+  }
+
+  Future<void> _initialize() async {
     await _fetchLocation();
     await fetchNearbyChargers();
   }
@@ -147,6 +156,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   }
 
   Future<void> refreshLocation() async {
+    _initializationFuture = null;
     await _fetchLocation();
     await fetchNearbyChargers();
   }
@@ -240,6 +250,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
 
   /// Refresh nearby chargers (pull-to-refresh support).
   Future<void> refreshChargers() async {
+    _initializationFuture = null;
     await _fetchLocation();
     await fetchNearbyChargers();
   }

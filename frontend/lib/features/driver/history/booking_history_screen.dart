@@ -413,20 +413,20 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
             children: [
               _infoBadge(
                 Icons.bolt_rounded,
                 '${booking.powerKw.round()} kW',
                 AppColors.primary,
               ),
-              const SizedBox(width: 8),
               _infoBadge(
                 Icons.power_rounded,
                 booking.connectorType,
                 AppColors.secondary,
               ),
-              const SizedBox(width: 8),
               _infoBadge(
                 Icons.currency_rupee_rounded,
                 'Est. ₹${booking.estimatedCost.round()}',
@@ -434,6 +434,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               ),
             ],
           ),
+
 
           // ─── START CODE / CHECK-IN OTP BANNER ───
           if (booking.startCode != null && !isCancelled) ...[
@@ -665,20 +666,20 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
             children: [
               _metricChip(
                 Icons.bolt_rounded,
                 '${item.energyKwh.toStringAsFixed(1)} kWh',
                 AppColors.primary,
               ),
-              const SizedBox(width: 8),
               _metricChip(
                 Icons.speed_rounded,
                 '${item.durationMinutes} min',
                 AppColors.secondary,
               ),
-              const SizedBox(width: 8),
               _metricChip(
                 Icons.currency_rupee_rounded,
                 '₹${item.amountPaid.round()}',
@@ -686,6 +687,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 10),
           Row(
             children: [

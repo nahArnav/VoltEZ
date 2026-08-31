@@ -145,6 +145,35 @@ class SessionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Refresh the server-side session state. This is important for cash
+  /// bookings: the owner verifies the driver's OTP and starts charging from
+  /// the business app, so the driver's screen must be able to observe that
+  /// transition without submitting the OTP itself.
+  Future<void> refreshStatus() async {
+    final current = _sessionData;
+    if (current == null) return;
+    try {
+      final updated = await _api.getSessionStatus(current.sessionId);
+      _sessionData = updated;
+      _phase = updated.status == SessionStatus.charging
+          ? SessionPhase.charging
+          : updated.status == SessionStatus.completed
+          ? SessionPhase.complete
+          : updated.status == SessionStatus.failed
+          ? SessionPhase.error
+          : SessionPhase.checkedIn;
+      if (_phase == SessionPhase.charging) {
+        await _connectWebSocket(updated.sessionId);
+      }
+      _errorMessage = null;
+    } on SessionApiException catch (error) {
+      _errorMessage = error.message;
+    } catch (_) {
+      _errorMessage = 'Could not refresh charging status. Please try again.';
+    }
+    notifyListeners();
+  }
+
   /// Start the charging session (transition from checkedIn to charging).
   Future<void> startCharging() async {
     if (_phase == SessionPhase.charging) return;

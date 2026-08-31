@@ -21,6 +21,8 @@ class RouteRecommendationRequest {
     this.vehicleId = '',
     this.originName,
     this.destinationName,
+    this.routeDistanceKm,
+    this.routeDurationMinutes,
   });
 
   final double originLat;
@@ -37,6 +39,8 @@ class RouteRecommendationRequest {
   final String vehicleId;
   final String? originName;
   final String? destinationName;
+  final double? routeDistanceKm;
+  final int? routeDurationMinutes;
 
   /// Serialize to JSON for the Dio request body.
   Map<String, dynamic> toJson() => {
@@ -59,6 +63,9 @@ class RouteRecommendationRequest {
     'currentSOC': currentSOC,
     'reserveSOC': reserveSOC,
     'preference': preference,
+    if (routeDistanceKm != null) 'route_distance_km': routeDistanceKm,
+    if (routeDurationMinutes != null)
+      'route_duration_minutes': routeDurationMinutes,
   };
 }
 

@@ -107,11 +107,36 @@ class BusinessProvider extends ChangeNotifier {
             (await _api.getBusinessDashboard(id)).data as Map,
           );
         } catch (error) {
-          requiredError ??= _message(error);
+          // Metrics are derived from the same live charger/booking payloads
+          // below when the analytics route is unavailable. Do not turn a
+          // partial analytics outage into a red dashboard error banner, and
+          // never fill the cards with demo/random numbers.
+          dashboard = _fallbackDashboard();
         }
       }(),
     ]);
     errorMessage = requiredError;
+  }
+
+  Map<String, dynamic> _fallbackDashboard() {
+    final active = chargers.where((charger) {
+      final status = charger['status']?.toString().toLowerCase();
+      final ports = charger['ports'] as List<dynamic>? ?? const [];
+      return status == 'available' &&
+          ports.any(
+            (port) => port is Map && (port['is_active'] as bool? ?? true),
+          );
+    }).length;
+    return {
+      'chargers': chargers.length,
+      'active_chargers': active,
+      'sessions': 0,
+      'bookings': bookings.length,
+      'confirmed_bookings': bookings.length,
+      'total_earnings': 0.0,
+      'active_minutes': 0.0,
+      'reviews': const <Map<String, dynamic>>[],
+    };
   }
 
   Future<bool> createBusiness({
