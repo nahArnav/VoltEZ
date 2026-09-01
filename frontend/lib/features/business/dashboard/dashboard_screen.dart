@@ -266,7 +266,7 @@ class _AnalyticsPage extends StatelessWidget {
                 label: 'AVG RATING',
                 value: metrics['average_rating'] != null
                     ? '${metrics['average_rating']} ★'
-                    : '5.0 ★',
+                    : 'No ratings',
                 icon: Icons.star_rounded,
                 color: AppColors.marigold,
               ),
@@ -303,7 +303,7 @@ class _AnalyticsPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
                         Text(
-                          'AI Tariff Optimization Active',
+                          'No live pricing recommendations yet',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -312,7 +312,7 @@ class _AnalyticsPage extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Your chargers are operating at recommended baseline rates. Dynamic discounts will trigger automatically during off-peak hours.',
+                          'Recommendations appear after VoltEZ has enough live demand and availability signals for your fleet.',
                           style: TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12,
@@ -484,12 +484,16 @@ class _ProfilePage extends StatelessWidget {
               color: AppColors.success,
             ),
             title: const Text('Bank Accounts & Daily Payouts'),
-            subtitle: const Text('Settlement account linked for auto-credits'),
+            subtitle: const Text(
+              'Payout details become active after identity verification.',
+            ),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Payouts are configured for daily direct settlement.'),
+                  content: Text(
+                    'Payout setup will be enabled after host KYC is verified.',
+                  ),
                 ),
               );
             },
@@ -503,12 +507,16 @@ class _ProfilePage extends StatelessWidget {
               color: AppColors.secondary,
             ),
             title: const Text('Operating Hours & Access'),
-            subtitle: const Text('24/7 Public EV Charging Access Enabled'),
+            subtitle: const Text(
+              'Set availability windows for each registered connector.',
+            ),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Operating schedule is active 24/7.'),
+                  content: Text(
+                    'Use a charger’s menu to configure its availability.',
+                  ),
                 ),
               );
             },
@@ -522,7 +530,9 @@ class _ProfilePage extends StatelessWidget {
               color: AppColors.primary,
             ),
             title: const Text('Refresh Live Fleet Data'),
-            subtitle: const Text('Fetch latest reservations and station telemetry'),
+            subtitle: const Text(
+              'Fetch latest reservations and station telemetry',
+            ),
             onTap: provider.load,
           ),
         ),
@@ -544,7 +554,6 @@ class _ProfilePage extends StatelessWidget {
     );
   }
 }
-
 
 class _ChargerList extends StatelessWidget {
   const _ChargerList(this.chargers, {this.showControls = false});
@@ -657,13 +666,16 @@ class _BookingList extends StatelessWidget {
           booking['start_at']?.toString() ?? '',
         )?.toLocal();
         final status = booking['status']?.toString() ?? 'unknown';
-        final isConfirmed = status.toLowerCase() == 'confirmed' || status.toLowerCase() == 'checked_in';
+        final isConfirmed =
+            status.toLowerCase() == 'confirmed' ||
+            status.toLowerCase() == 'checked_in';
         final cancellable = const {
           'pending',
           'held',
           'confirmed',
         }.contains(status.toLowerCase());
-        final isCash = booking['payment_type']?.toString().toLowerCase() == 'cash' ||
+        final isCash =
+            booking['payment_type']?.toString().toLowerCase() == 'cash' ||
             booking['start_code'] != null;
 
         return Card(
@@ -676,7 +688,10 @@ class _BookingList extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(8),
@@ -702,7 +717,10 @@ class _BookingList extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: isConfirmed
                             ? AppColors.success.withValues(alpha: 0.15)
@@ -717,7 +735,9 @@ class _BookingList extends StatelessWidget {
                       child: Text(
                         status.toUpperCase(),
                         style: TextStyle(
-                          color: isConfirmed ? AppColors.success : AppColors.marigold,
+                          color: isConfirmed
+                              ? AppColors.success
+                              : AppColors.marigold,
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                         ),
@@ -799,7 +819,6 @@ class _BookingList extends StatelessWidget {
     );
   }
 
-
   void _showVerifyCashCode(
     BuildContext context,
     BusinessProvider provider,
@@ -843,7 +862,9 @@ class _BookingList extends StatelessWidget {
               );
               if (success && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Charging started successfully!')),
+                  const SnackBar(
+                    content: Text('Charging started successfully!'),
+                  ),
                 );
               }
             },
@@ -1064,6 +1085,7 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
   Timer? _addressSearchTimer;
   var _addressSearchToken = 0;
   var _addressSearching = false;
+  var _submitting = false;
   List<_AddressSuggestion> _addressSuggestions = const [];
   double? _selectedLatitude;
   double? _selectedLongitude;
@@ -1134,6 +1156,7 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
   }
 
   Future<void> _submit() async {
+    if (_submitting) return;
     if (_name.text.trim().isEmpty ||
         _selectedLatitude == null ||
         _selectedLongitude == null) {
@@ -1144,6 +1167,7 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
       );
       return;
     }
+    setState(() => _submitting = true);
     final ok = await context.read<BusinessProvider>().createBusiness(
       name: _name.text.trim(),
       category: _category.text.trim(),
@@ -1151,7 +1175,18 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
       latitude: _selectedLatitude!,
       longitude: _selectedLongitude!,
     );
-    if (ok) await widget.onCreated();
+    if (!mounted) return;
+    if (ok) {
+      await widget.onCreated();
+    } else {
+      final error =
+          context.read<BusinessProvider>().errorMessage ??
+          'Business registration failed. Check the server connection and try again.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+    }
+    if (mounted) setState(() => _submitting = false);
   }
 
   @override
@@ -1234,8 +1269,8 @@ class _BusinessOnboardingState extends State<_BusinessOnboarding> {
             ),
           const SizedBox(height: 12),
           FilledButton(
-            onPressed: _submit,
-            child: const Text('CREATE BUSINESS'),
+            onPressed: _submitting ? null : _submit,
+            child: Text(_submitting ? 'CREATING…' : 'CREATE BUSINESS'),
           ),
         ],
       ),
@@ -1364,7 +1399,6 @@ Future<void> _showAddCharger(BuildContext context) async {
       double? selectedLatitude;
       double? selectedLongitude;
 
-
       Future<void> search(
         String query,
         void Function(void Function()) setState,
@@ -1466,8 +1500,15 @@ Future<void> _showAddCharger(BuildContext context) async {
                     child: Row(
                       children: [
                         ActionChip(
-                          avatar: const Icon(Icons.bolt_rounded, size: 14, color: AppColors.primary),
-                          label: const Text('7.4kW Type 2 AC', style: TextStyle(fontSize: 11)),
+                          avatar: const Icon(
+                            Icons.bolt_rounded,
+                            size: 14,
+                            color: AppColors.primary,
+                          ),
+                          label: const Text(
+                            '7.4kW Type 2 AC',
+                            style: TextStyle(fontSize: 11),
+                          ),
                           onPressed: () {
                             setState(() {
                               name.text = 'Type 2 AC Charger';
@@ -1481,8 +1522,15 @@ Future<void> _showAddCharger(BuildContext context) async {
                         ),
                         const SizedBox(width: 8),
                         ActionChip(
-                          avatar: const Icon(Icons.bolt_rounded, size: 14, color: AppColors.secondary),
-                          label: const Text('22kW Fast AC', style: TextStyle(fontSize: 11)),
+                          avatar: const Icon(
+                            Icons.bolt_rounded,
+                            size: 14,
+                            color: AppColors.secondary,
+                          ),
+                          label: const Text(
+                            '22kW Fast AC',
+                            style: TextStyle(fontSize: 11),
+                          ),
                           onPressed: () {
                             setState(() {
                               name.text = '22kW Fast AC Station';
@@ -1496,8 +1544,15 @@ Future<void> _showAddCharger(BuildContext context) async {
                         ),
                         const SizedBox(width: 8),
                         ActionChip(
-                          avatar: const Icon(Icons.flash_on_rounded, size: 14, color: AppColors.marigold),
-                          label: const Text('30kW CCS2 DC', style: TextStyle(fontSize: 11)),
+                          avatar: const Icon(
+                            Icons.flash_on_rounded,
+                            size: 14,
+                            color: AppColors.marigold,
+                          ),
+                          label: const Text(
+                            '30kW CCS2 DC',
+                            style: TextStyle(fontSize: 11),
+                          ),
                           onPressed: () {
                             setState(() {
                               name.text = '30kW DC Fast Charger';
@@ -1511,8 +1566,15 @@ Future<void> _showAddCharger(BuildContext context) async {
                         ),
                         const SizedBox(width: 8),
                         ActionChip(
-                          avatar: const Icon(Icons.electric_bolt_rounded, size: 14, color: AppColors.success),
-                          label: const Text('60kW Superfast DC', style: TextStyle(fontSize: 11)),
+                          avatar: const Icon(
+                            Icons.electric_bolt_rounded,
+                            size: 14,
+                            color: AppColors.success,
+                          ),
+                          label: const Text(
+                            '60kW Superfast DC',
+                            style: TextStyle(fontSize: 11),
+                          ),
                           onPressed: () {
                             setState(() {
                               name.text = '60kW High-Speed DC';
@@ -1716,11 +1778,20 @@ Future<void> _showAddCharger(BuildContext context) async {
                         );
                         return;
                       }
+                      if (selectedLatitude == null ||
+                          selectedLongitude == null) {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Select a location suggestion or use current location before saving.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      final chargerLatitude = selectedLatitude!;
+                      final chargerLongitude = selectedLongitude!;
                       final businessProvider = context.read<BusinessProvider>();
-                      final defaultLat = (biz?['latitude'] as num?)?.toDouble() ?? 18.5204;
-                      final defaultLng = (biz?['longitude'] as num?)?.toDouble() ?? 73.8567;
-                      selectedLatitude ??= defaultLat;
-                      selectedLongitude ??= defaultLng;
 
                       if (!dialogContext.mounted) return;
                       setState(() => saving = true);
@@ -1729,8 +1800,8 @@ Future<void> _showAddCharger(BuildContext context) async {
                         chargerType: chargerType,
                         powerKw: p,
                         pricePerKwh: pr,
-                        latitude: selectedLatitude!,
-                        longitude: selectedLongitude!,
+                        latitude: chargerLatitude,
+                        longitude: chargerLongitude,
                         addressText: location.text.trim().isNotEmpty
                             ? location.text.trim()
                             : defaultAddress,
@@ -1739,7 +1810,6 @@ Future<void> _showAddCharger(BuildContext context) async {
                         portMaxPowerKw: pp,
                         accessType: accessType,
                       );
-
 
                       if (!dialogContext.mounted) return;
                       if (ok) {

@@ -11,7 +11,6 @@ import '../../../core/utils/navigation_utils.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/widgets.dart';
 
-
 /// Charger Details — shown when driver taps a recommended charger
 /// or charger card from the map.
 ///
@@ -94,15 +93,24 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.ev_station_outlined, size: 64, color: AppColors.textMuted),
+                const Icon(
+                  Icons.ev_station_outlined,
+                  size: 64,
+                  color: AppColors.textMuted,
+                ),
                 const SizedBox(height: 16),
-                Text(_loadError!, style: AppTypography.bodyLarge, textAlign: TextAlign.center),
+                Text(
+                  _loadError!,
+                  style: AppTypography.bodyLarge,
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 20),
                 FilledButton(
-                  onPressed: () => context.canPop() ? context.pop() : context.go('/driver/home'),
+                  onPressed: () => context.canPop()
+                      ? context.pop()
+                      : context.go('/driver/home'),
                   child: const Text('GO BACK'),
                 ),
-
               ],
             ),
           ),
@@ -126,8 +134,11 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
         actions: [
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.share_rounded,
-                color: AppColors.textPrimary, size: 22),
+            icon: const Icon(
+              Icons.share_rounded,
+              color: AppColors.textPrimary,
+              size: 22,
+            ),
             tooltip: 'Share',
           ),
         ],
@@ -202,8 +213,9 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               const SizedBox(width: 10),
               Text(
                 _statusLabel(charger.status),
-                style: AppTypography.headlineSmall
-                    .copyWith(color: AppColors.onPrimary),
+                style: AppTypography.headlineSmall.copyWith(
+                  color: AppColors.onPrimary,
+                ),
               ),
               const Spacer(),
               _infoChip(
@@ -247,7 +259,8 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
     return Row(
       children: [
         _statCard(
-          Icons.navigation_rounded,              '$_detourMinutes min',
+          Icons.navigation_rounded,
+          '$_detourMinutes min',
           'Detour',
           AppColors.secondary,
         ),
@@ -256,9 +269,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
           Icons.verified_rounded,
           '${(_reliabilityScore * 100).round()}%',
           'Reliability',
-          _reliabilityScore >= 0.9
-              ? AppColors.success
-              : AppColors.warning,
+          _reliabilityScore >= 0.9 ? AppColors.success : AppColors.warning,
         ),
         const SizedBox(width: 10),
         _statCard(
@@ -267,16 +278,13 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               : Icons.warning_amber_rounded,
           _connectorCompatible ? 'Yes' : 'No',
           'Compatible',
-          _connectorCompatible
-              ? AppColors.success
-              : AppColors.warning,
+          _connectorCompatible ? AppColors.success : AppColors.warning,
         ),
       ],
     );
   }
 
-  Widget _statCard(
-      IconData icon, String value, String label, Color color) {
+  Widget _statCard(IconData icon, String value, String label, Color color) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -307,12 +315,11 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
   // ─── Connector Info ───
   Widget _buildConnectorInfo(Charger charger) {
     final connectorNames = charger.connectors
-        .map((ct) => '${connectorTypeLabel(ct.name)} '
-            '${ct == ConnectorType.type2 ||
-                    ct == ConnectorType.type1 ||
-                    ct == ConnectorType.bharatAc
-                ? '(AC)'
-                : '(DC)'}')
+        .map(
+          (ct) =>
+              '${connectorTypeLabel(ct.name)} '
+              '${ct == ConnectorType.type2 || ct == ConnectorType.type1 || ct == ConnectorType.bharatAc ? '(AC)' : '(DC)'}',
+        )
         .join(', ');
 
     return Column(
@@ -333,18 +340,22 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
                   color: AppColors.onPrimary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.power_rounded,
-                    color: AppColors.onPrimary.withValues(alpha: 0.9)),
+                child: Icon(
+                  Icons.power_rounded,
+                  color: AppColors.onPrimary.withValues(alpha: 0.9),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(connectorNames,
-                        style: AppTypography.headlineSmall.copyWith(
-                          color: AppColors.onPrimary,
-                        )),
+                    Text(
+                      connectorNames,
+                      style: AppTypography.headlineSmall.copyWith(
+                        color: AppColors.onPrimary,
+                      ),
+                    ),
                     Text(
                       '${charger.powerKw.round()} kW · ${charger.powerKw >= 50 ? "DC Fast Charging" : "AC Charging"}',
                       style: AppTypography.bodySmall.copyWith(
@@ -356,15 +367,15 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.onPrimary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  _connectorCompatible
-                      ? 'COMPATIBLE'
-                      : 'CHECK ADAPTER',
+                  _connectorCompatible ? 'COMPATIBLE' : 'CHECK ADAPTER',
                   style: TextStyle(
                     color: AppColors.onPrimary,
                     fontSize: 10,
@@ -403,8 +414,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
           runSpacing: 10,
           children: amenities.map((a) {
             return Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: AppColors.onPrimary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
@@ -449,7 +459,9 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
           const SizedBox(height: 12),
           Text(
             'Driver ratings and written reviews will appear here after completed sessions.',
-            style: AppTypography.bodySmall.copyWith(color: AppColors.onPrimary.withValues(alpha: 0.7)),
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.onPrimary.withValues(alpha: 0.7),
+            ),
           ),
         ],
       ),
@@ -461,9 +473,12 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       children: [
         SizedBox(
           width: 60,
-          child: Text(label, style: AppTypography.labelSmall.copyWith(
-            color: AppColors.onPrimary.withValues(alpha: 0.7),
-          )),
+          child: Text(
+            label,
+            style: AppTypography.labelSmall.copyWith(
+              color: AppColors.onPrimary.withValues(alpha: 0.7),
+            ),
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -494,7 +509,9 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
 
   // ─── Host Info ───
   Widget _buildHostInfo(Charger charger) {
-    if (charger.businessId.isEmpty || charger.businessId == '0') return const SizedBox.shrink();
+    if (charger.businessId.isEmpty || charger.businessId == '0') {
+      return const SizedBox.shrink();
+    }
 
     return GlassCard(
       accentColor: AppColors.primary,
@@ -509,17 +526,23 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               color: AppColors.onPrimary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.business_rounded,
-                color: AppColors.onPrimary.withValues(alpha: 0.9), size: 22),
+            child: Icon(
+              Icons.business_rounded,
+              color: AppColors.onPrimary.withValues(alpha: 0.9),
+              size: 22,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Hosted by', style: AppTypography.labelSmall.copyWith(
-                  color: AppColors.onPrimary.withValues(alpha: 0.6),
-                )),
+                Text(
+                  'Hosted by',
+                  style: AppTypography.labelSmall.copyWith(
+                    color: AppColors.onPrimary.withValues(alpha: 0.6),
+                  ),
+                ),
                 Text(
                   'VoltEZ Partner',
                   style: AppTypography.headlineSmall.copyWith(
@@ -529,8 +552,7 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
               ],
             ),
           ),
-          Icon(Icons.verified_rounded,
-              color: AppColors.onPrimary, size: 20),
+          Icon(Icons.verified_rounded, color: AppColors.onPrimary, size: 20),
         ],
       ),
     );
@@ -544,16 +566,18 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       borderRadius: 18,
       child: Row(
         children: [
-          Icon(Icons.verified_rounded,
-              color: AppColors.onPrimary, size: 32),
+          Icon(Icons.verified_rounded, color: AppColors.onPrimary, size: 32),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Verified Charger',
-                    style: AppTypography.headlineSmall
-                        .copyWith(color: AppColors.onPrimary)),
+                Text(
+                  'Verified Charger',
+                  style: AppTypography.headlineSmall.copyWith(
+                    color: AppColors.onPrimary,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   'Verified by VoltEZ. Regularly inspected for safety and performance.',
@@ -577,25 +601,33 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
         color: AppColors.card,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Row(
-        children: [
-          Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final priceSummary = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 '₹${charger.pricePerKwh.round()}/kWh',
-                style: AppTypography.headlineMedium
-                    .copyWith(color: AppColors.primary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.headlineMedium.copyWith(
+                  color: AppColors.primary,
+                ),
               ),
               Text(
                 '$_detourMinutes min detour · ${_reliabilityScore > 0 ? '${(_reliabilityScore * 100).round()}% reliable' : ''}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: AppTypography.bodySmall,
               ),
             ],
-          ),
-          const SizedBox(width: 12),
-          IconButton.filledTonal(
-            icon: const Icon(Icons.navigation_rounded, color: AppColors.primary),
+          );
+          final navigationButton = IconButton.filledTonal(
+            icon: const Icon(
+              Icons.navigation_rounded,
+              color: AppColors.primary,
+            ),
             style: IconButton.styleFrom(
               backgroundColor: AppColors.primary.withValues(alpha: 0.15),
               shape: RoundedRectangleBorder(
@@ -611,33 +643,61 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
                 context: context,
               );
             },
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: PrimaryButton(
-              text: 'SELECT SLOT',
-              onPressed: () {
-                // Set charger on booking provider
-                context.read<BookingProvider>().setCharger(charger);
-                context.go('/driver/booking');
-              },
-              isExpanded: true,
-              icon: Icons.schedule_rounded,
-            ),
-          ),
-        ],
+          );
+          final selectButton = PrimaryButton(
+            text: 'SELECT SLOT',
+            onPressed: () {
+              // Set charger on booking provider
+              context.read<BookingProvider>().setCharger(charger);
+              context.go('/driver/booking');
+            },
+            isExpanded: true,
+            icon: Icons.schedule_rounded,
+          );
+
+          if (constraints.maxWidth < 420) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: priceSummary),
+                    const SizedBox(width: 10),
+                    navigationButton,
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(width: double.infinity, child: selectButton),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(flex: 3, child: priceSummary),
+              const SizedBox(width: 12),
+              navigationButton,
+              const SizedBox(width: 10),
+              Expanded(flex: 4, child: selectButton),
+            ],
+          );
+        },
       ),
     );
   }
 
-
   // ─── Helpers ───
   Color _statusColor(String status) {
     switch (status) {
+      case 'available':
       case 'active':
         return AppColors.success;
+      case 'unavailable':
+      case 'busy':
       case 'paused':
         return AppColors.warning;
+      case 'maintenance':
+      case 'offline':
       case 'inactive':
         return AppColors.error;
       default:
@@ -647,10 +707,16 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
 
   String _statusLabel(String status) {
     switch (status) {
+      case 'available':
       case 'active':
         return 'Available';
+      case 'unavailable':
+      case 'busy':
       case 'paused':
         return 'Paused';
+      case 'maintenance':
+        return 'Maintenance';
+      case 'offline':
       case 'inactive':
         return 'Offline';
       default:
@@ -668,7 +734,11 @@ class _ChargerDetailsScreenState extends State<ChargerDetailsScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: AppColors.onPrimary.withValues(alpha: 0.9), size: 14),
+          Icon(
+            icon,
+            color: AppColors.onPrimary.withValues(alpha: 0.9),
+            size: 14,
+          ),
           const SizedBox(width: 6),
           Text(
             text,

@@ -227,6 +227,8 @@ class ApiService {
     required double targetSOC,
     required double reserveSOC,
     required String preference,
+    double? routeDistanceKm,
+    int? routeDurationMinutes,
     double radiusMeters = 25000,
   }) => _dio.post(
     '/recommendations/',
@@ -243,6 +245,9 @@ class ApiService {
       'target_soc': targetSOC / 100,
       'reserve_soc': reserveSOC / 100,
       'preferences': {'mode': preference},
+      if (routeDistanceKm != null) 'route_distance_km': routeDistanceKm,
+      if (routeDurationMinutes != null)
+        'route_duration_minutes': routeDurationMinutes,
     },
   );
 
@@ -394,8 +399,14 @@ class ApiService {
   Future<Response> cancelBusinessBooking(String businessId, String bookingId) =>
       _dio.post('/businesses/$businessId/bookings/$bookingId/cancel');
 
-  Future<Response> verifyCashBookingOtp(String businessId, String bookingId, String code) =>
-      _dio.post('/businesses/$businessId/bookings/$bookingId/cash-verify', data: {'code': code});
+  Future<Response> verifyCashBookingOtp(
+    String businessId,
+    String bookingId,
+    String code,
+  ) => _dio.post(
+    '/businesses/$businessId/bookings/$bookingId/cash-verify',
+    data: {'code': code},
+  );
 
   Future<Response> getBusinessDashboard(String businessId) =>
       _dio.get('/analytics/businesses/$businessId/dashboard');
@@ -426,16 +437,15 @@ class ApiService {
     required double originLng,
     required double destLat,
     required double destLng,
-  }) =>
-      _dio.get(
-        '/locations/route',
-        queryParameters: {
-          'origin_lat': originLat,
-          'origin_lng': originLng,
-          'dest_lat': destLat,
-          'dest_lng': destLng,
-        },
-      );
+  }) => _dio.get(
+    '/locations/route',
+    queryParameters: {
+      'origin_lat': originLat,
+      'origin_lng': originLng,
+      'dest_lat': destLat,
+      'dest_lng': destLng,
+    },
+  );
 
   Future<Response> getSponsorTariffs([String state = 'Maharashtra']) =>
       _dio.get('/sponsors/tariffs', queryParameters: {'state': state});
@@ -445,7 +455,6 @@ class ApiService {
 
   Future<Response> getSponsorEcosystem() => _dio.get('/sponsors/ecosystem');
 }
-
 
 /// Adds Bearer token to every request.
 class _AuthInterceptor extends Interceptor {

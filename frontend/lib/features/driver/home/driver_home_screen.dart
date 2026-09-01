@@ -14,7 +14,6 @@ import '../../../shared/models/models.dart';
 import '../history/booking_history_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
-
   const DriverHomeScreen({super.key});
 
   @override
@@ -72,7 +71,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-
   // ─── HOME TAB ───
   Widget _buildHomeTab() {
     return CustomScrollView(
@@ -115,7 +113,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       ],
     );
   }
-
 
   // ─── Active Session Banner ───
   Widget _buildActiveSessionBanner(SessionProvider session) {
@@ -211,7 +208,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const SizedBox(height: 2),
               Consumer<AuthProvider>(
                 builder: (context, auth, _) {
-                  final name = auth.user?.name ?? 'Driver';
+                  final name = auth.user?.name ?? 'User';
                   return Text(name, style: AppTypography.displaySmall);
                 },
               ),
@@ -448,8 +445,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         const SizedBox(width: 10),
         Expanded(child: Container(height: 1, color: AppColors.border)),
         const SizedBox(width: 10),
-        Text(title, style: AppTypography.sectionLabel),
-        const Spacer(),
+        Flexible(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.sectionLabel,
+          ),
+        ),
+        const SizedBox(width: 10),
         GestureDetector(
           onTap: () => context.go('/driver/map'),
           child: Text(
@@ -648,15 +652,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   // ─── SPONSORS & INNOVATION HUB ───
   Widget _buildSponsorsCard() {
-
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.05),
@@ -791,7 +792,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _showGeminiCopilotDialog(BuildContext context) async {
     final promptCtrl = TextEditingController(
-      text: 'What is the optimal fast charging speed for my EV on Pune highway?',
+      text: 'How should I choose the best charging stop for my trip?',
     );
     var advice = '';
     var loading = false;
@@ -877,9 +878,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   onPressed: () async {
                     setState(() => loading = true);
                     try {
+                      final planner = context.read<RoutePlannerProvider>();
+                      final vehicle = planner.selectedVehicle;
                       final res = await ApiService().askSponsorCopilot({
                         'prompt': promptCtrl.text.trim(),
-                        'battery_level': 45,
+                        // Keep the copilot grounded in route-planner state,
+                        // rather than sending a demo battery percentage.
+                        'battery_level': planner.currentSOC.round(),
+                        if (vehicle != null) ...{
+                          'vehicle_model': vehicle.displayName,
+                          'connector_type': vehicle.primaryConnector,
+                        },
                       });
                       final data = res.data as Map<String, dynamic>;
                       setState(() {
@@ -915,17 +924,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             if (loading) {
-              ApiService().getSponsorTariffs(stateName).then((res) {
-                final data = res.data as Map<String, dynamic>;
-                setState(() {
-                  tariffs = data['results'] as List<dynamic>? ?? [];
-                  loading = false;
-                });
-              }).catchError((_) {
-                setState(() {
-                  loading = false;
-                });
-              });
+              ApiService()
+                  .getSponsorTariffs(stateName)
+                  .then((res) {
+                    final data = res.data as Map<String, dynamic>;
+                    setState(() {
+                      tariffs = data['results'] as List<dynamic>? ?? [];
+                      loading = false;
+                    });
+                  })
+                  .catchError((_) {
+                    setState(() {
+                      loading = false;
+                    });
+                  });
             }
 
             return AlertDialog(
@@ -1033,7 +1045,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           const SizedBox(height: 16),
           Consumer<AuthProvider>(
             builder: (context, auth, _) {
-              final name = auth.user?.name ?? 'Driver';
+              final name = auth.user?.name ?? 'User';
               return Text(name, style: AppTypography.displaySmall);
             },
           ),
@@ -1192,7 +1204,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             children: const [
               Icon(Icons.verified_user_rounded, color: AppColors.primary),
               SizedBox(width: 8),
-              Expanded(child: Text('Driver KYC Verification')),
+              Expanded(child: Text('User KYC Verification')),
             ],
           ),
 
@@ -1203,13 +1215,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               children: [
                 const Text(
                   'Verify your driving credentials to unlock instant slot holds, zero-deposit charging, and higher trust rating.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   initialValue: docType,
                   decoration: const InputDecoration(labelText: 'Document Type'),
-
 
                   items: const [
                     DropdownMenuItem(
@@ -1220,8 +1234,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       value: 'aadhaar',
                       child: Text('Aadhaar / National ID'),
                     ),
-                    DropdownMenuItem(value: 'voter_id', child: Text('Voter ID')),
-                    DropdownMenuItem(value: 'passport', child: Text('Passport')),
+                    DropdownMenuItem(
+                      value: 'voter_id',
+                      child: Text('Voter ID'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'passport',
+                      child: Text('Passport'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) setDialogState(() => docType = val);
@@ -1271,7 +1291,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
-                          'Driver identity submitted. Verification status: PENDING REVIEW',
+                          'User identity submitted. Verification status: PENDING REVIEW',
                         ),
                       ),
                     );
@@ -1319,7 +1339,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     for (final option in const [
                       ('upi', 'UPI', Icons.account_balance_rounded),
                       ('card', 'Card', Icons.credit_card_rounded),
-                      ('cash', 'Pay at charger (cash)', Icons.payments_outlined),
+                      (
+                        'cash',
+                        'Pay at charger (cash)',
+                        Icons.payments_outlined,
+                      ),
                     ])
                       RadioListTile<String>(
                         value: option.$1,
@@ -1339,7 +1363,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
             FilledButton(
               onPressed: () async {
-                await prefs.setString('voltez_default_payment_method', selected);
+                await prefs.setString(
+                  'voltez_default_payment_method',
+                  selected,
+                );
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1423,7 +1450,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ),
               ],
             ),
-
           ),
           actions: [
             TextButton(
@@ -1436,22 +1462,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-
-
   Future<void> _showHelpDialog(BuildContext context) async {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Help & Support'),
-        content: const Text('For assistance, email us at support@voltez.com or visit our FAQ page.'),
+        content: const Text(
+          'For assistance, email us at support@voltez.com or visit our FAQ page.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CLOSE')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CLOSE'),
+          ),
         ],
       ),
     );
   }
 }
-
 
 String _greeting() {
   final hour = DateTime.now().hour;

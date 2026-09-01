@@ -84,6 +84,17 @@ class BookingProvider extends ChangeNotifier {
   ConfirmedBooking? _confirmedBooking;
   ConfirmedBooking? get confirmedBooking => _confirmedBooking;
 
+  /// Restore a confirmed booking selected from history so the session screen
+  /// has the same booking/payment context as the original confirmation flow.
+  /// This is especially important for cash reservations, whose owner OTP
+  /// verification is handled by the business app.
+  void setActiveBooking(ConfirmedBooking booking) {
+    _confirmedBooking = booking;
+    _phase = BookingPhase.confirmed;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   // ─── Error ───
   String? _errorMessage;
   String? get errorMessage => _errorMessage;

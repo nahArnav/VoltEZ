@@ -106,8 +106,8 @@ class RouteRecommendationResult {
       charger: Charger.fromJson(chargerJson),
       reason: json['reason'] as String? ?? '',
       estimatedCost: (json['estimatedCost'] as num?)?.toDouble() ?? 0,
-      estimatedPricePerKwh:
-          (json['estimated_price_per_kwh'] as num?)?.toDouble(),
+      estimatedPricePerKwh: (json['estimated_price_per_kwh'] as num?)
+          ?.toDouble(),
       estimatedTimeMinutes: json['estimatedTimeMinutes'] as int? ?? 0,
       confidenceScore: (json['confidenceScore'] as num?)?.toDouble() ?? 0,
       detourMinutes: json['detourMinutes'] as int? ?? 0,
@@ -157,6 +157,8 @@ class LiveRouteRecommendationApi implements RouteRecommendationApi {
       targetSOC: 80,
       reserveSOC: request.reserveSOC,
       preference: request.preference,
+      routeDistanceKm: request.routeDistanceKm,
+      routeDurationMinutes: request.routeDurationMinutes,
     );
     final body = response.data as Map<String, dynamic>;
     final rows = body['recommendations'] as List<dynamic>? ?? const [];
@@ -179,8 +181,8 @@ class LiveRouteRecommendationApi implements RouteRecommendationApi {
             ? '${distance.toStringAsFixed(1)} km away and reachable at your current charge.'
             : 'Outside the safe range at your current state of charge.',
         estimatedCost: (json['estimated_cost'] as num?)?.toDouble() ?? 0,
-        estimatedPricePerKwh:
-            (json['estimated_price_per_kwh'] as num?)?.toDouble(),
+        estimatedPricePerKwh: (json['estimated_price_per_kwh'] as num?)
+            ?.toDouble(),
         estimatedTimeMinutes:
             ((json['estimated_charge_minutes'] as num?)?.toDouble() ?? 0)
                 .round(),

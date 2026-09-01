@@ -6,7 +6,6 @@ import 'package:latlong2/latlong.dart' as latlong;
 import 'package:provider/provider.dart';
 import 'dart:math' as math;
 
-
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/providers/charger_discovery_provider.dart';
@@ -39,7 +38,6 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   // Base-map center only; no charger data is fabricated when GPS/API access
   // is unavailable.
   static const latlong.LatLng _defaultCenter = latlong.LatLng(18.5204, 73.8567);
-
 
   // Connector type display labels (backend uses plain strings)
   static const Map<String, String> _connectorLabels = {
@@ -90,6 +88,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
         return AppColors.success;
       case 'unavailable':
       case 'paused':
+      case 'busy':
         return AppColors.warning;
       case 'maintenance':
       case 'offline':
@@ -107,6 +106,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
         return 'Available now';
       case 'unavailable':
       case 'paused':
+      case 'busy':
         return 'Currently unavailable';
       case 'maintenance':
         return 'Maintenance';
@@ -139,7 +139,6 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
             if (discovery.currentPosition != null) {
               _centerOnPosition(discovery.currentPosition!);
             }
-
 
             return Stack(
               children: [
@@ -326,7 +325,6 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
     );
   }
 
-
   // ─── Search Bar ───
   Widget _buildSearchBar(ChargerDiscoveryProvider discovery) {
     return Container(
@@ -464,7 +462,6 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                   14,
                 );
               },
-
             );
           },
         ),
@@ -1076,7 +1073,9 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                                         child: Text(
                                           '${charger.powerKw.round()} kW \u00B7 \u20B9${charger.pricePerKwh.round()}/kWh',
                                           style: AppTypography.labelMedium
-                                              .copyWith(color: AppColors.primary),
+                                              .copyWith(
+                                                color: AppColors.primary,
+                                              ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
