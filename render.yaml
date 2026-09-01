@@ -1,10 +1,9 @@
 # ═════════════════════════════════════════════════════════════════════════════
-# Render Blueprint Configuration for VoltEZ Backend & Data Infrastructure
+# Render Web Service Blueprint (100% Free Tier - No Credit Card Required)
 # Docs: https://render.com/docs/blueprint-spec
 # ═════════════════════════════════════════════════════════════════════════════
 
 services:
-  # ─── FastAPI Application Server ───
   - type: web
     name: voltez-api
     runtime: python
@@ -13,6 +12,7 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health/live
     autoDeploy: true
+    plan: free
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.3
@@ -23,14 +23,9 @@ services:
       - key: CORS_ORIGINS
         value: "*"
       - key: DATABASE_URL
-        fromDatabase:
-          name: voltez-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
-        fromService:
-          type: redis
-          name: voltez-redis
-          property: connectionString
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: GEMINI_API_KEY
@@ -49,17 +44,3 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
-
-  # ─── Managed Redis Cache / Celery & Booking Lock Backend ───
-  - type: redis
-    name: voltez-redis
-    plan: free
-    ipAllowList: []
-
-# ─── Managed PostgreSQL with PostGIS Geospatial Support ───
-databases:
-  - name: voltez-db
-    databaseName: voltez
-    user: voltez
-    plan: free
-    ipAllowList: []
