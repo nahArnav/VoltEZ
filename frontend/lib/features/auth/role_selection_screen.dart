@@ -15,50 +15,72 @@ class RoleSelectionScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              const Text('VOLTEZ', style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 3,
-              )),
-              const SizedBox(height: 8),
-              Text('How will you use VoltEZ?', style: AppTypography.displaySmall),
-              const SizedBox(height: 8),
-              const Text(
-                'Choose your role to get started.',
-                style: TextStyle(color: AppColors.textSecondary),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 48,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 10),
+                        const Text(
+                          'VOLTEZ',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('How will you use VoltEZ?', style: AppTypography.displaySmall),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Choose your role to get started.',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Column(
+                      children: [
+                        _RoleOption(
+                          icon: Icons.directions_car_rounded,
+                          title: 'I drive an EV',
+                          subtitle: 'Find chargers, plan routes, book slots.',
+                          color: AppColors.primary,
+                          onTap: () {
+                            context.read<AuthProvider>().setRole(AccountRole.driver);
+                            context.go('/driver/home');
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _RoleOption(
+                          icon: Icons.ev_station_rounded,
+                          title: 'I own chargers',
+                          subtitle: 'Manage your charging business.',
+                          color: AppColors.success,
+                          onTap: () {
+                            context.read<AuthProvider>().setRole(AccountRole.owner);
+                            context.go('/business/dashboard');
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
-              const Spacer(),
-              _RoleOption(
-                icon: Icons.directions_car_rounded,
-                title: 'I drive an EV',
-                subtitle: 'Find chargers, plan routes, book slots.',
-                color: AppColors.primary,
-                onTap: () {
-                  context.read<AuthProvider>().setRole(AccountRole.driver);
-                  context.go('/driver/home');
-                },
-              ),
-              const SizedBox(height: 16),
-              _RoleOption(
-                icon: Icons.ev_station_rounded,
-                title: 'I own chargers',
-                subtitle: 'Manage your charging business.',
-                color: AppColors.success,
-                onTap: () {
-                  context.read<AuthProvider>().setRole(AccountRole.owner);
-                  context.go('/business/dashboard');
-                },
-              ),
-              const Spacer(),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

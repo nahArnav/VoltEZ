@@ -478,7 +478,7 @@ class _BookingScreenState extends State<BookingScreen> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(14),
@@ -488,25 +488,33 @@ class _BookingScreenState extends State<BookingScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              timeStr,
-              style: TextStyle(
-                color: textColor,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                timeStr,
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
               ),
             ),
             const SizedBox(height: 3),
             Row(
               children: [
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    color: !disabled || selected
-                        ? AppColors.success
-                        : AppColors.textMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      color: !disabled || selected
+                          ? AppColors.success
+                          : AppColors.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (slot.isStale) ...[

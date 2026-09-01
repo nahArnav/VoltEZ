@@ -46,7 +46,7 @@ class _RoleSelect extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (_, box) {
-      final heroWidth = math.min(math.max(0.0, box.maxWidth - 48), 360.0);
+      final heroWidth = math.min(math.max(0.0, box.maxWidth - 24), 380.0);
       return SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
@@ -87,14 +87,14 @@ class _RoleSelect extends StatelessWidget {
                 ],
               ),
               const Text('INTELLIGENT EV CHARGING NETWORK', style: _micro),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Center(
                 child: SizedBox(
                   width: heroWidth,
-                  child: const HolographicEv(progress: .62, compact: true),
+                  child: const HolographicEv(progress: .62, compact: false),
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
               Text('Choose your access', style: AppTypography.displaySmall),
               const SizedBox(height: 8),
               const Text(

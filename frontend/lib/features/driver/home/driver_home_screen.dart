@@ -818,51 +818,55 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ],
               ),
 
-              content: SizedBox(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: promptCtrl,
-                      style: AppTypography.bodyMedium,
-                      decoration: InputDecoration(
-                        labelText: 'Ask Gemini Copilot',
-                        hintText: 'e.g. Where can I find CCS2 50kW chargers?',
-                        filled: true,
-                        fillColor: AppColors.surface,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    if (loading)
-                      const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primary,
-                        ),
-                      )
-                    else if (advice.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Text(
-                          advice,
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: Colors.white,
-                            height: 1.4,
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: double.maxFinite,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: promptCtrl,
+                        style: AppTypography.bodyMedium,
+                        maxLines: 3,
+                        minLines: 1,
+                        decoration: InputDecoration(
+                          labelText: 'Ask Gemini Copilot',
+                          hintText: 'e.g. Where can I find CCS2 50kW chargers?',
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 14),
+                      if (loading)
+                        const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                        )
+                      else if (advice.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Text(
+                            advice,
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: Colors.white,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               actions: [

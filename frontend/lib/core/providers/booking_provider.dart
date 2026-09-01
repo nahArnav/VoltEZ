@@ -105,6 +105,14 @@ class BookingProvider extends ChangeNotifier {
   bool _historyLoading = false;
   bool get historyLoading => _historyLoading;
 
+    // ─── Active booking ───
+  ConfirmedBooking? _activeBooking;
+  ConfirmedBooking? get activeBooking => _activeBooking;
+
+  void setActiveBooking(ConfirmedBooking booking) {
+    _activeBooking = booking;
+    notifyListeners();
+  }
   // ═══════════════════════════════════════════════════════════════════════════
   // Actions
   // ═══════════════════════════════════════════════════════════════════════════

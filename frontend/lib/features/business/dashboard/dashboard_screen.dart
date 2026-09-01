@@ -107,7 +107,7 @@ class _OverviewPage extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 1.55,
+            childAspectRatio: 1.32,
             children: [
               _MetricCard(
                 label: 'TOTAL EARNINGS',
@@ -241,7 +241,7 @@ class _AnalyticsPage extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 1.55,
+            childAspectRatio: 1.32,
             children: [
               _MetricCard(
                 label: 'GROSS REVENUE',
@@ -945,14 +945,28 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: color, size: 22),
-          Text(value, style: AppTypography.headlineMedium),
-          Text(label, style: AppTypography.labelSmall),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: AppTypography.headlineMedium.copyWith(fontSize: 16),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: AppTypography.labelSmall.copyWith(fontSize: 10),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     ),

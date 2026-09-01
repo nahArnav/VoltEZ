@@ -406,7 +406,7 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
   // ─── Vehicle Selector ───
   Widget _buildVehicleSelector(RoutePlannerProvider planner) {
     return SizedBox(
-      height: 120,
+      height: 135,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: planner.availableVehicles.length,
