@@ -110,6 +110,37 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+
+    // ─── Update Profile ───
+  Future<bool> updateProfile({
+    required String name,
+    String? phone,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _api.updateMe({
+        'name': name.trim(),
+        if (phone != null) 'phone': phone.trim(),
+      });
+
+      _user = User.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   // ─── Set Role (after role selection) ───
   void setRole(AccountRole role) {
     if (_user != null) {

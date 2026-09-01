@@ -803,6 +803,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
+              scrollable: true,
               backgroundColor: AppColors.card,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -826,6 +827,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   children: [
                     TextField(
                       controller: promptCtrl,
+                      minLines: 1,
+                      maxLines: 3,
                       style: AppTypography.bodyMedium,
                       decoration: InputDecoration(
                         labelText: 'Ask Gemini Copilot',
@@ -1065,6 +1068,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
           ),
+          Consumer<AuthProvider>(
+            builder: (context, auth, _) => _profileOption(
+              Icons.person_outline_rounded,
+              'Personal Details',
+              auth.user?.email ?? 'View and edit your account information',
+              () => _showPersonalDetailsDialog(context),
+            ),
+          ),
           _profileOption(
             Icons.receipt_long_rounded,
             'Booking History',
@@ -1119,6 +1130,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       ),
     );
   }
+
+  Future<void> _showPersonalDetailsDialog(BuildContext context) async {
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => _PersonalDetailsDialog(user: user),
+    );
+
+    if (!context.mounted || saved != true) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Personal details updated successfully')),
+    );
+  }
+
 
   Widget _profileOption(
     IconData icon,
@@ -1477,6 +1504,145 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PersonalDetailsDialog extends StatefulWidget {
+  const _PersonalDetailsDialog({required this.user});
+
+  final User user;
+
+  @override
+  State<_PersonalDetailsDialog> createState() => _PersonalDetailsDialogState();
+}
+
+class _PersonalDetailsDialogState extends State<_PersonalDetailsDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _emailController;
+  var _isSaving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.user.name);
+    _phoneController = TextEditingController(text: widget.user.phone ?? '');
+    _emailController = TextEditingController(text: widget.user.email);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Name cannot be empty');
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _error = null;
+    });
+
+    final success = await context.read<AuthProvider>().updateProfile(
+      name: name,
+      phone: phone.isEmpty ? null : phone,
+    );
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+
+    setState(() {
+      _isSaving = false;
+      _error = context.read<AuthProvider>().error ?? 'Unable to update profile';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final roleName = switch (widget.user.role.name) {
+      'driver' => 'Driver',
+      'owner' => 'Business Owner',
+      _ => 'Admin',
+    };
+
+    return AlertDialog(
+      title: const Text('Personal Details'),
+      scrollable: true,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _nameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number',
+              prefixIcon: Icon(Icons.phone_outlined),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _emailController,
+            readOnly: true,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              prefixIcon: Icon(Icons.email_outlined),
+            ),
+          ),
+          const SizedBox(height: 16),
+          InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'Account Type',
+              prefixIcon: Icon(Icons.badge_outlined),
+            ),
+            child: Text(roleName),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: const TextStyle(color: AppColors.error, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+          child: const Text('CANCEL'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : _save,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('SAVE'),
+        ),
+      ],
     );
   }
 }
