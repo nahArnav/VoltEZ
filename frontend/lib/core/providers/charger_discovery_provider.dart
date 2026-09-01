@@ -162,12 +162,13 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   }
 
   // ─── Chargers ───
+  // Pune pilot center: used when GPS is unavailable so chargers always load.
+  static const double _fallbackLat = 18.5204;
+  static const double _fallbackLng = 73.8567;
+
   Future<void> fetchNearbyChargers() async {
-    if (_currentPosition == null) {
-      _chargersError = 'Location not available';
-      notifyListeners();
-      return;
-    }
+    final lat = _currentPosition?.latitude ?? _fallbackLat;
+    final lng = _currentPosition?.longitude ?? _fallbackLng;
 
     _chargersLoading = true;
     _chargersError = null;
@@ -175,8 +176,8 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
 
     try {
       final response = await _api.getNearbyChargers(
-        latitude: _currentPosition!.latitude,
-        longitude: _currentPosition!.longitude,
+        latitude: lat,
+        longitude: lng,
         radiusMeters: 10000,
       );
 
@@ -257,10 +258,11 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
 
   /// Calculate distance from user to a charger in km.
   double distanceTo(Charger charger) {
-    if (_currentPosition == null) return 0;
+    final lat = _currentPosition?.latitude ?? _fallbackLat;
+    final lng = _currentPosition?.longitude ?? _fallbackLng;
     return Geolocator.distanceBetween(
-          _currentPosition!.latitude,
-          _currentPosition!.longitude,
+          lat,
+          lng,
           charger.latitude,
           charger.longitude,
         ) /
