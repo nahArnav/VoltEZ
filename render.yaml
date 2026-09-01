@@ -54,14 +54,12 @@ services:
   - type: redis
     name: voltez-redis
     plan: free
-    region: oregon
     ipAllowList: []
 
 # ─── Managed PostgreSQL with PostGIS Geospatial Support ───
 databases:
   - name: voltez-db
     databaseName: voltez
-    user: postgres
+    user: voltez
     plan: free
-    region: oregon
     ipAllowList: []
