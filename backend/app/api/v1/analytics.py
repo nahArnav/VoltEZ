@@ -175,17 +175,15 @@ async def get_business_dashboard(
         select(ChargingSession).where(ChargingSession.charger_port_id.in_(port_ids))
     )
     sessions = list(sessions_result.scalars().all())
-    session_earnings = sum(
+    # Revenue is based on completed charging telemetry, not reservation
+    # estimates. A confirmed booking may still be cancelled, no-show, or
+    # awaiting cash settlement, and Booking has no `total_price` column.
+    # ChargingSession.amount is the server-calculated delivered-energy charge.
+    total_earnings = sum(
         float(session.amount or 0)
         for session in sessions
-        if session.status == "completed"
+        if str(session.status).lower() == "completed"
     )
-    booking_earnings = sum(
-        float(booking.total_price or 0)
-        for booking in bookings
-        if str(booking.status).upper() in ("CONFIRMED", "COMPLETED", "CHECKED_IN")
-    )
-    total_earnings = session_earnings + booking_earnings
     active_minutes = sum(
         max(0.0, (session.ended_at - session.started_at).total_seconds() / 60.0)
         for session in sessions

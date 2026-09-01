@@ -3,6 +3,12 @@ Verification script for VoltEZ integrations (Gemini, Render, n8n, Config).
 """
 import asyncio
 import os
+import sys
+from pathlib import Path
+
+# Make the verifier runnable as `python scripts/verify_integrations.py` from
+# the backend directory, just like the deployment smoke-check instructions.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # Set dummy env vars for local verification
 os.environ["SECRET_KEY"] = "verification_secret_key_minimum_32_characters_long_123"
@@ -24,7 +30,9 @@ def test_imports():
     print("    [OK] FastAPI app created successfully")
 
     # Check routes
-    route_paths = [r.path for r in app.routes]
+    # Included FastAPI routers are represented as mount objects without a
+    # concrete `.path`; OpenAPI expands them into the actual endpoint paths.
+    route_paths = list(app.openapi().get("paths", {}))
     print(f"    [OK] Total app routes: {len(route_paths)}")
     
     assert "/" in route_paths, "Root GET / missing!"
@@ -36,17 +44,18 @@ def test_imports():
 
     print("--> All route assertions PASSED!")
 
-async def test_ai_fallback_and_n8n():
-    print("--> Testing AI Charging Advice fallback...")
-    from unittest.mock import AsyncMock
+async def test_ai_empty_state_and_n8n():
+    print("--> Testing AI Charging Advice empty-state safety...")
+    from unittest.mock import AsyncMock, MagicMock
 
     from app.api.v1.ai import ChargingAdviceRequest, LocationCoords, get_ai_charging_advice
 
-    mock_db = AsyncMock()
-    # Mock empty db execution
-    mock_result = AsyncMock()
+    mock_db = MagicMock()
+    # Mock empty DB execution. The SQLAlchemy execute call is async, while
+    # Result.all() itself is synchronous.
+    mock_result = MagicMock()
     mock_result.all.return_value = []
-    mock_db.execute.return_value = mock_result
+    mock_db.execute = AsyncMock(return_value=mock_result)
 
     req = ChargingAdviceRequest(
         battery_percentage=32.0,
@@ -55,10 +64,10 @@ async def test_ai_fallback_and_n8n():
     )
 
     response = await get_ai_charging_advice(req, db=mock_db)
-    print(f"    [OK] AI Recommendation generated: {response.recommendation[:80]}...")
-    print(f"    [OK] Best station: {response.recommended_station.name if response.recommended_station else 'None'}")
-    assert response.recommended_station is not None
-    assert len(response.all_options) > 0
+    print(f"    [OK] AI response: {response.recommendation[:80]}...")
+    print("    [OK] Best station: None (no database fixtures were fabricated)")
+    assert response.recommended_station is None
+    assert response.all_options == []
 
     print("--> Testing n8n incident dispatch...")
     from app.services.n8n import n8n_service
@@ -79,4 +88,4 @@ async def test_ai_fallback_and_n8n():
 
 if __name__ == "__main__":
     test_imports()
-    asyncio.run(test_ai_fallback_and_n8n())
+    asyncio.run(test_ai_empty_state_and_n8n())

@@ -1,6 +1,6 @@
 import httpx
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.config import settings
 
@@ -63,10 +63,11 @@ async def get_live_discom_tariffs(
 # 2. Google Gemini Integration (AI Charging Copilot & Host Advisor)
 # ─────────────────────────────────────────────────────────────────────────────
 class CopilotRequest(BaseModel):
-    prompt: str
+    prompt: str = Field(..., min_length=2, max_length=1000)
     context: str = "driver"  # "driver" or "host"
     vehicle_model: str | None = None
-    battery_level: int | None = None
+    connector_type: str | None = None
+    battery_level: int | None = Field(default=None, ge=0, le=100)
 
 
 class CopilotResponse(BaseModel):
@@ -85,8 +86,9 @@ async def ask_gemini_copilot(req: CopilotRequest):
     )
     user_prompt = (
         f"{system_ctx}\nContext: {req.context}\n"
-        f"Vehicle: {req.vehicle_model or 'Standard 4W EV'}\n"
-        f"Battery: {req.battery_level or 30}%\n"
+        f"Vehicle: {req.vehicle_model or 'Not provided'}\n"
+        f"Connector: {req.connector_type or 'Not provided'}\n"
+        f"Battery: {req.battery_level if req.battery_level is not None else 'Not provided'}%\n"
         f"Question: {req.prompt}"
     )
 
@@ -112,22 +114,16 @@ async def ask_gemini_copilot(req: CopilotRequest):
             except Exception:
                 continue
 
-    # Smart heuristic fallback advice when API key is unconfigured or rate-limited
-    if req.context == "host":
-        advice = (
-            "To maximize charger utilization during off-peak hours (11 PM - 6 AM), "
-            "set a dynamic tariff of ₹12-14/kWh with peak daytime pricing at ₹18/kWh."
-        )
-    else:
-        advice = (
-            f"With {req.battery_level or 30}% battery on your {req.vehicle_model or 'EV'}, "
-            "target a 50kW+ CCS2 fast charger along your route. A 20-minute top-up will reach 80% SoC."
-        )
-
+    # No made-up charge times, tariffs or connector advice. The client can
+    # clearly distinguish an unavailable sponsor service from live Gemini
+    # output and continue using VoltEZ's deterministic recommendation engine.
     return CopilotResponse(
-        advice=advice,
-        model="VoltEZ ML Heuristics",
-        source="VoltEZ AI Engine",
+        advice=(
+            "Live Gemini advice is unavailable right now. Configure "
+            "GEMINI_API_KEY on the backend or try again later."
+        ),
+        model="unavailable",
+        source="Gemini not configured",
     )
 
 

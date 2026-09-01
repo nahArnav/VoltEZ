@@ -111,7 +111,27 @@ async def create_business(
             )
             zone_id = zone_result.scalar_one_or_none()
         if zone_id is None:
-            zone_id = UUID("11111111-1111-4111-8111-111111111111")
+            # A fresh deployment may not have run the optional Pune seed yet.
+            # Create a real service-zone row instead of pointing at a
+            # made-up UUID (which would fail the FK constraint). The zone is
+            # intentionally centroid-only; an operator can later replace it
+            # with an authoritative PostGIS boundary.
+            fallback_zone = Zone(
+                city="Pune",
+                name="Pune Service Area",
+                h3_index=None,
+                centroid=(
+                    f"SRID=4326;POINT({lon} {lat})"
+                    if lat is not None and lon is not None
+                    else None
+                ),
+                timezone="Asia/Kolkata",
+                active=True,
+                zone_type="commercial",
+            )
+            db.add(fallback_zone)
+            await db.flush()
+            zone_id = fallback_zone.id
         business_data["zone_id"] = zone_id
 
 
