@@ -54,7 +54,8 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
         child: Consumer2<BookingProvider, SessionProvider>(
           builder: (context, bookingProvider, sessionProvider, _) {
             final isLoading =
-                bookingProvider.historyLoading || sessionProvider.historyLoading;
+                bookingProvider.historyLoading ||
+                sessionProvider.historyLoading;
             final bookings = bookingProvider.bookingHistory;
             final sessions = sessionProvider.history;
 
@@ -68,7 +69,9 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                   s == 'charging';
             }).toList();
 
-            final completedItems = sessions.where((s) => s.status == 'completed').toList();
+            final completedItems = sessions
+                .where((s) => s.status == 'completed')
+                .toList();
 
             if (isLoading && bookings.isEmpty && sessions.isEmpty) {
               return _buildSkeleton();
@@ -166,19 +169,16 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            if (index < bookings.length) {
-                              return _buildBookingCard(
-                                bookings[index],
-                                bookingProvider,
-                              );
-                            }
-                            final sessionIndex = index - bookings.length;
-                            return _buildSessionCard(sessions[sessionIndex]);
-                          },
-                          childCount: bookings.length + sessions.length,
-                        ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          if (index < bookings.length) {
+                            return _buildBookingCard(
+                              bookings[index],
+                              bookingProvider,
+                            );
+                          }
+                          final sessionIndex = index - bookings.length;
+                          return _buildSessionCard(sessions[sessionIndex]);
+                        }, childCount: bookings.length + sessions.length),
                       ),
                     ),
                   ],
@@ -200,11 +200,26 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
   }) {
     return Row(
       children: [
-        _statItem('$activeCount', 'Active Slots', AppColors.primary, Icons.schedule_rounded),
+        _statItem(
+          '$activeCount',
+          'Active Slots',
+          AppColors.primary,
+          Icons.schedule_rounded,
+        ),
         const SizedBox(width: 10),
-        _statItem('$completedCount', 'Completed', AppColors.success, Icons.check_circle_rounded),
+        _statItem(
+          '$completedCount',
+          'Completed',
+          AppColors.success,
+          Icons.check_circle_rounded,
+        ),
         const SizedBox(width: 10),
-        _statItem('₹${totalSpent.round()}', 'Total Spent', AppColors.warning, Icons.currency_rupee_rounded),
+        _statItem(
+          '₹${totalSpent.round()}',
+          'Total Spent',
+          AppColors.warning,
+          Icons.currency_rupee_rounded,
+        ),
       ],
     );
   }
@@ -265,51 +280,57 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
       ('all', 'All ($totalCount)'),
     ];
 
-    return Row(
-      children: filters.map((f) {
-        final (key, label) = f;
-        final selected = _filter == key;
-        return Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: GestureDetector(
-            onTap: () => setState(() => _filter = key),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.primary
-                    : AppColors.card,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: selected ? AppColors.primary : AppColors.border,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: filters.map((f) {
+          final (key, label) = f;
+          final selected = _filter == key;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _filter = key),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
                 ),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: selected
-                      ? AppColors.textOnPrimary
-                      : AppColors.textSecondary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.primary : AppColors.card,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: selected ? AppColors.primary : AppColors.border,
+                  ),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: selected
+                        ? AppColors.textOnPrimary
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
 
   // ─── Active Booking Card (With Start Code & Navigation) ───
-  Widget _buildBookingCard(
-    ConfirmedBooking booking,
-    BookingProvider provider,
-  ) {
+  Widget _buildBookingCard(ConfirmedBooking booking, BookingProvider provider) {
     final status = booking.status.toLowerCase();
     final isCancelled = status == 'cancelled';
-    final isConfirmed = status == 'confirmed' || status == 'held';
+    final isConfirmed =
+        status == 'confirmed' ||
+        status == 'held' ||
+        status == 'checked_in' ||
+        status == 'charging';
 
     final (statusLabel, statusColor) = _bookingStatusMeta(status);
 
@@ -379,7 +400,10 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
@@ -403,14 +427,18 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
           const SizedBox(height: 14),
 
           // Time slot & Power specs
-          Row(
-            children: [
-              _infoBadge(
-                Icons.calendar_month_rounded,
-                '${booking.date} · ${booking.startTime} - ${booking.endTime}',
-                AppColors.textPrimary,
-              ),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                _infoBadge(
+                  Icons.calendar_month_rounded,
+                  '${booking.date} · ${booking.startTime} - ${booking.endTime}',
+                  AppColors.textPrimary,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -434,7 +462,6 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               ),
             ],
           ),
-
 
           // ─── START CODE / CHECK-IN OTP BANNER ───
           if (booking.startCode != null && !isCancelled) ...[
@@ -578,9 +605,10 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      context
-                          .read<SessionProvider>()
-                          .setBookingId(booking.bookingId);
+                      context.read<BookingProvider>().setActiveBooking(booking);
+                      context.read<SessionProvider>().setBookingId(
+                        booking.bookingId,
+                      );
                       context.go('/driver/session');
                     },
                     icon: const Icon(Icons.bolt_rounded, size: 18),
@@ -636,10 +664,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.chargerName,
-                      style: AppTypography.headlineSmall,
-                    ),
+                    Text(item.chargerName, style: AppTypography.headlineSmall),
                     const SizedBox(height: 2),
                     Text(
                       '${item.date} · ${item.startTime} - ${item.endTime}',
