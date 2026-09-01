@@ -1,39 +1,47 @@
-# Render Blueprint configuration for VoltEZ Backend
+# ═════════════════════════════════════════════════════════════════════════════
+# Render Blueprint Configuration for VoltEZ Backend & Data Infrastructure
 # Docs: https://render.com/docs/blueprint-spec
+# ═════════════════════════════════════════════════════════════════════════════
 
 services:
+  # ─── FastAPI Application Server ───
   - type: web
     name: voltez-api
     runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt && alembic upgrade head
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
+    healthCheckPath: /health/live
     autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.8
+        value: 3.12.3
       - key: PROJECT_NAME
-        value: VoltEZ
+        value: VoltEZ API
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGINS
         value: "*"
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: voltez-db
+          property: connectionString
       - key: REDIS_URL
-        sync: false
+        fromService:
+          type: redis
+          name: voltez-redis
+          property: connectionString
       - key: SECRET_KEY
         generateValue: true
       - key: GEMINI_API_KEY
         sync: false
-      - key: N8N_WEBHOOK_URL
-        sync: false
-      - key: N8N_WEBHOOK_SECRET
-        sync: false
       - key: GOOGLE_MAPS_API_KEY
         sync: false
       - key: TAVILY_API_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
@@ -41,3 +49,19 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+
+  # ─── Managed Redis Cache / Celery & Booking Lock Backend ───
+  - type: redis
+    name: voltez-redis
+    plan: free
+    region: oregon
+    ipAllowList: []
+
+# ─── Managed PostgreSQL with PostGIS Geospatial Support ───
+databases:
+  - name: voltez-db
+    databaseName: voltez
+    user: postgres
+    plan: free
+    region: oregon
+    ipAllowList: []

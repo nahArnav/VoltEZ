@@ -8,13 +8,14 @@ from app.core.config import settings
 def _get_async_database_url(url: str) -> str:
     """
     Convert a standard PostgreSQL URL to an asyncpg-compatible URL.
-    Handles both postgresql:// and postgresql+psycopg:// formats.
+    Handles postgresql://, postgresql+psycopg://, and postgres:// formats.
     """
     # Replace any sync driver prefix with asyncpg
-    for prefix in ("postgresql+psycopg://", "postgresql://"):
+    for prefix in ("postgresql+psycopg://", "postgresql://", "postgres://"):
         if url.startswith(prefix):
             return url.replace(prefix, "postgresql+asyncpg://", 1)
     return url
+
 
 
 # 1. Create the Async Engine

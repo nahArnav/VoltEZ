@@ -52,14 +52,46 @@ if [[ "$*" == *"--lan"* || "$*" == *"--wifi"* ]]; then
   USE_LAN=true
 fi
 
-if [ "$USE_LAN" = true ]; then
+# Check for custom server URL (e.g. Render cloud deployment)
+CUSTOM_SERVER="${SERVER_URL:-}"
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+  arg="${args[i]}"
+  if [[ "$arg" == "--server" || "$arg" == "--render" || "$arg" == "--url" ]]; then
+    CUSTOM_SERVER="${args[i+1]}"
+  elif [[ "$arg" =~ ^--server= ]]; then
+    CUSTOM_SERVER="${arg#--server=}"
+  elif [[ "$arg" =~ ^--render= ]]; then
+    CUSTOM_SERVER="${arg#--render=}"
+  fi
+done
+
+if [ -n "$CUSTOM_SERVER" ]; then
+  CUSTOM_SERVER="${CUSTOM_SERVER%/}"
+  if [[ "$CUSTOM_SERVER" != http* ]]; then
+    CUSTOM_SERVER="https://$CUSTOM_SERVER"
+  fi
+  if [[ "$CUSTOM_SERVER" != */api/v1 ]]; then
+    API_URL="${CUSTOM_SERVER}/api/v1"
+  else
+    API_URL="$CUSTOM_SERVER"
+  fi
+  if [[ "$API_URL" == https* ]]; then
+    WS_URL="${API_URL/https:\/\//wss:\/\/}"
+  else
+    WS_URL="${API_URL/http:\/\//ws:\/\/}"
+  fi
+  ACTIVE_HOST="$CUSTOM_SERVER"
+elif [ "$USE_LAN" = true ]; then
   ACTIVE_HOST="$HOST_IP"
+  API_URL="http://${ACTIVE_HOST}:${PORT}/api/v1"
+  WS_URL="ws://${ACTIVE_HOST}:${PORT}/api/v1"
 else
   ACTIVE_HOST="127.0.0.1"
+  API_URL="http://${ACTIVE_HOST}:${PORT}/api/v1"
+  WS_URL="ws://${ACTIVE_HOST}:${PORT}/api/v1"
 fi
 
-API_URL="http://${ACTIVE_HOST}:${PORT}/api/v1"
-WS_URL="ws://${ACTIVE_HOST}:${PORT}/api/v1"
 
 echo "========================================================"
 echo "  ⚡ VoltEZ Multi-Device Phone Testing Suite ⚡"
