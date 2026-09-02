@@ -344,11 +344,9 @@ class _CarHologramPainter extends CustomPainter {
 
     // ── HOOD ──
     final pHoodFront = Offset(ox - 130 * s, oy + 6 * s);
-    final pHoodMid = Offset(ox - 90 * s, oy - 4 * s);
-    final pHoodRear = Offset(ox - 50 * s, oy - 10 * s);
-
+  
     final pFenderFront = Offset(ox - 136 * s, oy + 8 * s);
-    final pFenderMid = Offset(ox - 105 * s, oy + 2 * s);
+   
 
     final pHoodCrease1 = Offset(ox - 120 * s, oy + 4 * s);
     final pHoodCrease2 = Offset(ox - 60 * s, oy - 6 * s);
@@ -364,7 +362,7 @@ class _CarHologramPainter extends CustomPainter {
     final pWindBase = Offset(ox + 8 * s, oy - 12 * s);
 
     final pBeltFront = Offset(ox - 46 * s, oy - 10 * s);
-    final pBeltMid = Offset(ox + 8 * s, oy - 12 * s);
+   
     final pBeltCPillar = Offset(ox + 108 * s, oy - 8 * s);
 
     final pBPillarTop = Offset(ox + 38 * s, oy - 50 * s);
