@@ -102,18 +102,19 @@ class RouteRecommendationResult {
   /// Parse from the JSON contract returned by POST /routes/recommendations.
   factory RouteRecommendationResult.fromJson(Map<String, dynamic> json) {
     final chargerJson = json['charger'] as Map<String, dynamic>;
+    final charger = Charger.fromJson(chargerJson);
     return RouteRecommendationResult(
-      charger: Charger.fromJson(chargerJson),
+      charger: charger,
       reason: json['reason'] as String? ?? '',
-      estimatedCost: (json['estimatedCost'] as num?)?.toDouble() ?? 0,
+      estimatedCost: (json['estimated_cost'] as num?)?.toDouble() ?? 0,
       estimatedPricePerKwh: (json['estimated_price_per_kwh'] as num?)
           ?.toDouble(),
-      estimatedTimeMinutes: json['estimatedTimeMinutes'] as int? ?? 0,
-      confidenceScore: (json['confidenceScore'] as num?)?.toDouble() ?? 0,
+      estimatedTimeMinutes: json['estimated_charge_minutes'] as int? ?? 0,
+      confidenceScore: (json['ranking_score'] as num?)?.toDouble() ?? 0,
       detourMinutes: json['detourMinutes'] as int? ?? 0,
       detourDistanceKm: (json['estimated_detour_km'] as num?)?.toDouble() ?? 0,
       predictedWaitMinutes: json['predictedWaitMinutes'] as int? ?? 0,
-      reliabilityScore: (json['reliabilityScore'] as num?)?.toDouble() ?? 0.0,
+      reliabilityScore: charger.reliabilityScore,
       connectorCompatible: json['connectorCompatible'] as bool? ?? true,
     );
   }

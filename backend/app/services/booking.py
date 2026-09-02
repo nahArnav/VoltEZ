@@ -218,7 +218,42 @@ class BookingService:
         await db.commit()
         await db.refresh(booking)
         return booking
+    @staticmethod
+    async def cancel_business_booking(
+        db: AsyncSession, booking_id: UUID, user_id: UUID
+    ) -> Booking:
+        """Business logic for a host/business canceling a booking."""
+        booking = await booking_repo.get(db, id=booking_id)
+        if not booking:
+            raise NotFoundError(resource="Booking")
 
+        booking_status = BookingStatus(cast(str, booking.status))
+        if booking_status not in BookingService.CANCELLABLE_STATUSES:
+            raise BadRequestError(
+                message=f"Cannot cancel a booking that is {booking_status.value}.",
+                code="INVALID_STATE_TRANSITION",
+            )
 
+        old_status = booking_status.value
+        now = datetime.now(UTC)
+        booking.status = BookingStatus.CANCELLED.value
+        booking.cancelled_at = now
+        db.add(booking)
+
+        event = BookingEvent(
+            booking_id=booking.id,
+            old_status=old_status,
+            new_status=BookingStatus.CANCELLED.value,
+            actor=f"business_user:{user_id}",
+            metadata_={
+                "reason": "business_cancelled",
+                "cancelled_at": now.isoformat(),
+            },
+        )
+        db.add(event)
+
+        await db.commit()
+        await db.refresh(booking)
+        return booking
 
 booking_service = BookingService()

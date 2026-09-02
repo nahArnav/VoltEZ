@@ -85,8 +85,10 @@ class BusinessProvider extends ChangeNotifier {
           // in the owner's actionable bookings list.
           bookings = _maps((await _api.getBusinessBookings(id)).data)
               .where(
-                (booking) =>
-                    booking['status']?.toString().toLowerCase() == 'confirmed',
+                (booking) {
+                  final status = booking['status']?.toString().toLowerCase();
+                  return status == 'confirmed' || status == 'checked_in' || status == 'charging' || status == 'in_progress';
+                },
               )
               .toList();
         } catch (error) {

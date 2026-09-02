@@ -92,14 +92,20 @@ class RecommendationService:
             # Calculate Distance
             dist_km = _road_distance_km(req.latitude, req.longitude, charger_lat, charger_lon)
             detour_km = 0.0
-            if direct_route_km is not None:
+            if req.destination_latitude is not None and req.destination_longitude is not None:
+                estimated_direct_km = _road_distance_km(
+                    req.latitude,
+                    req.longitude,
+                    req.destination_latitude,
+                    req.destination_longitude,
+                )
                 via_charger_km = dist_km + _road_distance_km(
                     charger_lat,
                     charger_lon,
                     req.destination_latitude,
                     req.destination_longitude,
                 )
-                detour_km = max(0.0, via_charger_km - direct_route_km)
+                detour_km = max(0.0, via_charger_km - estimated_direct_km)
 
             # Reachability Math - Route-Energy Physics Implementation
             veh_battery = get_float(vehicle, "battery_kwh")

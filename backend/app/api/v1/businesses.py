@@ -184,7 +184,12 @@ async def list_business_bookings(
         # but must not appear as current work in the dashboard.
         .where(
             Charger.business_id == business_id,
-            Booking.status == BookingStatus.CONFIRMED.value,
+            Booking.status.in_([
+                BookingStatus.CONFIRMED.value,
+                BookingStatus.CHECKED_IN.value,
+                BookingStatus.CHARGING.value,
+                BookingStatus.IN_PROGRESS.value,
+            ]),
         )
         # Chronological upcoming reservations are easier for an owner to act
         # on than a newest-first feed. Historical cancelled/expired rows are
@@ -199,6 +204,44 @@ async def list_business_bookings(
         await _with_charger_context(db, booking)
         for booking in result.scalars().all()
     ]
+
+
+@router.post("/{business_id}/bookings/{booking_id}/cancel", response_model=BookingResponse)
+async def cancel_business_booking(
+    business_id: UUID,
+    booking_id: UUID,
+    current_user: User = Depends(require_role(UserRole.OWNER, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel a booking as a business/host."""
+    business = await business_repo.get(db, id=business_id)
+    if business is None or (
+        current_user.role != UserRole.ADMIN and business.owner_id != current_user.id
+    ):
+        raise HTTPException(status_code=404, detail="Business not found")
+        
+    # Verify booking belongs to this business
+    booking_check = await db.execute(
+        select(Booking)
+        .join(ChargerPort, Booking.charger_port_id == ChargerPort.id)
+        .join(Charger, ChargerPort.charger_id == Charger.id)
+        .where(
+            Charger.business_id == business_id,
+            Booking.id == booking_id,
+        )
+    )
+    if not booking_check.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Booking not found for this business")
+
+    from app.services.booking import booking_service
+    from app.api.v1.booking import _with_charger_context
+    try:
+        booking = await booking_service.cancel_business_booking(
+            db, booking_id=booking_id, user_id=current_user.id
+        )
+        return await _with_charger_context(db, booking)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post(

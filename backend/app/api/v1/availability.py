@@ -17,6 +17,7 @@ from app.schemas.availability_window import (
 )
 from app.schemas.enums import UserRole
 from app.services.availability import availability_service
+from app.ml.adapters import ml_adapter
 from database.models.user import User
 
 router = APIRouter(prefix="/availability", tags=["Availability Windows"])

@@ -1000,16 +1000,24 @@ class _BookingList extends StatelessWidget {
           FilledButton(
             onPressed: () async {
               if (controller.text.trim().isEmpty) return;
-              Navigator.pop(ctx);
               final success = await provider.verifyCashCode(
                 booking['id'].toString(),
                 controller.text.trim(),
               );
-              if (success && context.mounted) {
+              if (!context.mounted) return;
+              if (success) {
+                Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('OTP verified! Charging started for $userName.'),
                     backgroundColor: AppColors.success,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(provider.errorMessage ?? 'OTP Verification failed'),
+                    backgroundColor: AppColors.error,
                   ),
                 );
               }
@@ -1053,18 +1061,21 @@ class _ReviewList extends StatelessWidget {
   }
 }
 
-String _formatReasonCode(String? raw) {
+String _formatReasonCode(String? raw, Map<String, dynamic> data) {
   if (raw == null || raw.trim().isEmpty) return 'Based on live demand signals';
   final code = raw.trim();
+  final discountPct = (data['suggested_discount_pct'] as num?)?.toInt() ?? 10;
+  final demand = (data['expected_demand'] as num?)?.toDouble() ?? 0.5;
+  final demandText = demand > 0.8 ? 'high' : (demand < 0.3 ? 'low' : 'moderate');
+  
   switch (code.toUpperCase()) {
     case 'BUSINESS_OFF_PEAK':
-      return 'Off-peak demand optimization';
+    case 'LOW_OCCUPANCY_DISCOUNT':
+      return 'Prices can be dropped by $discountPct% due to $demandText demand';
     case 'HIGH_DEMAND_LOW_SUPPLY':
-      return 'High demand & peak charger utilization';
+      return 'High demand ($demandText) & peak charger utilization';
     case 'SURGE_PRICING':
       return 'Surge demand pricing adjustment';
-    case 'LOW_OCCUPANCY_DISCOUNT':
-      return 'Off-peak occupancy discount';
     case 'EV_NIGHT_TARIFF':
       return 'Overnight charging tariff optimization';
     case 'COMPETITOR_UNDERCUT_RISK':
@@ -1090,7 +1101,7 @@ class _RecommendationCard extends StatelessWidget {
     final percent = confidence <= 1 ? confidence * 100 : confidence;
     final action = data['recommended_action']?.toString() ?? 'Recommendation';
     final rawReason = data['reason_code']?.toString();
-    final cleanReason = _formatReasonCode(rawReason);
+    final cleanReason = _formatReasonCode(rawReason, data);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),

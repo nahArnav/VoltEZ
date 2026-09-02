@@ -44,9 +44,8 @@ def issue_cash_otp(booking: Booking) -> tuple[str, datetime]:
     used for a later reservation.
     """
     now = datetime.now(UTC)
-    configured_expiry = now + timedelta(minutes=settings.CASH_OTP_TTL_MINUTES)
     slot_expiry = booking.end_at + timedelta(minutes=30)
-    expires_at = min(configured_expiry, slot_expiry)
+    expires_at = slot_expiry
     if expires_at <= now:
         expires_at = now + timedelta(minutes=5)
 

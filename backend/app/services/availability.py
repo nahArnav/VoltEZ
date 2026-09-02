@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.ml.adapters import ml_adapter
 from app.repositories.availability_window import availability_window_repo
 from app.repositories.booking import booking_repo
 from app.services.pricing import dynamic_rate_from_signals
@@ -102,6 +103,16 @@ class AvailabilityService:
         price_per_kwh = float(
             price_result.scalar_one_or_none() or settings.DEFAULT_PRICE_PER_KWH_INR
         )
+        
+        charger_id = await db.scalar(select(ChargerPort.charger_id).where(ChargerPort.id == port_id))
+        if charger_id:
+            demand_pred = await ml_adapter.predict_demand(db, charger_id=charger_id)
+            expected_demand = demand_pred["expected_demand"]
+            wait_pred = await ml_adapter.predict_wait_time(db, charger_id=charger_id, port_id=port_id)
+            probability_unavailable = min(max(wait_pred["wait_minutes"] / 60.0, 0.0), 1.0)
+        else:
+            expected_demand = 0.5
+            probability_unavailable = 0.0
 
         slots: dict[tuple[datetime, datetime], dict] = {}
         for window in positive:
@@ -122,8 +133,8 @@ class AvailabilityService:
                 if start_utc > now and not blocked_by_owner and not overlaps_booking:
                     quote = dynamic_rate_from_signals(
                         base_rate=price_per_kwh,
-                        expected_demand=float(len(bookings)),
-                        probability_unavailable=occupancy_pressure,
+                        expected_demand=expected_demand,
+                        probability_unavailable=probability_unavailable,
                         active_ports=max(int(active_port_count or 1), 1),
                         target_time=start_utc,
                     )
