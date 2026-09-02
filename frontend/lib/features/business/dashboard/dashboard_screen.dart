@@ -2006,11 +2006,31 @@ Future<void> _showAvailability(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: Text('Publish availability · ${charger['name'] ?? ''}'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Publish availability'),
+            if ((charger['name'] ?? '').toString().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                charger['name'].toString(),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.normal,
+                  color: AppColors.textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const SizedBox(height: 8),
               _dialogDropdown<String>(
                 value: portId,
                 labelText: 'Port',
@@ -2195,7 +2215,7 @@ Widget _dialogInput(
   String label, {
   TextInputType keyboard = TextInputType.text,
 }) => Padding(
-  padding: const EdgeInsets.only(bottom: 14),
+  padding: const EdgeInsets.only(bottom: 18),
   child: TextField(
     controller: c,
     decoration: InputDecoration(labelText: label),
@@ -2209,7 +2229,7 @@ Widget _dialogDropdown<T>({
   required List<DropdownMenuItem<T>> items,
   required ValueChanged<T?> onChanged,
 }) => Padding(
-  padding: const EdgeInsets.only(bottom: 14),
+  padding: const EdgeInsets.only(bottom: 18),
   child: DropdownButtonFormField<T>(
     initialValue: value,
     decoration: InputDecoration(labelText: labelText),
