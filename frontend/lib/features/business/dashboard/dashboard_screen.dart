@@ -1580,11 +1580,9 @@ Future<void> _showAddCharger(BuildContext context) async {
                   const SizedBox(height: 12),
                   _dialogInput(name, 'Name'),
 
-                  DropdownButtonFormField<String>(
-                    initialValue: chargerType,
-                    decoration: const InputDecoration(
-                      labelText: 'Charging type',
-                    ),
+                  _dialogDropdown<String>(
+                    value: chargerType,
+                    labelText: 'Charging type',
                     items: const [
                       DropdownMenuItem(value: 'AC', child: Text('AC charging')),
                       DropdownMenuItem(
@@ -1615,11 +1613,9 @@ Future<void> _showAddCharger(BuildContext context) async {
                     'Port number',
                     keyboard: TextInputType.number,
                   ),
-                  DropdownButtonFormField<int>(
-                    initialValue: connectorTypeId,
-                    decoration: const InputDecoration(
-                      labelText: 'Connector standard',
-                    ),
+                  _dialogDropdown<int>(
+                    value: connectorTypeId,
+                    labelText: 'Connector standard',
                     items: const [
                       DropdownMenuItem(value: 1, child: Text('CCS2')),
                       DropdownMenuItem(value: 2, child: Text('Type 2')),
@@ -1635,9 +1631,9 @@ Future<void> _showAddCharger(BuildContext context) async {
                       }
                     },
                   ),
-                  DropdownButtonFormField<String>(
-                    initialValue: accessType,
-                    decoration: const InputDecoration(labelText: 'Access'),
+                  _dialogDropdown<String>(
+                    value: accessType,
+                    labelText: 'Access',
                     items: const [
                       DropdownMenuItem(value: 'public', child: Text('Public')),
                       DropdownMenuItem(
@@ -1661,7 +1657,7 @@ Future<void> _showAddCharger(BuildContext context) async {
                     ),
                   ),
                   const Padding(
-                    padding: EdgeInsets.only(bottom: 10),
+                    padding: EdgeInsets.only(top: 2, bottom: 14),
                     child: Text(
                       'VoltEZ applies a bounded peak/off-peak multiplier using live demand and availability signals.',
                       style: TextStyle(
@@ -1670,21 +1666,24 @@ Future<void> _showAddCharger(BuildContext context) async {
                       ),
                     ),
                   ),
-                  TextField(
-                    controller: location,
-                    onChanged: (value) {
-                      selectedLatitude = null;
-                      selectedLongitude = null;
-                      search(value, setState);
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Search charger address',
-                      hintText: 'Search a landmark, street, or business',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: IconButton(
-                        tooltip: 'Use current location',
-                        icon: const Icon(Icons.my_location_rounded),
-                        onPressed: () => useCurrentLocation(setState),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: TextField(
+                      controller: location,
+                      onChanged: (value) {
+                        selectedLatitude = null;
+                        selectedLongitude = null;
+                        search(value, setState);
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Search charger address',
+                        hintText: 'Search a landmark, street, or business',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: IconButton(
+                          tooltip: 'Use current location',
+                          icon: const Icon(Icons.my_location_rounded),
+                          onPressed: () => useCurrentLocation(setState),
+                        ),
                       ),
                     ),
                   ),
@@ -1844,9 +1843,9 @@ Future<void> _showAddPort(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              DropdownButtonFormField<int>(
-                initialValue: connectorId,
-                decoration: const InputDecoration(labelText: 'Connector'),
+              _dialogDropdown<int>(
+                value: connectorId,
+                labelText: 'Connector',
                 items: const [
                   DropdownMenuItem(value: 1, child: Text('CCS2')),
                   DropdownMenuItem(value: 2, child: Text('Type 2')),
@@ -2012,9 +2011,9 @@ Future<void> _showAvailability(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              DropdownButtonFormField<String>(
-                initialValue: portId,
-                decoration: const InputDecoration(labelText: 'Port'),
+              _dialogDropdown<String>(
+                value: portId,
+                labelText: 'Port',
                 items: [
                   for (final port in rawPorts)
                     DropdownMenuItem(
@@ -2026,9 +2025,9 @@ Future<void> _showAvailability(
                   if (value != null) setState(() => portId = value);
                 },
               ),
-              DropdownButtonFormField<int>(
-                initialValue: day,
-                decoration: const InputDecoration(labelText: 'Day'),
+              _dialogDropdown<int>(
+                value: day,
+                labelText: 'Day',
                 items: const [
                   DropdownMenuItem(value: 0, child: Text('Monday')),
                   DropdownMenuItem(value: 1, child: Text('Tuesday')),
@@ -2196,11 +2195,26 @@ Widget _dialogInput(
   String label, {
   TextInputType keyboard = TextInputType.text,
 }) => Padding(
-  padding: const EdgeInsets.only(bottom: 10),
+  padding: const EdgeInsets.only(bottom: 14),
   child: TextField(
     controller: c,
     decoration: InputDecoration(labelText: label),
     keyboardType: keyboard,
+  ),
+);
+
+Widget _dialogDropdown<T>({
+  required T value,
+  required String labelText,
+  required List<DropdownMenuItem<T>> items,
+  required ValueChanged<T?> onChanged,
+}) => Padding(
+  padding: const EdgeInsets.only(bottom: 14),
+  child: DropdownButtonFormField<T>(
+    initialValue: value,
+    decoration: InputDecoration(labelText: labelText),
+    items: items,
+    onChanged: onChanged,
   ),
 );
 List<Map<String, dynamic>> _listOfMaps(dynamic value) =>
