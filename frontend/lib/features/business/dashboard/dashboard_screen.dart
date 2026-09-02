@@ -1053,25 +1053,108 @@ class _ReviewList extends StatelessWidget {
   }
 }
 
+String _formatReasonCode(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return 'Based on live demand signals';
+  final code = raw.trim();
+  switch (code.toUpperCase()) {
+    case 'BUSINESS_OFF_PEAK':
+      return 'Off-peak demand optimization';
+    case 'HIGH_DEMAND_LOW_SUPPLY':
+      return 'High demand & peak charger utilization';
+    case 'SURGE_PRICING':
+      return 'Surge demand pricing adjustment';
+    case 'LOW_OCCUPANCY_DISCOUNT':
+      return 'Off-peak occupancy discount';
+    case 'EV_NIGHT_TARIFF':
+      return 'Overnight charging tariff optimization';
+    case 'COMPETITOR_UNDERCUT_RISK':
+      return 'Competitive price positioning';
+    default:
+      if (code.contains('_') || code == code.toUpperCase()) {
+        return code
+            .split('_')
+            .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
+            .join(' ');
+      }
+      return code;
+  }
+}
+
 class _RecommendationCard extends StatelessWidget {
   const _RecommendationCard(this.data);
   final Map<String, dynamic> data;
+
   @override
   Widget build(BuildContext context) {
     final confidence = (data['confidence'] as num?)?.toDouble() ?? 0;
     final percent = confidence <= 1 ? confidence * 100 : confidence;
+    final action = data['recommended_action']?.toString() ?? 'Recommendation';
+    final rawReason = data['reason_code']?.toString();
+    final cleanReason = _formatReasonCode(rawReason);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: const Icon(
-          Icons.auto_awesome_rounded,
-          color: AppColors.primary,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    action,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    cleanReason,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.success.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Text(
+                '${percent.round()}% match',
+                style: const TextStyle(
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
         ),
-        title: Text(data['recommended_action']?.toString() ?? 'Recommendation'),
-        subtitle: Text(
-          data['reason_code']?.toString() ?? 'Based on live demand',
-        ),
-        trailing: Text('${percent.round()}%'),
       ),
     );
   }
