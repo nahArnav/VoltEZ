@@ -182,7 +182,7 @@ def create_app() -> FastAPI:
             try:
                 await asyncio.wait_for(probe(), timeout=2.0)
             except Exception as exc:
-                checks[name] = False
+                checks[name] = str(exc)
                 logger.warning("Readiness check failed for %s: %s", name, exc)
             else:
                 checks[name] = True
