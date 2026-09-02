@@ -466,9 +466,6 @@ class _ProfilePage extends StatelessWidget {
               color: AppColors.primary,
             ),
             title: const Text('Host KYC & Verification'),
-            subtitle: Text(
-              'Status: ${verification.toUpperCase()} • Update GSTIN & PAN',
-            ),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               final id = business['id']?.toString();
@@ -484,9 +481,6 @@ class _ProfilePage extends StatelessWidget {
               color: AppColors.success,
             ),
             title: const Text('Bank Accounts & Daily Payouts'),
-            subtitle: const Text(
-              'Payout details become active after identity verification.',
-            ),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -507,9 +501,6 @@ class _ProfilePage extends StatelessWidget {
               color: AppColors.secondary,
             ),
             title: const Text('Operating Hours & Access'),
-            subtitle: const Text(
-              'Set availability windows for each registered connector.',
-            ),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -530,9 +521,6 @@ class _ProfilePage extends StatelessWidget {
               color: AppColors.primary,
             ),
             title: const Text('Refresh Live Fleet Data'),
-            subtitle: const Text(
-              'Fetch latest reservations and station telemetry',
-            ),
             onTap: provider.load,
           ),
         ),
