@@ -46,7 +46,7 @@ void main() {
       ),
     );
 
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.byType(VoltezApp), findsOneWidget);
   });
