@@ -56,12 +56,14 @@ dev_dependencies:
     sdk: flutter
   mocktail: ^1.0.4
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/VoltEZ_logo.svg
+    - assets/images/VoltEZ_logo.png
 
   fonts:
     - family: Outfit
@@ -70,3 +72,8 @@ flutter:
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Regular.ttf
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/VoltEZ_logo.png"    
