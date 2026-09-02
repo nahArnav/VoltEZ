@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import '../../shared/models/models.dart';
 import '../network/api_service.dart';
 import '../network/route_recommendation_api.dart';
+import '../utils/address_formatter.dart';
 
 class LocationSuggestion {
   const LocationSuggestion({
@@ -253,7 +254,9 @@ class RoutePlannerProvider extends ChangeNotifier {
             .whereType<Map>()
             .map(
               (item) => LocationSuggestion(
-                label: item['display_name']?.toString() ?? query,
+                label: AddressFormatter.cleanAddressString(
+                  item['display_name']?.toString() ?? query,
+                ),
                 latitude: (item['latitude'] as num).toDouble(),
                 longitude: (item['longitude'] as num).toDouble(),
               ),
@@ -274,13 +277,7 @@ class RoutePlannerProvider extends ChangeNotifier {
             location.longitude,
           );
           if (placemarks.isNotEmpty) {
-            final p = placemarks.first;
-            label = [p.name, p.street, p.locality, p.administrativeArea]
-                .whereType<String>()
-                .map((value) => value.trim())
-                .where((value) => value.isNotEmpty)
-                .toSet()
-                .join(', ');
+            label = AddressFormatter.formatPlacemark(placemarks.first, query);
           }
         } catch (_) {
           // Coordinate results are still valid even if reverse labelling fails.

@@ -97,6 +97,24 @@ async def _search_google(query: str, limit: int) -> list[LocationSearchResult]:
         return results
 
 
+import re
+
+def _clean_display_name(raw_name: str) -> str:
+    if not raw_name:
+        return ""
+    # Strip leading Plus Code (e.g. "FV38+53H, Katraj, Pune..." -> "Katraj, Pune...")
+    cleaned = re.sub(r'^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}\s*,\s*', '', raw_name, flags=re.IGNORECASE).strip()
+    parts = [p.strip() for p in cleaned.split(',') if p.strip()]
+    seen = set()
+    deduped = []
+    for part in parts:
+        lower = part.lower()
+        if lower not in seen and not re.match(r'^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}$', part, re.IGNORECASE):
+            seen.add(lower)
+            deduped.append(part)
+    return ", ".join(deduped) if deduped else raw_name
+
+
 @router.get("/search", response_model=list[LocationSearchResult])
 async def search_locations(
     q: str = Query(..., min_length=3, max_length=200),
@@ -111,7 +129,16 @@ async def search_locations(
     try:
         google_results = await _search_google(query, limit)
         if google_results:
-            return google_results
+            return [
+                LocationSearchResult(
+                    display_name=_clean_display_name(r.display_name),
+                    latitude=r.latitude,
+                    longitude=r.longitude,
+                    place_type=r.place_type,
+                    importance=r.importance,
+                )
+                for r in google_results
+            ]
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
         pass
 
@@ -137,9 +164,11 @@ async def search_locations(
     results: list[LocationSearchResult] = []
     for item in payload if isinstance(payload, list) else []:
         try:
+            raw_display = str(item.get("display_name", ""))
+            clean_display = _clean_display_name(raw_display)
             results.append(
                 LocationSearchResult(
-                    display_name=str(item["display_name"]),
+                    display_name=clean_display,
                     latitude=float(item["lat"]),
                     longitude=float(item["lon"]),
                     place_type=item.get("type"),

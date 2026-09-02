@@ -12,6 +12,7 @@ import '../../../core/network/api_service.dart';
 import '../../../core/providers/business_provider.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
+import '../../../core/utils/address_formatter.dart';
 
 /// Live owner workspace. Every number and list on this screen comes from the
 /// authenticated business APIs; an empty account is shown as an empty state,
@@ -1308,7 +1309,9 @@ Future<List<_AddressSuggestion>> _searchAddressSuggestions(
           .whereType<Map>()
           .map(
             (item) => _AddressSuggestion(
-              label: item['display_name']?.toString() ?? query,
+              label: AddressFormatter.cleanAddressString(
+                item['display_name']?.toString() ?? query,
+              ),
               latitude: (item['latitude'] as num).toDouble(),
               longitude: (item['longitude'] as num).toDouble(),
             ),
@@ -1329,19 +1332,7 @@ Future<List<_AddressSuggestion>> _searchAddressSuggestions(
           location.longitude,
         );
         if (placemarks.isNotEmpty) {
-          final place = placemarks.first;
-          label =
-              [
-                    place.name,
-                    place.street,
-                    place.locality,
-                    place.administrativeArea,
-                  ]
-                  .whereType<String>()
-                  .map((value) => value.trim())
-                  .where((value) => value.isNotEmpty)
-                  .toSet()
-                  .join(', ');
+          label = AddressFormatter.formatPlacemark(placemarks.first, query);
         }
       } catch (_) {
         // Coordinates remain usable even when reverse labelling is unavailable.

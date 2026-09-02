@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../network/api_service.dart';
 import '../../shared/models/models.dart';
+import '../utils/address_formatter.dart';
 
 class MapLocationSuggestion {
   const MapLocationSuggestion({
@@ -358,7 +359,9 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
                   .whereType<Map>()
                   .map(
                     (item) => MapLocationSuggestion(
-                      label: item['display_name']?.toString() ?? trimmed,
+                      label: AddressFormatter.cleanAddressString(
+                        item['display_name']?.toString() ?? trimmed,
+                      ),
                       latitude: (item['latitude'] as num).toDouble(),
                       longitude: (item['longitude'] as num).toDouble(),
                       placeType: item['place_type']?.toString(),
