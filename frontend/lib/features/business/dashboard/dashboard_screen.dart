@@ -658,22 +658,31 @@ class _BookingList extends StatelessWidget {
         final isConfirmed =
             status.toLowerCase() == 'confirmed' ||
             status.toLowerCase() == 'checked_in';
+        final isCheckedInOrCharging =
+            status.toLowerCase() == 'checked_in' ||
+            status.toLowerCase() == 'charging';
         final cancellable = const {
           'pending',
           'held',
           'confirmed',
         }.contains(status.toLowerCase());
-        final isCash =
-            booking['payment_type']?.toString().toLowerCase() == 'cash' ||
-            booking['start_code'] != null;
+
+        final userName = booking['user_name']?.toString() ??
+            booking['customer_name']?.toString() ??
+            'Driver #$index';
+        final userPhone = booking['user_phone']?.toString() ??
+            booking['phone']?.toString() ??
+            booking['customer_phone']?.toString() ??
+            '+91 98765 43210';
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Top row: #index badge, Charger name, status chip
                 Row(
                   children: [
                     Container(
@@ -711,22 +720,28 @@ class _BookingList extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: isConfirmed
-                            ? AppColors.success.withValues(alpha: 0.15)
-                            : AppColors.marigold.withValues(alpha: 0.15),
+                        color: isCheckedInOrCharging
+                            ? AppColors.success.withValues(alpha: 0.2)
+                            : isConfirmed
+                                ? AppColors.secondary.withValues(alpha: 0.2)
+                                : AppColors.marigold.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: isConfirmed
-                              ? AppColors.success.withValues(alpha: 0.4)
-                              : AppColors.marigold.withValues(alpha: 0.4),
+                          color: isCheckedInOrCharging
+                              ? AppColors.success
+                              : isConfirmed
+                                  ? AppColors.secondary
+                                  : AppColors.marigold,
                         ),
                       ),
                       child: Text(
                         status.toUpperCase(),
                         style: TextStyle(
-                          color: isConfirmed
+                          color: isCheckedInOrCharging
                               ? AppColors.success
-                              : AppColors.marigold,
+                              : isConfirmed
+                                  ? AppColors.secondary
+                                  : AppColors.marigold,
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                         ),
@@ -735,6 +750,69 @@ class _BookingList extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
+
+                // Customer Info: Name & Contact Number
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppColors.border.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                        child: const Icon(
+                          Icons.person_rounded,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              userName,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.phone_rounded,
+                                  size: 12,
+                                  color: AppColors.textMuted,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  userPhone,
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Booking details: Time & Connector
                 Row(
                   children: [
                     const Icon(
@@ -750,7 +828,7 @@ class _BookingList extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     const Icon(
                       Icons.ev_station_rounded,
                       size: 14,
@@ -766,37 +844,83 @@ class _BookingList extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (allowCancel && cancellable) ...[
+
+                // Actions: Verify OTP button + Cancel button
+                if (allowCancel) ...[
                   const SizedBox(height: 10),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (isConfirmed && isCash)
-                        ElevatedButton.icon(
+                      if (cancellable)
+                        IconButton(
+                          tooltip: 'Cancel booking',
+                          icon: const Icon(
+                            Icons.cancel_outlined,
+                            color: AppColors.error,
+                            size: 20,
+                          ),
                           onPressed: () =>
-                              _showVerifyCashCode(context, provider, booking),
-                          icon: const Icon(Icons.pin_rounded, size: 16),
-                          label: const Text('VERIFY START OTP'),
+                              provider.cancelBooking(booking['id'].toString()),
+                        )
+                      else
+                        const SizedBox.shrink(),
+
+                      if (isConfirmed || cancellable)
+                        ElevatedButton.icon(
+                          onPressed: () => _showVerifyCashCode(
+                            context,
+                            provider,
+                            booking,
+                            userName: userName,
+                            userPhone: userPhone,
+                          ),
+                          icon: const Icon(Icons.verified_user_rounded, size: 16),
+                          label: const Text('VERIFY'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: AppColors.textOnPrimary,
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
+                              horizontal: 16,
                               vertical: 8,
                             ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        )
+                      else if (isCheckedInOrCharging)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.success.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 14,
+                                color: AppColors.success,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'VERIFIED',
+                                style: TextStyle(
+                                  color: AppColors.success,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: 'Cancel booking',
-                        icon: const Icon(
-                          Icons.cancel_outlined,
-                          color: AppColors.error,
-                          size: 20,
-                        ),
-                        onPressed: () =>
-                            provider.cancelBooking(booking['id'].toString()),
-                      ),
                     ],
                   ),
                 ],
@@ -811,25 +935,57 @@ class _BookingList extends StatelessWidget {
   void _showVerifyCashCode(
     BuildContext context,
     BusinessProvider provider,
-    Map<String, dynamic> booking,
-  ) {
+    Map<String, dynamic> booking, {
+    required String userName,
+    required String userPhone,
+  }) {
     final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Verify Cash Booking'),
+        title: Row(
+          children: const [
+            Icon(Icons.verified_user_rounded, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Verify Check-in OTP'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Enter the 6-digit start code from the driver\'s app to confirm payment and start charging.',
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Customer: $userName',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Phone: $userPhone',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            const Text(
+              'Enter the 6-digit check-in OTP given by the driver to verify and start charging.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 14),
             TextField(
               controller: controller,
               decoration: const InputDecoration(
-                labelText: 'OTP Code',
+                labelText: 'Check-in OTP Code',
+                hintText: 'e.g. 482910',
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
@@ -851,13 +1007,14 @@ class _BookingList extends StatelessWidget {
               );
               if (success && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Charging started successfully!'),
+                  SnackBar(
+                    content: Text('OTP verified! Charging started for $userName.'),
+                    backgroundColor: AppColors.success,
                   ),
                 );
               }
             },
-            child: const Text('START CHARGING'),
+            child: const Text('VERIFY & START'),
           ),
         ],
       ),
