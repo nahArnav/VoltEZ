@@ -59,9 +59,16 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    # Cloud-hosted databases (Neon, Supabase) require SSL
+    connect_args = {}
+    cloud_hosts = (".neon.tech", ".supabase.co", ".render.com", ".railway.app")
+    if any(host in (DATABASE_URL or "") for host in cloud_hosts):
+        connect_args["sslmode"] = "require"
+
     connectable = create_engine(
         DATABASE_URL,
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
 
     with connectable.connect() as connection:
