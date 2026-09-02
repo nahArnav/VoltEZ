@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/colors.dart';
 import '../../core/theme/typography.dart';
@@ -177,14 +178,12 @@ class _SplashScreenState extends State<SplashScreen>
                           ((entrance - 0.3) * 3).clamp(0, 1)),
                       child: Transform.translate(
                         offset: Offset(0, 15 * (1 - entrance)),
-                        child: Text(
-                          'VOLTEZ',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 40,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 6,
-                            fontFamily: 'Outfit',
+                        child: SizedBox(
+                          width: 200,
+                          height: 88,
+                          child: SvgPicture.asset(
+                            'assets/images/VoltEZ_logo.svg',
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),

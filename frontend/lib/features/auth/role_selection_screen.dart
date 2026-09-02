@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/auth/auth_provider.dart';
@@ -21,12 +22,14 @@ class RoleSelectionScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              const Text('VOLTEZ', style: TextStyle(
-                color: AppColors.primary,
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 3,
-              )),
+              SizedBox(
+                width: 140,
+                height: 70,
+                child: SvgPicture.asset(
+                  'assets/images/VoltEZ_logo.svg',
+                  fit: BoxFit.contain,
+                ),
+              ),
               const SizedBox(height: 8),
               Text('How will you use VoltEZ?', style: AppTypography.displaySmall),
               const SizedBox(height: 8),
