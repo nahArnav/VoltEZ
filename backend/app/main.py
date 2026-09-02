@@ -178,11 +178,13 @@ def create_app() -> FastAPI:
         # Keep the probe bounded: a failed dependency must produce a quick,
         # actionable 503 rather than tying up health-check workers.
         checks: dict[str, bool] = {}
+        check_errors: dict[str, str] = {}
         for name, probe in (("database", probe_database), ("redis", probe_redis)):
             try:
                 await asyncio.wait_for(probe(), timeout=2.0)
             except Exception as exc:
-                checks[name] = str(exc)
+                checks[name] = False
+                check_errors[name] = str(exc)
                 logger.warning("Readiness check failed for %s: %s", name, exc)
             else:
                 checks[name] = True
@@ -190,10 +192,11 @@ def create_app() -> FastAPI:
         demand_bundle = getattr(request.app.state, "demand_bundle", None)
         avail_bundle = getattr(request.app.state, "availability_bundle", None)
         checks["ml"] = bool(getattr(request.app.state, "ml_ready", False))
-        is_ready = all(checks.values())
+        is_ready = all(value is True for value in checks.values())
         payload = {
             "status": "ready" if is_ready else "not_ready",
             "checks": checks,
+            "errors": check_errors,
             "ml_ready": getattr(request.app.state, "ml_ready", False),
             "models": {
                 "demand": {

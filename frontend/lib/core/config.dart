@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 /// Environment configuration for the VoltEZ Platform.
 ///
 /// Build flags:
@@ -9,6 +7,14 @@ import 'package:flutter/foundation.dart';
 /// - `flutter run --dart-define FCM_VAPID_KEY=your_key`
 class AppConfig {
   AppConfig._();
+
+  static const String deployedApiBaseUrl =
+      'https://voltez-sb0w.onrender.com/api/v1';
+
+  static const String _apiBaseUrlOverride = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
 
   static const String _env = String.fromEnvironment(
     'ENV',
@@ -32,19 +38,8 @@ class AppConfig {
 
   /// FastAPI backend base URL resolved from build-time environment flags.
   static String get apiBaseUrl {
-    switch (environment) {
-      case 'production':
-        return 'https://api.voltez.app/api/v1';
-      case 'staging':
-        return 'https://voltez-backend.onrender.com/api/v1';
-      case 'development':
-      default:
-        // Android emulators route host machine loopback through 10.0.2.2
-        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-          return 'http://10.0.2.2:8000/api/v1';
-        }
-        return 'http://localhost:8000/api/v1';
-    }
+    final override = _apiBaseUrlOverride.trim();
+    return override.isEmpty ? deployedApiBaseUrl : override;
   }
 
   /// Google Maps API key (injected via `--dart-define MAPS_KEY=...`).

@@ -69,7 +69,7 @@ class ApiService {
   // Backend serves under /api/v1
   static const String _defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000/api/v1',
+    defaultValue: 'https://voltez-sb0w.onrender.com/api/v1',
   );
 
   late final Dio _dio;

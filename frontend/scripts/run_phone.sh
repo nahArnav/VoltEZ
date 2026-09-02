@@ -46,24 +46,46 @@ get_host_ip() {
 HOST_IP=$(get_host_ip)
 PORT="${PORT:-8000}"
 
-# Check for flags
+# The deployed Render API is the safe default. Local modes stay explicit so a
+# release APK never silently points at the phone's own loopback interface.
+DEPLOYED_SERVER="https://voltez-sb0w.onrender.com"
 USE_LAN=false
-if [[ "$*" == *"--lan"* || "$*" == *"--wifi"* ]]; then
-  USE_LAN=true
-fi
-
-# Check for custom server URL (e.g. Render cloud deployment)
+USE_LOCAL=false
+BUILD_APK=false
 CUSTOM_SERVER="${SERVER_URL:-}"
-args=("$@")
-for ((i=0; i<${#args[@]}; i++)); do
-  arg="${args[i]}"
-  if [[ "$arg" == "--server" || "$arg" == "--render" || "$arg" == "--url" ]]; then
-    CUSTOM_SERVER="${args[i+1]}"
-  elif [[ "$arg" =~ ^--server= ]]; then
-    CUSTOM_SERVER="${arg#--server=}"
-  elif [[ "$arg" =~ ^--render= ]]; then
-    CUSTOM_SERVER="${arg#--render=}"
-  fi
+FLUTTER_ARGS=()
+
+while (($#)); do
+  case "$1" in
+    --lan|--wifi)
+      USE_LAN=true
+      shift
+      ;;
+    --local|--usb)
+      USE_LOCAL=true
+      shift
+      ;;
+    --server|--render|--url)
+      if (($# < 2)); then
+        echo "Missing URL after $1" >&2
+        exit 2
+      fi
+      CUSTOM_SERVER="$2"
+      shift 2
+      ;;
+    --server=*|--render=*|--url=*)
+      CUSTOM_SERVER="${1#*=}"
+      shift
+      ;;
+    --build-apk|build)
+      BUILD_APK=true
+      shift
+      ;;
+    *)
+      FLUTTER_ARGS+=("$1")
+      shift
+      ;;
+  esac
 done
 
 if [ -n "$CUSTOM_SERVER" ]; then
@@ -86,10 +108,14 @@ elif [ "$USE_LAN" = true ]; then
   ACTIVE_HOST="$HOST_IP"
   API_URL="http://${ACTIVE_HOST}:${PORT}/api/v1"
   WS_URL="ws://${ACTIVE_HOST}:${PORT}/api/v1"
-else
+elif [ "$USE_LOCAL" = true ]; then
   ACTIVE_HOST="127.0.0.1"
   API_URL="http://${ACTIVE_HOST}:${PORT}/api/v1"
   WS_URL="ws://${ACTIVE_HOST}:${PORT}/api/v1"
+else
+  ACTIVE_HOST="$DEPLOYED_SERVER"
+  API_URL="${DEPLOYED_SERVER}/api/v1"
+  WS_URL="wss://voltez-sb0w.onrender.com/api/v1"
 fi
 
 
@@ -123,17 +149,17 @@ fi
 
 cd "$FRONTEND_DIR"
 
-if [[ "$1" == "--build-apk" || "$1" == "build" ]]; then
+if [ "$BUILD_APK" = true ]; then
   echo "🔨 Building release APK with target: $API_URL..."
   flutter build apk --release \
     --dart-define=API_BASE_URL="$API_URL" \
     --dart-define=WS_BASE_URL="$WS_URL" \
-    "${@:2}"
+    "${FLUTTER_ARGS[@]}"
   echo "✅ APK successfully generated at: $FRONTEND_DIR/build/app/outputs/flutter-apk/app-release.apk"
 else
   echo "🚀 Launching app on phone..."
   flutter run \
     --dart-define=API_BASE_URL="$API_URL" \
     --dart-define=WS_BASE_URL="$WS_URL" \
-    "$@"
+    "${FLUTTER_ARGS[@]}"
 fi

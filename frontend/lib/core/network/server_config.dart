@@ -14,11 +14,21 @@ class ServerConfig extends ChangeNotifier {
         _activeUrl = initialUrl ?? _defaultBaseUrl;
 
   static const String _storageKey = 'voltez_custom_server_url';
+  static const String _storageVersionKey = 'voltez_server_config_version';
+  static const String _storageVersion = 'render-sb0w-v1';
 
   static const String _defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000/api/v1',
+    defaultValue: 'https://voltez-sb0w.onrender.com/api/v1',
   );
+
+  static const Set<String> _legacyDefaultHosts = {
+    '127.0.0.1',
+    'localhost',
+    '10.0.2.2',
+    'voltez-backend.onrender.com',
+    'api.voltez.app',
+  };
 
   final ApiService _api;
   String _activeUrl;
@@ -76,9 +86,29 @@ class ServerConfig extends ChangeNotifier {
     try {
       const storage = FlutterSecureStorage();
       final saved = await storage.read(key: _storageKey);
+      final storedVersion = await storage.read(key: _storageVersionKey);
       if (saved != null && saved.trim().isNotEmpty) {
-        return normalizeUrl(saved.trim());
+        final normalized = normalizeUrl(saved.trim());
+        final savedHost = Uri.tryParse(normalized)?.host;
+
+        // Existing installs may have persisted a loopback address or the old
+        // Render hostname. Migrate those once so an updated APK connects to
+        // the deployed API without requiring the user to clear app storage.
+        if (storedVersion != _storageVersion &&
+            savedHost != null &&
+            _legacyDefaultHosts.contains(savedHost)) {
+          await storage.write(key: _storageKey, value: _defaultBaseUrl);
+          await storage.write(
+            key: _storageVersionKey,
+            value: _storageVersion,
+          );
+          return _defaultBaseUrl;
+        }
+
+        await storage.write(key: _storageVersionKey, value: _storageVersion);
+        return normalized;
       }
+      await storage.write(key: _storageVersionKey, value: _storageVersion);
     } catch (_) {}
     return _defaultBaseUrl;
   }

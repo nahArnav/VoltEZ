@@ -35,7 +35,8 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
   void initState() {
     super.initState();
     final initialUrl =
-        widget.config?.activeUrl ?? 'http://127.0.0.1:8000/api/v1';
+        widget.config?.activeUrl ??
+        'https://voltez-sb0w.onrender.com/api/v1';
     _controller = TextEditingController(text: initialUrl);
   }
 
@@ -233,10 +234,10 @@ class _ServerConfigDialogState extends State<_ServerConfigDialog> {
                     onTap: () => _applyPreset('http://10.0.2.2:8000/api/v1'),
                   ),
                   _PresetCard(
-                    title: 'Cloud Staging',
-                    subtitle: 'https://voltez-backend.onrender.com/api/v1',
+                    title: 'VoltEZ Cloud (Render)',
+                    subtitle: 'https://voltez-sb0w.onrender.com/api/v1',
                     onTap: () => _applyPreset(
-                      'https://voltez-backend.onrender.com/api/v1',
+                      'https://voltez-sb0w.onrender.com/api/v1',
                     ),
                   ),
                 ],

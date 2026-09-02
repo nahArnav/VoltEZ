@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -9,17 +10,23 @@ def _get_async_database_url(url: str) -> str:
     """
     Convert a standard PostgreSQL URL to an asyncpg-compatible URL.
     Handles postgresql://, postgresql+psycopg://, and postgres:// formats.
-    Also strips sslmode param (asyncpg uses its own ssl kwarg).
+    Also strips libpq-only SSL parameters (asyncpg receives an SSL context
+    through connect_args instead).
     """
     # Replace any sync driver prefix with asyncpg
     for prefix in ("postgresql+psycopg://", "postgresql://", "postgres://"):
         if url.startswith(prefix):
             url = url.replace(prefix, "postgresql+asyncpg://", 1)
             break
-    # asyncpg doesn't understand sslmode=require in the DSN; strip it and
-    # let the connect_args handle SSL instead.
-    url = url.replace("?sslmode=require", "").replace("&sslmode=require", "")
-    return url
+    parts = urlsplit(url)
+    query = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key not in {"sslmode", "channel_binding"}
+    ]
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+    )
 
 
 def _needs_ssl(url: str) -> bool:

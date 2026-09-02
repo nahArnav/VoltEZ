@@ -109,7 +109,7 @@ abstract class SessionWebSocket {
 /// - Server → Client: `{"type": "error", "message": "..."}`
 class LiveSessionWebSocket implements SessionWebSocket {
   LiveSessionWebSocket({
-    this.baseUrl = 'ws://127.0.0.1:8000/api/v1',
+    this.baseUrl = 'wss://voltez-sb0w.onrender.com/api/v1',
     this.baseUrlGetter,
     required this.userIdGetter,
     required this.tokenGetter,

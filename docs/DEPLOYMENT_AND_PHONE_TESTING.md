@@ -5,14 +5,16 @@ Compose deployment, the local web build, and the native phone prerequisites.
 
 ## What is verified in this branch
 
-- Backend unit/contract suite: 138 tests passed with integration tests excluded.
+- Backend unit/contract suite: 140 tests passed with integration tests excluded.
 - Python compilation, fatal Ruff checks, and a single Alembic head: passed.
 - Flutter static analyzer: 0 issues found.
+- Flutter test suite: 6 tests passed.
+- Android release APK: verified against the Render REST/WSS endpoints below.
 - Dynamic pricing bounds and tariff-lock behavior have focused regression tests.
 
-The PostGIS/Redis integration suite, native Android/iOS builds, and release web
-build require the corresponding local services and SDKs. They are not claimed
-as verified by the checks above; run the deployment steps below on the target
+The PostGIS/Redis integration suite, native iOS build, and release web build
+require the corresponding local services and SDKs. They are not claimed as
+verified by the checks above; run the deployment steps below on the target
 machine before releasing.
 
 ## Local deployment with Docker Compose
@@ -131,19 +133,29 @@ Google Maps, and payment SDKs are more reliable from an HTTPS staging URL.
 
 2. Enable Developer options and USB debugging on the phone. Connect it by USB,
    authorize the Mac, and confirm it appears in `flutter devices`.
-3. For USB testing, use the repository runner. It sets up the required reverse
-   tunnel before launching Flutter, so the app's `127.0.0.1` points back to the
-   Mac API:
+3. For phone testing against the deployed API, use the repository runner. Its
+   default target is `https://voltez-sb0w.onrender.com/api/v1`, so no ADB
+   reverse tunnel or shared Wi-Fi is required:
 
    ```bash
    # From the repository root
    ./frontend/scripts/run_phone.sh
    ```
 
-   The runner verifies an authorized device and configures
-   `adb reverse tcp:8000 tcp:8000`. If you prefer Wi-Fi, keep both devices on
-   the same network and run `./frontend/scripts/run_phone.sh --lan`; do not use
-   `127.0.0.1` in LAN mode because that is the phone itself.
+   To test a backend running on the Mac instead, opt into the appropriate local
+   mode. `--local` uses `127.0.0.1` and configures
+   `adb reverse tcp:8000 tcp:8000`; `--lan` uses the detected Mac LAN address:
+
+   ```bash
+   ./frontend/scripts/run_phone.sh --local
+   ./frontend/scripts/run_phone.sh --lan
+   ```
+
+   Build a Render-targeted release APK with:
+
+   ```bash
+   ./frontend/scripts/run_phone.sh --build-apk
+   ```
 
 4. To launch manually against the Mac LAN API, use:
 
