@@ -17,6 +17,7 @@ from database.models.charger import Charger
 from database.models.charger_port import ChargerPort
 from database.models.connector import ConnectorType
 from database.models.payment import Payment
+from database.models.user import User
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -35,11 +36,14 @@ async def _with_charger_context(db: AsyncSession, booking: Booking) -> dict:
             ConnectorType.display_name,
             Payment.method,
             Payment.status,
+            User.name,
+            User.phone,
         )
         .select_from(Booking)
         .join(ChargerPort, Booking.charger_port_id == ChargerPort.id)
         .join(Charger, ChargerPort.charger_id == Charger.id)
         .join(ConnectorType, ChargerPort.connector_type_id == ConnectorType.id)
+        .outerjoin(User, Booking.user_id == User.id)
         .outerjoin(Payment, Payment.booking_id == Booking.id)
         .where(Booking.id == booking.id)
     )
@@ -49,7 +53,20 @@ async def _with_charger_context(db: AsyncSession, booking: Booking) -> dict:
     start_code = get_booking_start_code(booking)
     payload["start_code"] = start_code
     if row is not None:
-        name, address, lat, lng, price, quoted_price, power, connector, payment_method, payment_status = row
+        (
+            name,
+            address,
+            lat,
+            lng,
+            price,
+            quoted_price,
+            power,
+            connector,
+            payment_method,
+            payment_status,
+            u_name,
+            u_phone,
+        ) = row
         payload.update(
             charger_name=name,
             charger_address=address,
@@ -62,6 +79,8 @@ async def _with_charger_context(db: AsyncSession, booking: Booking) -> dict:
             payment_method=payment_method,
             payment_status=payment_status,
             cash_otp_verified_at=booking.cash_otp_verified_at,
+            user_name=u_name,
+            user_phone=u_phone,
         )
     return payload
 

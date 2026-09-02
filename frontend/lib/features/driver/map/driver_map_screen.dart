@@ -148,7 +148,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                 // ─── Search Bar ───
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 8,
-                  left: 64,
+                  left: 68,
                   right: 16,
                   child: _buildSearchBar(discovery),
                 ),
@@ -179,7 +179,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
                 // ─── Filter Chips Row ───
                 Positioned(
-                  top: MediaQuery.of(context).padding.top + 112,
+                  top: MediaQuery.of(context).padding.top + 64,
                   left: 0,
                   right: 0,
                   child: _buildFilterRow(discovery),
@@ -189,8 +189,8 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                 // never hidden underneath the horizontal chip list.
                 if (discovery.locationSuggestions.isNotEmpty)
                   Positioned(
-                    top: MediaQuery.of(context).padding.top + 62,
-                    left: 64,
+                    top: MediaQuery.of(context).padding.top + 60,
+                    left: 68,
                     right: 16,
                     child: _buildLocationSuggestions(discovery),
                   ),
@@ -208,7 +208,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                 // ─── Charger Count Badge ───
                 if (discovery.locationSuggestions.isEmpty)
                   Positioned(
-                    top: MediaQuery.of(context).padding.top + 160,
+                    top: MediaQuery.of(context).padding.top + 114,
                     right: 16,
                     child: _buildCountBadge(discovery),
                   ),
@@ -328,6 +328,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
   // ─── Search Bar ───
   Widget _buildSearchBar(ChargerDiscoveryProvider discovery) {
     return Container(
+      height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
         color: AppColors.card,
@@ -574,6 +575,54 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
             ),
           ),
 
+          // Radius filter chip
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: GestureDetector(
+              onTap: () => _showRadiusSheet(discovery),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: discovery.maxRadiusKm != 5.0
+                      ? AppColors.primary.withValues(alpha: 0.2)
+                      : AppColors.card,
+                  borderRadius: BorderRadius.circular(21),
+                  border: Border.all(
+                    color: discovery.maxRadiusKm != 5.0
+                        ? AppColors.primary
+                        : AppColors.border,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.near_me_rounded,
+                      size: 14,
+                      color: discovery.maxRadiusKm != 5.0
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${discovery.maxRadiusKm.toStringAsFixed(discovery.maxRadiusKm % 1 == 0 ? 0 : 1)} km radius',
+                      style: TextStyle(
+                        color: discovery.maxRadiusKm != 5.0
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // Clear filters button
           if (_hasActiveFilters(discovery))
             Padding(
@@ -582,6 +631,7 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                 onTap: () {
                   discovery.clearConnectorFilter();
                   discovery.setPowerRange(const RangeValues(7, 150));
+                  discovery.setMaxRadiusKm(5.0);
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -628,7 +678,8 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
 
   bool _hasActiveFilters(ChargerDiscoveryProvider discovery) {
     return discovery.selectedConnectors.isNotEmpty ||
-        _isPowerRangeActive(discovery);
+        _isPowerRangeActive(discovery) ||
+        discovery.maxRadiusKm != 5.0;
   }
 
   // ─── Count Badge ───
@@ -1191,6 +1242,70 @@ class _DriverMapScreenState extends State<DriverMapScreen> {
                       ),
                     ),
                   ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ─── Proximity Radius Bottom Sheet ───
+  void _showRadiusSheet(ChargerDiscoveryProvider discovery) {
+    final options = [2.0, 5.0, 10.0, 15.0, 20.0];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Proximity Radius', style: AppTypography.headlineMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Show chargers within range of your target location',
+                    style: AppTypography.bodySmall,
+                  ),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: options.map((r) {
+                      final selected = discovery.maxRadiusKm == r;
+                      return ChoiceChip(
+                        label: Text(
+                          '${r.toInt()} km',
+                          style: AppTypography.labelMedium.copyWith(
+                            color: selected
+                                ? AppColors.textOnPrimary
+                                : AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        selected: selected,
+                        selectedColor: AppColors.primary,
+                        backgroundColor: AppColors.surface,
+                        onSelected: (val) {
+                          if (val) {
+                            discovery.setMaxRadiusKm(r);
+                            setModalState(() {});
+                            Navigator.pop(context);
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
             );

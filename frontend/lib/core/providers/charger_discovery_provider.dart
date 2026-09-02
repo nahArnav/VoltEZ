@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../network/api_service.dart';
 import '../../shared/models/models.dart';
+import '../utils/address_formatter.dart';
 
 class MapLocationSuggestion {
   const MapLocationSuggestion({
@@ -47,8 +48,12 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   String? get chargersError => _chargersError;
 
   // ─── Filters ───
+  // ─── Filters ───
   final Set<String> _selectedConnectorStrings = {};
   RangeValues _powerRange = const RangeValues(7, 150);
+  double _maxRadiusKm = 5.0; // Default 5 km proximity radius
+  double? _customCenterLat;
+  double? _customCenterLng;
   String _searchQuery = '';
   bool _locationQueryActive = false;
   Timer? _locationSearchTimer;
@@ -58,6 +63,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
 
   Set<String> get selectedConnectors => _selectedConnectorStrings;
   RangeValues get powerRange => _powerRange;
+  double get maxRadiusKm => _maxRadiusKm;
   String get searchQuery => _searchQuery;
   List<MapLocationSuggestion> get locationSuggestions => _locationSuggestions;
 
@@ -68,6 +74,11 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   // ─── Filtered Chargers ───
   List<Charger> get filteredChargers {
     return _allChargers.where((c) {
+      // Proximity radius filter (5 km default)
+      if (distanceTo(c) > _maxRadiusKm) {
+        return false;
+      }
+
       // Connector filter
       if (_selectedConnectorStrings.isNotEmpty) {
         final hasMatchingConnector = c.connectorTypes.any(
@@ -157,6 +168,8 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
 
   Future<void> refreshLocation() async {
     _initializationFuture = null;
+    _customCenterLat = null;
+    _customCenterLng = null;
     await _fetchLocation();
     await fetchNearbyChargers();
   }
@@ -167,6 +180,8 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   static const double _fallbackLng = 73.8567;
 
   Future<void> fetchNearbyChargers() async {
+    _customCenterLat = null;
+    _customCenterLng = null;
     final lat = _currentPosition?.latitude ?? _fallbackLat;
     final lng = _currentPosition?.longitude ?? _fallbackLng;
 
@@ -178,7 +193,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
       final response = await _api.getNearbyChargers(
         latitude: lat,
         longitude: lng,
-        radiusMeters: 10000,
+        radiusMeters: (_maxRadiusKm * 1000).toInt(),
       );
 
       final data = response.data;
@@ -209,6 +224,8 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
   /// from the device GPS position: the driver can explore a destination
   /// without pretending that their current location changed.
   Future<void> fetchChargersAt(double latitude, double longitude) async {
+    _customCenterLat = latitude;
+    _customCenterLng = longitude;
     _chargersLoading = true;
     _chargersError = null;
     notifyListeners();
@@ -216,7 +233,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
       final response = await _api.getNearbyChargers(
         latitude: latitude,
         longitude: longitude,
-        radiusMeters: 10000,
+        radiusMeters: (_maxRadiusKm * 1000).toInt(),
       );
       final data = response.data;
       _allChargers = data is List
@@ -225,20 +242,7 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
                 .toList()
           : [];
       _allChargers.sort(
-        (a, b) =>
-            Geolocator.distanceBetween(
-              latitude,
-              longitude,
-              a.latitude,
-              a.longitude,
-            ).compareTo(
-              Geolocator.distanceBetween(
-                latitude,
-                longitude,
-                b.latitude,
-                b.longitude,
-              ),
-            ),
+        (a, b) => distanceTo(a).compareTo(distanceTo(b)),
       );
       _chargersLoading = false;
     } catch (e) {
@@ -256,10 +260,10 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
     await fetchNearbyChargers();
   }
 
-  /// Calculate distance from user to a charger in km.
+  /// Calculate distance from search center / user location to a charger in km.
   double distanceTo(Charger charger) {
-    final lat = _currentPosition?.latitude ?? _fallbackLat;
-    final lng = _currentPosition?.longitude ?? _fallbackLng;
+    final lat = _customCenterLat ?? _currentPosition?.latitude ?? _fallbackLat;
+    final lng = _customCenterLng ?? _currentPosition?.longitude ?? _fallbackLng;
     return Geolocator.distanceBetween(
           lat,
           lng,
@@ -267,6 +271,17 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
           charger.longitude,
         ) /
         1000;
+  }
+
+  void setMaxRadiusKm(double radiusKm) {
+    if (_maxRadiusKm == radiusKm) return;
+    _maxRadiusKm = radiusKm;
+    notifyListeners();
+    if (_customCenterLat != null && _customCenterLng != null) {
+      fetchChargersAt(_customCenterLat!, _customCenterLng!);
+    } else {
+      fetchNearbyChargers();
+    }
   }
 
   // ─── Filter Mutators ───
@@ -344,7 +359,9 @@ class ChargerDiscoveryProvider extends ChangeNotifier {
                   .whereType<Map>()
                   .map(
                     (item) => MapLocationSuggestion(
-                      label: item['display_name']?.toString() ?? trimmed,
+                      label: AddressFormatter.cleanAddressString(
+                        item['display_name']?.toString() ?? trimmed,
+                      ),
                       latitude: (item['latitude'] as num).toDouble(),
                       longitude: (item['longitude'] as num).toDouble(),
                       placeType: item['place_type']?.toString(),
