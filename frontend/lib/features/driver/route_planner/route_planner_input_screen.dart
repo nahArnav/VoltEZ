@@ -32,7 +32,17 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RoutePlannerProvider>().loadVehicles();
+      final planner = context.read<RoutePlannerProvider>();
+      planner.loadVehicles();
+      // Restore values left over from a previous planning session (e.g. when
+      // the driver comes back from the results screen to tweak the trip).
+      if (_originController.text.isEmpty && planner.originName.isNotEmpty) {
+        _originController.text = planner.originName;
+      }
+      if (_destinationController.text.isEmpty &&
+          planner.destinationName.isNotEmpty) {
+        _destinationController.text = planner.destinationName;
+      }
     });
     _pulseController = AnimationController(
       vsync: this,
@@ -405,6 +415,47 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
 
   // ─── Vehicle Selector ───
   Widget _buildVehicleSelector(RoutePlannerProvider planner) {
+    if (planner.availableVehicles.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.directions_car_outlined,
+              color: AppColors.primary,
+              size: 30,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Add your EV to plan routes',
+              style: AppTypography.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Route planning needs your vehicle\'s battery and connector type.',
+              textAlign: TextAlign.center,
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            PrimaryButton(
+              text: 'ADD YOUR EV',
+              onPressed: () => context.push('/driver/vehicles'),
+              isExpanded: true,
+              icon: Icons.add_rounded,
+            ),
+          ],
+        ),
+      );
+    }
     return SizedBox(
       height: 120,
       child: ListView.separated(
@@ -953,7 +1004,9 @@ class _RoutePlannerInputScreenState extends State<RoutePlannerInputScreen>
     if (planner.originLat == null || planner.destinationLat == null) {
       return 'Use GPS or enter places your phone can locate';
     }
-    if (planner.selectedVehicle == null) return 'Select your vehicle';
+    if (planner.selectedVehicle == null) {
+      return 'Add your EV under VEHICLE above to continue';
+    }
     return '';
   }
 }

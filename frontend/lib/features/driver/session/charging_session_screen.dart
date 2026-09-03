@@ -65,12 +65,22 @@ class _ChargingSessionScreenState extends State<ChargingSessionScreen>
         elevation: 0,
         leading: Consumer<SessionProvider>(
           builder: (context, session, _) {
+            // A driver must always be able to step back before the session is
+            // actually charging: while idle (pre check-in), mid check-in, on
+            // the "Ready to charge" screen and on error.
             final showBack = session.phase == SessionPhase.idle ||
                 session.phase == SessionPhase.checkingIn ||
+                session.phase == SessionPhase.checkedIn ||
                 session.phase == SessionPhase.error;
             return showBack
                 ? IconButton(
-                    onPressed: () => context.go('/driver/home'),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/driver/home');
+                      }
+                    },
                     icon: const Icon(Icons.arrow_back_rounded,
                         color: AppColors.textPrimary, size: 24),
                   )
@@ -267,6 +277,25 @@ class _ChargingSessionScreenState extends State<ChargingSessionScreen>
               onPressed: () => context.read<SessionProvider>().checkIn(),
               isExpanded: true,
               icon: Icons.check_circle_rounded,
+            ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/driver/home');
+                }
+              },
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                size: 16,
+                color: AppColors.textMuted,
+              ),
+              label: const Text(
+                'Go back',
+                style: TextStyle(color: AppColors.textMuted),
+              ),
             ),
           ],
         ),

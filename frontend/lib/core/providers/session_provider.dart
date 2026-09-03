@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../network/session_api.dart';
 import '../network/session_websocket.dart';
 import '../network/api_service.dart';
+import '../services/notification_service.dart';
 
 /// Phase of the session flow.
 enum SessionPhase {
@@ -127,6 +128,8 @@ class SessionProvider extends ChangeNotifier {
       // the driver taps CHECK IN. Reflect the server status immediately so the
       // driver is taken to the live charging view instead of seeing a second
       // "START CHARGING" action that would fail.
+      final wasAlreadyCharging =
+          _sessionData!.status == SessionStatus.charging;
       _phase = _sessionData!.status == SessionStatus.charging
           ? SessionPhase.charging
           : _sessionData!.status == SessionStatus.completed
@@ -134,6 +137,14 @@ class SessionProvider extends ChangeNotifier {
           : SessionPhase.checkedIn;
       // Connect WebSocket for live updates
       await _connectWebSocket(_sessionData!.sessionId);
+      NotificationService.instance.notify(
+        title: wasAlreadyCharging
+            ? 'Charging started ⚡'
+            : 'Checked in ✅',
+        body: wasAlreadyCharging
+            ? '${_sessionData!.chargerName} is now charging your vehicle.'
+            : 'You are checked in at ${_sessionData!.chargerName}. Plug in to start charging.',
+      );
     } on SessionApiException catch (e) {
       _errorMessage = e.message;
       _phase = SessionPhase.error;
@@ -181,8 +192,13 @@ class SessionProvider extends ChangeNotifier {
     if (_sessionData == null) return;
     _errorMessage = null;
     try {
+      final chargerName = _sessionData!.chargerName;
       _sessionData = await _api.startSession(_sessionData!.sessionId);
       _phase = SessionPhase.charging;
+      NotificationService.instance.notify(
+        title: 'Charging started ⚡',
+        body: 'Your session at $chargerName is now live. Follow the updates on screen.',
+      );
     } on SessionApiException catch (error) {
       _errorMessage = error.message;
       _phase = SessionPhase.error;
@@ -205,6 +221,13 @@ class SessionProvider extends ChangeNotifier {
     try {
       _sessionSummary = await _api.endSession(_sessionData!.sessionId);
       _phase = SessionPhase.complete;
+      final summary = _sessionSummary;
+      NotificationService.instance.notify(
+        title: 'Session complete 🎉',
+        body: summary == null
+            ? 'Your charging session has ended.'
+            : '${summary.chargerName} · ${summary.energyKwh.toStringAsFixed(1)} kWh · ₹${summary.totalCost.toStringAsFixed(0)}',
+      );
     } on SessionApiException catch (e) {
       _errorMessage = e.message;
       _phase = SessionPhase.charging;
@@ -335,6 +358,13 @@ class SessionProvider extends ChangeNotifier {
         if (event.summary != null) {
           _sessionSummary = event.summary;
           _phase = SessionPhase.complete;
+          NotificationService.instance.notify(
+            title: 'Session complete 🎉',
+            body:
+                '${event.summary!.chargerName} · '
+                '${event.summary!.energyKwh.toStringAsFixed(1)} kWh · '
+                '₹${event.summary!.totalCost.toStringAsFixed(0)}',
+          );
           _disconnectWebSocket();
         }
         break;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../shared/models/models.dart';
 import '../network/api_service.dart';
+import '../services/notification_service.dart';
 
 /// Auth state managed via ChangeNotifier (Provider).
 /// Handles login, logout, role persistence, and token storage.
@@ -163,6 +164,7 @@ class AuthProvider extends ChangeNotifier {
     _api.setRefreshToken(null);
     await _storage.delete(key: _accessKey);
     await _storage.delete(key: _refreshKey);
+    await NotificationService.instance.clear();
     notifyListeners();
   }
 

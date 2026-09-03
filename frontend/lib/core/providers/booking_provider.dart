@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../shared/models/models.dart';
 import '../network/booking_api.dart';
 import '../network/api_service.dart';
+import '../services/notification_service.dart';
 
 /// Phase of the booking flow.
 enum BookingPhase {
@@ -241,6 +242,7 @@ class BookingProvider extends ChangeNotifier {
       _confirmedBooking = await _api.confirmCashPayment(_holdResult!.bookingId);
       _stopCountdown();
       _phase = BookingPhase.confirmed;
+      _notifyConfirmed();
     } catch (_) {
       _errorMessage = 'Could not confirm the pay-at-charger reservation.';
       _phase = BookingPhase.paymentFailed;
@@ -277,6 +279,7 @@ class BookingProvider extends ChangeNotifier {
 
       _stopCountdown();
       _phase = BookingPhase.confirmed;
+      _notifyConfirmed();
     } on PaymentFailedException catch (e) {
       _errorMessage = e.message;
       _phase = BookingPhase.paymentFailed;
@@ -302,6 +305,7 @@ class BookingProvider extends ChangeNotifier {
       );
       _stopCountdown();
       _phase = BookingPhase.confirmed;
+      _notifyConfirmed();
     } on PaymentFailedException catch (e) {
       _errorMessage = e.message;
       _phase = BookingPhase.paymentFailed;
@@ -343,6 +347,10 @@ class BookingProvider extends ChangeNotifier {
     _holdResult = null;
     _selectedSlot = null;
     _phase = BookingPhase.paymentCancelled;
+    NotificationService.instance.notify(
+      title: 'Booking cancelled',
+      body: 'Your held slot at ${_selectedCharger?.name ?? 'the charger'} has been released.',
+    );
     notifyListeners();
   }
 
@@ -417,6 +425,17 @@ class BookingProvider extends ChangeNotifier {
   }
 
   bool get isCountdownUrgent => _countdownSeconds < 120; // < 2 min
+
+  void _notifyConfirmed() {
+    final booking = _confirmedBooking;
+    if (booking == null) return;
+    NotificationService.instance.notify(
+      title: 'Booking confirmed ⚡',
+      body:
+          '${booking.chargerName} · ${booking.date} ${booking.startTime}–${booking.endTime}. '
+          'Show your check-in code at the station.',
+    );
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Cleanup

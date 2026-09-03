@@ -12,6 +12,7 @@ import '../../features/auth/role_selection_screen.dart';
 import '../../features/driver/home/driver_home_screen.dart';
 import '../../features/driver/map/driver_map_screen.dart';
 import '../../features/driver/onboarding/driver_onboarding_screen.dart';
+import '../../features/driver/onboarding/vehicle_management_screen.dart';
 import '../../features/driver/recommendations/route_planner_screen.dart';
 import '../../features/driver/charger_details/charger_details_screen.dart';
 import '../../features/driver/booking/booking_screen.dart';
@@ -108,6 +109,10 @@ class AppRouter {
       GoRoute(
         path: '/driver/history',
         builder: (context, state) => const DriverHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/driver/vehicles',
+        builder: (context, state) => const VehicleManagementScreen(),
       ),
       GoRoute(
         path: '/driver/onboarding',

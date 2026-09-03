@@ -201,7 +201,14 @@ class _DriverOnboardingScreenState extends State<DriverOnboardingScreen> {
       await context.read<RoutePlannerProvider>().loadVehicles(
         selectedVehicleId: savedId ?? widget.vehicleToEdit?.id,
       );
-      if (mounted) context.go('/driver/home');
+      if (!mounted) return;
+      // Return to wherever the wizard was opened from (home / vehicle
+      // management). Fall back to home when this route is a top-level entry.
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/driver/home');
+      }
     } on DioException catch (error) {
       if (!mounted) return;
       final detail = error.response?.data;

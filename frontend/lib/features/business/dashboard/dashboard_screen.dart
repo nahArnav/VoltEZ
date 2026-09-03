@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/providers/business_provider.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/address_formatter.dart';
@@ -93,6 +94,7 @@ class _OverviewPage extends StatelessWidget {
             title: (name == null || name.isEmpty) ? 'Your business' : name,
             subtitle: 'Live operations overview',
             icon: Icons.notifications_none_rounded,
+            showNotificationBadge: true,
             onIconTap: () => _showBusinessNotifications(context),
           ),
           if (provider.errorMessage != null) ...[
@@ -187,31 +189,199 @@ class _ChargersPage extends StatelessWidget {
   }
 }
 
-class _BookingsPage extends StatelessWidget {
+enum _BookingFilter { all, today, upcoming, custom }
+
+class _BookingsPage extends StatefulWidget {
   const _BookingsPage();
+
+  @override
+  State<_BookingsPage> createState() => _BookingsPageState();
+}
+
+class _BookingsPageState extends State<_BookingsPage> {
+  _BookingFilter _filter = _BookingFilter.all;
+  DateTime? _customDay;
+
+  bool _matchesFilter(Map<String, dynamic> booking) {
+    final parsed = DateTime.tryParse(
+      booking['start_at']?.toString() ?? '',
+    )?.toLocal();
+    if (parsed == null) return _filter == _BookingFilter.all;
+    final start = DateTime(parsed.year, parsed.month, parsed.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    switch (_filter) {
+      case _BookingFilter.all:
+        return true;
+      case _BookingFilter.today:
+        return start.isAtSameMomentAs(today);
+      case _BookingFilter.upcoming:
+        return start.isAfter(today) || start.isAtSameMomentAs(today);
+      case _BookingFilter.custom:
+        final day = _customDay;
+        if (day == null) return true;
+        final target = DateTime(day.year, day.month, day.day);
+        return start.isAtSameMomentAs(target);
+    }
+  }
+
+  Future<void> _pickDay(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _customDay ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      helpText: 'Filter bookings by date',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _customDay = picked;
+      _filter = _BookingFilter.custom;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<BusinessProvider>();
+    final visibleBookings = provider.bookings
+        .where(_matchesFilter)
+        .toList(growable: false);
     return RefreshIndicator(
       onRefresh: provider.load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
-          const _PageHeader(
+          _PageHeader(
             eyebrow: 'RESERVATIONS',
             title: 'Bookings',
-            subtitle:
-                'Confirmed reservations currently actionable by your fleet',
+            subtitle: _filterSubtitle(),
             icon: Icons.calendar_today_rounded,
+            onIconTap: () => _pickDay(context),
           ),
-          const SizedBox(height: 18),
-          _BookingList(provider.bookings, allowCancel: true),
+          const SizedBox(height: 12),
+          _buildFilterChips(),
+          const SizedBox(height: 10),
+          if (_filter != _BookingFilter.all && visibleBookings.isEmpty)
+            const _EmptyState(
+              icon: Icons.event_busy_outlined,
+              title: 'No bookings for this filter',
+              message: 'Try another day or switch the filter back to All.',
+            )
+          else
+            _BookingList(visibleBookings, allowCancel: true),
         ],
       ),
     );
   }
+
+  String _filterSubtitle() {
+    switch (_filter) {
+      case _BookingFilter.all:
+        return 'Confirmed reservations actionable by your fleet';
+      case _BookingFilter.today:
+        return 'Showing bookings scheduled for today';
+      case _BookingFilter.upcoming:
+        return 'Showing today and upcoming bookings';
+      case _BookingFilter.custom:
+        final day = _customDay;
+        if (day == null) return 'Showing bookings for the selected date';
+        final weekdays = const [
+          'Mon',
+          'Tue',
+          'Wed',
+          'Thu',
+          'Fri',
+          'Sat',
+          'Sun',
+        ];
+        return 'Showing bookings for ${weekdays[day.weekday - 1]}, '
+            '${day.day}/${day.month}/${day.year}';
+    }
+  }
+
+  Widget _buildFilterChips() {
+    final options = <(String, _BookingFilter)>[
+      ('All', _BookingFilter.all),
+      ('Today', _BookingFilter.today),
+      ('Upcoming', _BookingFilter.upcoming),
+    ];
+    return SizedBox(
+      height: 38,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          for (final option in options)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _FilterPill(
+                label: option.$1,
+                selected: _filter == option.$2,
+                onTap: () => setState(() => _filter = option.$2),
+              ),
+            ),
+          _FilterPill(
+            label: _filter == _BookingFilter.custom && _customDay != null
+                ? '📅 ${_customDay!.day}/${_customDay!.month}'
+                : '📅 Pick date',
+            selected: _filter == _BookingFilter.custom,
+            onTap: () => _pickDay(context),
+          ),
+          if (_filter != _BookingFilter.all || _customDay != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: _FilterPill(
+                label: 'Clear',
+                selected: false,
+                onTap: () => setState(() {
+                  _filter = _BookingFilter.all;
+                  _customDay = null;
+                }),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.16)
+            : AppColors.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: selected ? AppColors.primary : AppColors.border,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: selected ? AppColors.primary : AppColors.textSecondary,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ),
+  );
 }
 
 class _AnalyticsPage extends StatelessWidget {
@@ -852,15 +1022,41 @@ class _BookingList extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       if (cancellable)
-                        IconButton(
-                          tooltip: 'Cancel booking',
+                        OutlinedButton.icon(
+                          onPressed: () => _confirmCancelBooking(
+                            context,
+                            provider,
+                            booking,
+                            chargerName:
+                                booking['charger_name']?.toString() ?? 'booking',
+                            userName: userName,
+                          ),
                           icon: const Icon(
                             Icons.cancel_outlined,
+                            size: 16,
                             color: AppColors.error,
-                            size: 20,
                           ),
-                          onPressed: () =>
-                              provider.cancelBooking(booking['id'].toString()),
+                          label: const Text(
+                            'CANCEL',
+                            style: TextStyle(
+                              color: AppColors.error,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            side: BorderSide(
+                              color: AppColors.error.withValues(alpha: 0.45),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
                         )
                       else
                         const SizedBox.shrink(),
@@ -875,7 +1071,7 @@ class _BookingList extends StatelessWidget {
                             userPhone: userPhone,
                           ),
                           icon: const Icon(Icons.verified_user_rounded, size: 16),
-                          label: const Text('VERIFY'),
+                          label: const Text('VERIFY OTP'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: AppColors.textOnPrimary,
@@ -930,6 +1126,66 @@ class _BookingList extends StatelessWidget {
         );
       }).toList(),
     );
+  }
+
+  Future<void> _confirmCancelBooking(
+    BuildContext context,
+    BusinessProvider provider,
+    Map<String, dynamic> booking, {
+    required String chargerName,
+    required String userName,
+  }) async {
+    final bookingId = booking['id'].toString();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.cancel_outlined, color: AppColors.error),
+            SizedBox(width: 8),
+            Text('Cancel this booking?'),
+          ],
+        ),
+        content: Text(
+          'Cancel $chargerName for $userName?\n\nThe reserved slot will be released and offered to other drivers.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('KEEP BOOKING'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('CANCEL BOOKING'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final ok = await provider.cancelBooking(bookingId);
+    if (!context.mounted) return;
+    if (ok) {
+      NotificationService.instance.notify(
+        title: 'Booking cancelled',
+        body: 'Booking for $userName at $chargerName was cancelled. The slot is released.',
+        showBanner: false,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Booking cancelled — slot released.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.errorMessage ?? 'Could not cancel this booking.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   void _showVerifyCashCode(
@@ -1007,6 +1263,11 @@ class _BookingList extends StatelessWidget {
               if (!context.mounted) return;
               if (success) {
                 Navigator.pop(ctx);
+                NotificationService.instance.notify(
+                  title: 'OTP verified — charging started',
+                  body: '$userName\'s charging session is now active. Keep an eye on the session.',
+                  showBanner: false,
+                );
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('OTP verified! Charging started for $userName.'),
@@ -1206,12 +1467,18 @@ class _PageHeader extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     this.onIconTap,
+    this.showNotificationBadge = false,
   });
   final String eyebrow;
   final String title;
   final String subtitle;
   final IconData icon;
   final VoidCallback? onIconTap;
+
+  /// Renders the unread-alert dot next to the header icon (used by the bell on
+  /// the Overview page; other pages keep their plain header icon).
+  final bool showNotificationBadge;
+
   @override
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1233,22 +1500,61 @@ class _PageHeader extends StatelessWidget {
           ],
         ),
       ),
-      onIconTap == null
-          ? CircleAvatar(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.onPrimary,
-              child: Icon(icon),
-            )
-          : IconButton.filled(
-              onPressed: onIconTap,
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.onPrimary,
-              ),
-              icon: Icon(icon),
-            ),
+      _trailing(context),
     ],
   );
+
+  Widget _trailing(BuildContext context) {
+    final Widget base = onIconTap == null
+        ? CircleAvatar(
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.onPrimary,
+            child: Icon(icon),
+          )
+        : IconButton.filled(
+            onPressed: onIconTap,
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.onPrimary,
+            ),
+            icon: Icon(icon),
+          );
+    if (!showNotificationBadge) return base;
+    return Consumer<NotificationService>(
+      builder: (context, notifications, _) {
+        final unread = notifications.unreadCount;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            base,
+            if (unread > 0)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.card, width: 1.5),
+                  ),
+                  child: Text(
+                    unread > 9 ? '9+' : '$unread',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -2499,6 +2805,8 @@ String _dateTime(DateTime value) =>
     '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 
 Future<void> _showBusinessNotifications(BuildContext context) async {
+  final localAlerts = NotificationService.instance.alerts;
+  NotificationService.instance.markAllRead();
   List<Map<String, dynamic>> notifications = const [];
   String? error;
   try {
@@ -2520,37 +2828,50 @@ Future<void> _showBusinessNotifications(BuildContext context) async {
       title: const Text('Notifications'),
       content: SizedBox(
         width: 360,
-        child: error != null
+        child: error != null && localAlerts.isEmpty && notifications.isEmpty
             ? Text(error)
-            : notifications.isEmpty
+            : localAlerts.isEmpty && notifications.isEmpty
             ? const Text('No notifications yet.')
             : SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: notifications
-                      .map(
-                        (item) => ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(
-                            Icons.notifications_outlined,
-                            color: AppColors.primary,
-                          ),
-                          title: Text(
-                            item['title']?.toString() ?? 'VoltEZ alert',
-                          ),
-                          subtitle: Text(item['message']?.toString() ?? ''),
-                          isThreeLine: true,
-                          onTap: () {
-                            final id = item['id']?.toString();
-                            if (id != null) {
-                              context.read<ApiService>().markNotificationRead(
-                                id,
-                              );
-                            }
-                          },
+                  children: [
+                    for (final alert in localAlerts)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.notifications_active_rounded,
+                          color: AppColors.primary,
                         ),
-                      )
-                      .toList(),
+                        title: Text(
+                          alert.title,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text('${alert.body}\n${_localTimeAgo(alert.time)}'),
+                        isThreeLine: true,
+                      ),
+                    for (final item in notifications)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.notifications_outlined,
+                          color: AppColors.primary,
+                        ),
+                        title: Text(
+                          item['title']?.toString() ?? 'VoltEZ alert',
+                        ),
+                        subtitle: Text(item['message']?.toString() ?? ''),
+                        isThreeLine: true,
+                        onTap: () {
+                          final id = item['id']?.toString();
+                          if (id != null) {
+                            context.read<ApiService>().markNotificationRead(
+                              id,
+                            );
+                          }
+                        },
+                      ),
+                  ],
                 ),
               ),
       ),
@@ -2562,6 +2883,14 @@ Future<void> _showBusinessNotifications(BuildContext context) async {
       ],
     ),
   );
+}
+
+String _localTimeAgo(DateTime time) {
+  final diff = DateTime.now().difference(time);
+  if (diff.inMinutes < 1) return 'Just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  return '${diff.inDays}d ago';
 }
 
 Color _statusColor(String status) {

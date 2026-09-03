@@ -140,9 +140,14 @@ class RoutePlannerProvider extends ChangeNotifier {
               .firstOrNull;
           _selectedVehicle = refreshed ?? availableVehicles.first;
         }
+      } else {
+        // No saved vehicles (for example the last one was removed) — fall back
+        // to the "Add your EV" state on the home screen.
+        _selectedVehicle = null;
       }
     } catch (error) {
       availableVehicles.clear();
+      _selectedVehicle = null;
       _vehiclesError = error.toString();
     }
     notifyListeners();

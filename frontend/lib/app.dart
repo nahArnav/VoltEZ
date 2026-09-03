@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/colors.dart';
 import 'core/auth/auth_provider.dart';
 import 'core/routing/app_router.dart';
+import 'core/services/notification_service.dart';
 
 class VoltezApp extends StatefulWidget {
   const VoltezApp({super.key});
@@ -41,6 +42,7 @@ class _VoltezAppState extends State<VoltezApp> {
       title: 'VoltEZ',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      scaffoldMessengerKey: NotificationService.scaffoldMessengerKey,
       routerConfig: _appRouter.router,
     );
   }

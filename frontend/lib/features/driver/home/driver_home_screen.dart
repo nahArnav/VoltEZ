@@ -9,6 +9,7 @@ import '../../../core/providers/charger_discovery_provider.dart';
 import '../../../core/providers/route_planner_provider.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../../shared/models/models.dart';
 import '../history/booking_history_screen.dart';
@@ -218,19 +219,43 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         Semantics(
           button: true,
           label: 'Open notifications',
-          child: Material(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
+          child: Consumer<NotificationService>(
+            builder: (context, notifications, _) => Material(
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(14),
-              onTap: () => _showNotificationDialog(context),
-              child: const SizedBox(
-                width: 46,
-                height: 46,
-                child: Icon(
-                  Icons.notifications_none_rounded,
-                  color: AppColors.textOnPrimary,
-                  size: 23,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _showNotificationDialog(context),
+                child: SizedBox(
+                  width: 46,
+                  height: 46,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(
+                        Icons.notifications_none_rounded,
+                        color: AppColors.textOnPrimary,
+                        size: 23,
+                      ),
+                      if (notifications.unreadCount > 0)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.primary,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -250,7 +275,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             title: 'Add your EV details',
             message:
                 'Save a car, bike or auto profile to unlock accurate range and charger compatibility.',
-            onTap: () => context.push('/driver/onboarding'),
+            onTap: () => context.push('/driver/vehicles'),
           );
         }
         return GlassCard(
@@ -268,12 +293,32 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       color: AppColors.onPrimary.withValues(alpha: 0.7),
                     ),
                   ),
-                  const Text(
-                    '—',
-                    style: TextStyle(
-                      color: AppColors.onPrimary,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
+                  GestureDetector(
+                    onTap: () => context.push('/driver/vehicles'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.onPrimary.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.onPrimary.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.edit_rounded, color: AppColors.onPrimary, size: 13),
+                          SizedBox(width: 4),
+                          Text(
+                            'Manage',
+                            style: TextStyle(
+                              color: AppColors.onPrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -1061,12 +1106,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           Consumer<RoutePlannerProvider>(
             builder: (context, planner, _) => _profileOption(
               Icons.directions_car_rounded,
-              'My Vehicle',
-              planner.selectedVehicle?.displayName ?? 'No vehicle saved',
-              () => context.push(
-                '/driver/onboarding',
-                extra: planner.selectedVehicle,
-              ),
+              'My Vehicles',
+              planner.selectedVehicle == null
+                  ? 'Add or manage your EV profiles'
+                  : '${planner.availableVehicles.length} saved · ${planner.selectedVehicle!.displayName} active',
+              () => context.push('/driver/vehicles'),
             ),
           ),
           Consumer<AuthProvider>(
@@ -1416,6 +1460,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     if (!context.mounted) return;
     var enabled = prefs.getBool('voltez_notifications_enabled') ?? true;
+    final localAlerts = NotificationService.instance.alerts;
+    NotificationService.instance.markAllRead();
     List<Map<String, dynamic>> notifications = const [];
     String? loadError;
     try {
@@ -1438,7 +1484,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           title: const Text('Notifications'),
           content: SizedBox(
             width: double.maxFinite,
-            height: MediaQuery.sizeOf(context).height * 0.42,
+            height: MediaQuery.sizeOf(context).height * 0.46,
             child: Column(
               children: [
                 SwitchListTile(
@@ -1452,7 +1498,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ),
                 const Divider(),
                 Expanded(
-                  child: loadError != null
+                  child: loadError != null &&
+                          localAlerts.isEmpty &&
+                          notifications.isEmpty
                       ? Center(
                           child: Text(
                             loadError,
@@ -1460,20 +1508,50 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                             style: const TextStyle(color: Colors.red),
                           ),
                         )
-                      : notifications.isEmpty
+                      : localAlerts.isEmpty && notifications.isEmpty
                       ? const Center(child: Text('No notifications yet.'))
                       : ListView.separated(
-                          itemCount: notifications.length,
+                          itemCount: localAlerts.length + notifications.length,
                           separatorBuilder: (_, _) => const Divider(height: 1),
-                          itemBuilder: (ctx, i) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              notifications[i]['title']?.toString() ?? '',
-                            ),
-                            subtitle: Text(
-                              notifications[i]['message']?.toString() ?? '',
-                            ),
-                          ),
+                          itemBuilder: (ctx, i) {
+                            if (i < localAlerts.length) {
+                              final alert = localAlerts[i];
+                              return ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(
+                                  Icons.notifications_active_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                                title: Text(
+                                  alert.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${alert.body}\n${_timeAgo(alert.time)}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                isThreeLine: true,
+                              );
+                            }
+                            final serverItem = notifications[i - localAlerts.length];
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(
+                                Icons.notifications_outlined,
+                                color: AppColors.textMuted,
+                                size: 20,
+                              ),
+                              title: Text(
+                                serverItem['title']?.toString() ?? '',
+                              ),
+                              subtitle: Text(
+                                serverItem['message']?.toString() ?? '',
+                              ),
+                            );
+                          },
                         ),
                 ),
               ],
@@ -1655,6 +1733,14 @@ String _greeting() {
   return 'Good evening';
 }
 
+String _timeAgo(DateTime time) {
+  final diff = DateTime.now().difference(time);
+  if (diff.inMinutes < 1) return 'Just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  return '${diff.inDays}d ago';
+}
+
 class _HomeInfoCard extends StatelessWidget {
   const _HomeInfoCard({
     required this.icon,
@@ -1668,39 +1754,68 @@ class _HomeInfoCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final content = Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 32),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppTypography.headlineSmall),
-                const SizedBox(height: 4),
-                Text(message, style: AppTypography.bodySmall),
-              ],
+  Widget build(BuildContext context) => Material(
+    color: AppColors.card,
+    borderRadius: BorderRadius.circular(12),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 26),
             ),
-          ),
-        ],
-      ),
-    );
-
-    return Card(
-      child: onTap == null
-          ? content
-          : Semantics(
-              button: true,
-              label: title,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: onTap,
-                child: content,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTypography.headlineSmall),
+                  const SizedBox(height: 4),
+                  Text(message, style: AppTypography.bodySmall),
+                ],
               ),
             ),
-    );
-  }
+            if (onTap != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'ADD EV',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(Icons.add_rounded, color: AppColors.primary, size: 15),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
 }

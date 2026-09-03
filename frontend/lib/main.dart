@@ -12,6 +12,7 @@ import 'core/network/booking_api.dart';
 import 'core/network/server_config.dart';
 import 'core/network/session_api.dart';
 import 'core/network/session_websocket.dart';
+import 'core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +46,9 @@ void main() async {
               tokenGetter: () => api.token,
             ),
           ),
+        ),
+        ChangeNotifierProvider<NotificationService>.value(
+          value: NotificationService.instance,
         ),
       ],
       child: const VoltezApp(),
