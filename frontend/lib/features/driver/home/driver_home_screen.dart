@@ -245,11 +245,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       builder: (context, planner, _) {
         final vehicle = planner.selectedVehicle;
         if (vehicle == null) {
-          return const _HomeInfoCard(
+          return _HomeInfoCard(
             icon: Icons.directions_car_outlined,
             title: 'Add your EV details',
             message:
                 'Save a car, bike or auto profile to unlock accurate range and charger compatibility.',
+            onTap: () => context.push('/driver/onboarding'),
           );
         }
         return GlassCard(
@@ -1659,14 +1660,16 @@ class _HomeInfoCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.message,
+    this.onTap,
   });
   final IconData icon;
   final String title;
   final String message;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
+  Widget build(BuildContext context) {
+    final content = Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
@@ -1684,6 +1687,20 @@ class _HomeInfoCard extends StatelessWidget {
           ),
         ],
       ),
-    ),
-  );
+    );
+
+    return Card(
+      child: onTap == null
+          ? content
+          : Semantics(
+              button: true,
+              label: title,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onTap,
+                child: content,
+              ),
+            ),
+    );
+  }
 }
