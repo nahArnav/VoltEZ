@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # Sponsor Integrations
     GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.7-flash"
     TAVILY_API_KEY: str = ""
     LYZR_API_KEY: str = ""
     LYZR_AGENT_ID: str = ""

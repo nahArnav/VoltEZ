@@ -5,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from geoalchemy2 import Geometry as GeometryType
 from pydantic import BaseModel, Field
@@ -13,9 +12,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user
-from app.core.config import settings
 from app.core.logging import get_logger
 from app.db.session import get_db
+from app.integrations.providers import generate_gemini_text
 from app.repositories.business import business_repo
 from app.schemas.enums import BookingStatus, UserRole
 from app.services.n8n import n8n_service
@@ -78,47 +77,8 @@ class ChargingAdviceResponse(BaseModel):
 
 
 async def _call_gemini(prompt: str) -> str | None:
-    gemini_key = settings.GEMINI_API_KEY.strip()
-    if not gemini_key:
-        return None
-
-    headers = {
-        "x-goog-api-key": gemini_key,
-        "Content-Type": "application/json",
-    }
-
-    # Try preferred Gemini models in order
-    for model_name in [
-        "models/gemini-3.6-flash",
-        "models/gemini-2.0-flash",
-        "models/gemini-flash-latest",
-        "models/gemini-pro-latest",
-    ]:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={gemini_key}"
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.post(
-                    url,
-                    headers=headers,
-                    json={
-                        "contents": [{"parts": [{"text": prompt}]}],
-                        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 500},
-                    },
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        content = candidates[0].get("content", {})
-                        parts = content.get("parts", [])
-                        if parts and "text" in parts[0]:
-                            return parts[0]["text"].strip()
-                else:
-                    logger.debug("Gemini %s responded with HTTP %d: %s", model_name, resp.status_code, resp.text[:150])
-        except Exception as exc:
-            logger.warning("Gemini API call to %s failed: %s", model_name, exc)
-            continue
-    return None
+    result = await generate_gemini_text(prompt)
+    return result.text
 
 
 @router.post("/charging-advice", response_model=ChargingAdviceResponse)

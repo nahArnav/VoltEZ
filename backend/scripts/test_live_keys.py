@@ -7,41 +7,34 @@ import urllib.request
 def test_gemini():
     print("\n--- 1. Testing Google Gemini API ---")
 
-    key = os.getenv("GEMINI_API_KEY")
+    key = os.getenv("GEMINI_API_KEY", "").strip().strip("\"'").strip()
 
     if not key:
         print("ERROR: GEMINI_API_KEY is not set.")
         return
 
     models = [
-        "models/gemini-2.0-flash",
-        "models/gemini-2.0-flash-exp",
-        "models/gemini-flash-latest",
-        "models/gemini-pro-latest",
+        os.getenv("GEMINI_MODEL", "gemini-3.7-flash").removeprefix("models/"),
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-2.5-flash",
     ]
 
-    for m in models:
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/"
-            f"{m}:generateContent?key={key}"
-        )
+    for model in dict.fromkeys(models):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
         headers = {
             "x-goog-api-key": key,
             "Content-Type": "application/json",
         }
 
-        data = json.dumps({
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "text": "Say 'VoltEZ Gemini Connected successfully!' in 5 words."
-                        }
-                    ]
-                }
-            ]
-        }).encode("utf-8")
+        data = json.dumps(
+            {
+                "contents": [
+                    {"parts": [{"text": "Say 'VoltEZ Gemini Connected successfully!' in 5 words."}]}
+                ]
+            }
+        ).encode("utf-8")
 
         req = urllib.request.Request(
             url,
@@ -55,7 +48,7 @@ def test_gemini():
                 status = resp.status
                 body = resp.read().decode("utf-8")
 
-                print(f"Model {m}: HTTP {status}")
+                print(f"Model {model}: HTTP {status}")
 
                 result = json.loads(body)
                 text = result["candidates"][0]["content"]["parts"][0]["text"]
@@ -65,10 +58,10 @@ def test_gemini():
 
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8")
-            print(f"Model {m}: HTTP {e.code} -> {err_body[:200]}")
+            print(f"Model {model}: HTTP {e.code} -> {err_body[:200]}")
 
         except Exception as e:
-            print(f"--> Exception for {m}: {e}")
+            print(f"--> Exception for {model}: {e}")
 
     print("Gemini connection failed for all tested models.")
 

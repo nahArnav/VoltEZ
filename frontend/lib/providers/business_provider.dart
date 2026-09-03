@@ -353,12 +353,12 @@ class BusinessNotifier extends StateNotifier<BusinessState> {
   Future<String> queryAiCopilot(String query) async {
     try {
       final response = await _apiClient.post(
-        '/businesses/me/copilot-query',
-        data: {'query': query},
+        '/sponsors/copilot',
+        data: {'prompt': query, 'context': 'host'},
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        return response.data['response'] as String? ?? 'No response generated.';
+        return response.data['advice'] as String? ?? 'No response generated.';
       }
       return 'Unable to process query at this time.';
     } catch (e) {

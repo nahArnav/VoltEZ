@@ -1,4 +1,3 @@
-import 'dart:convert';
 import '../services/api_client.dart';
 
 class CopilotMessage {
@@ -25,11 +24,7 @@ class CopilotMessage {
       );
 }
 
-/// Copilot AI service using the centralized ApiClient with JWT auth.
-///
-/// NOTE: The backend endpoint for copilot queries does not exist yet.
-/// This service is wired up correctly so it will work once the endpoint
-/// is implemented on the backend.
+/// Copilot AI service using the live sponsor endpoint.
 class CopilotService {
   final _api = ApiClient.instance;
 
@@ -38,31 +33,26 @@ class CopilotService {
     List<Map<String, String>>? conversationHistory,
   }) async {
     final payload = <String, dynamic>{
-      'query': prompt,
-      if (conversationHistory != null && conversationHistory.isNotEmpty)
-        'history': conversationHistory,
+      'prompt': prompt,
+      'context': 'host',
     };
 
     try {
       final response = await _api.post(
-        '/businesses/me/copilot-query',
+        '/sponsors/copilot',
         data: payload,
       );
 
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data as Map<String, dynamic>;
-        return data['response'] ??
-            data['reply'] ??
-            data['message'] ??
+        return data['advice'] ??
             'No response received from AI.';
       } else {
         throw Exception(
             'Server error: (${response.statusCode})');
       }
-    } catch (e) {
-      // The copilot endpoint is not yet implemented on the backend.
-      // Return a helpful fallback message instead of crashing.
-      return 'The AI Copilot is not yet available. This feature is coming soon.';
+    } catch (_) {
+      return 'The AI Copilot is unavailable right now. Please try again shortly.';
     }
   }
 }

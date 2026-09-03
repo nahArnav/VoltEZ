@@ -167,7 +167,7 @@ class _AiCopilotSheetState extends State<AiCopilotSheet> {
               ),
               SizedBox(height: 2),
               Text(
-                "Powered by Gemini 2.5 Intelligence",
+                "Powered by Google Gemini",
                 style: TextStyle(color: _muted, fontSize: 10),
               ),
             ],
