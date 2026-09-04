@@ -830,7 +830,8 @@ class _BookingList extends StatelessWidget {
             status.toLowerCase() == 'checked_in';
         final isCheckedInOrCharging =
             status.toLowerCase() == 'checked_in' ||
-            status.toLowerCase() == 'charging';
+            status.toLowerCase() == 'charging' ||
+            booking['cash_otp_verified_at'] != null;
         final cancellable = const {
           'pending',
           'held',
@@ -921,7 +922,7 @@ class _BookingList extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
 
-                // Customer Info: Name & Contact Number
+                // Customer Info: Name & Contact Number (with OTP Verification)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
@@ -977,6 +978,72 @@ class _BookingList extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      if (isCheckedInOrCharging)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: AppColors.success.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 13,
+                                color: AppColors.success,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'VERIFIED',
+                                style: TextStyle(
+                                  color: AppColors.success,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (isConfirmed || cancellable)
+                        ElevatedButton.icon(
+                          onPressed: () => _showVerifyCashCode(
+                            context,
+                            provider,
+                            booking,
+                            userName: userName,
+                            userPhone: userPhone,
+                          ),
+                          icon: const Icon(Icons.verified_user_rounded, size: 14),
+                          label: const Text(
+                            'Verify OTP',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: AppColors.textOnPrimary,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -1015,108 +1082,48 @@ class _BookingList extends StatelessWidget {
                   ],
                 ),
 
-                // Actions: Verify OTP button + Cancel button
-                if (allowCancel) ...[
+                // Actions: Cancel button
+                if (allowCancel && cancellable) ...[
                   const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (cancellable)
-                        OutlinedButton.icon(
-                          onPressed: () => _confirmCancelBooking(
-                            context,
-                            provider,
-                            booking,
-                            chargerName:
-                                booking['charger_name']?.toString() ?? 'booking',
-                            userName: userName,
-                          ),
-                          icon: const Icon(
-                            Icons.cancel_outlined,
-                            size: 16,
+                      OutlinedButton.icon(
+                        onPressed: () => _confirmCancelBooking(
+                          context,
+                          provider,
+                          booking,
+                          chargerName:
+                              booking['charger_name']?.toString() ?? 'booking',
+                          userName: userName,
+                        ),
+                        icon: const Icon(
+                          Icons.cancel_outlined,
+                          size: 16,
+                          color: AppColors.error,
+                        ),
+                        label: const Text(
+                          'CANCEL',
+                          style: TextStyle(
                             color: AppColors.error,
-                          ),
-                          label: const Text(
-                            'CANCEL',
-                            style: TextStyle(
-                              color: AppColors.error,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                            side: BorderSide(
-                              color: AppColors.error.withValues(alpha: 0.45),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        )
-                      else
-                        const SizedBox.shrink(),
-
-                      if (isConfirmed || cancellable)
-                        ElevatedButton.icon(
-                          onPressed: () => _showVerifyCashCode(
-                            context,
-                            provider,
-                            booking,
-                            userName: userName,
-                            userPhone: userPhone,
-                          ),
-                          icon: const Icon(Icons.verified_user_rounded, size: 16),
-                          label: const Text('VERIFY OTP'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: AppColors.textOnPrimary,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        )
-                      else if (isCheckedInOrCharging)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: AppColors.success.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(
-                                Icons.check_circle_rounded,
-                                size: 14,
-                                color: AppColors.success,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'VERIFIED',
-                                style: TextStyle(
-                                  color: AppColors.success,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: BorderSide(
+                            color: AppColors.error.withValues(alpha: 0.45),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ],
