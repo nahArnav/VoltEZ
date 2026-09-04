@@ -337,9 +337,20 @@ class BusinessProvider extends ChangeNotifier {
 
   static String _message(Object error) {
     if (error is! DioException) return error.toString();
+    if (error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.sendTimeout) {
+      return 'Server response timed out. The backend may be spinning up; please pull to refresh.';
+    }
+    if (error.type == DioExceptionType.connectionError) {
+      return 'Could not connect to the VoltEZ server. Please check your internet connection.';
+    }
     final data = error.response?.data;
     if (data is Map && data['detail'] is String) {
       return data['detail'] as String;
+    }
+    if (data is Map && data['message'] is String) {
+      return data['message'] as String;
     }
     return error.error?.toString() ?? error.message ?? 'Request failed';
   }
