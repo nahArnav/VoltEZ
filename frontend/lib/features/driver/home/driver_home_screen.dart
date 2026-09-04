@@ -296,7 +296,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   GestureDetector(
                     onTap: () => context.push('/driver/vehicles'),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.onPrimary.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(14),
@@ -307,7 +310,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.edit_rounded, color: AppColors.onPrimary, size: 13),
+                          Icon(
+                            Icons.edit_rounded,
+                            color: AppColors.onPrimary,
+                            size: 13,
+                          ),
                           SizedBox(width: 4),
                           Text(
                             'Manage',
@@ -782,7 +789,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         Text(
                           'AI Copilot',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: AppColors.secondary,
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                           ),
@@ -819,7 +826,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         Text(
                           'Grid Tariffs',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: AppColors.secondary,
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                           ),
@@ -1191,7 +1198,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-
   Widget _profileOption(
     IconData icon,
     String title,
@@ -1498,7 +1504,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ),
                 const Divider(),
                 Expanded(
-                  child: loadError != null &&
+                  child:
+                      loadError != null &&
                           localAlerts.isEmpty &&
                           notifications.isEmpty
                       ? Center(
@@ -1536,7 +1543,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                 isThreeLine: true,
                               );
                             }
-                            final serverItem = notifications[i - localAlerts.length];
+                            final serverItem =
+                                notifications[i - localAlerts.length];
                             return ListTile(
                               contentPadding: EdgeInsets.zero,
                               leading: const Icon(
@@ -1787,7 +1795,10 @@ class _HomeInfoCard extends StatelessWidget {
             if (onTap != null) ...[
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(20),

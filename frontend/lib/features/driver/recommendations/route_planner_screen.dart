@@ -6,6 +6,7 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/providers/route_planner_provider.dart';
 import '../../../core/providers/booking_provider.dart';
+import '../../../core/utils/navigation_utils.dart';
 import '../../../shared/models/models.dart';
 import '../../../shared/widgets/widgets.dart';
 
@@ -43,13 +44,6 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen>
     super.dispose();
   }
 
-  // ─── Tag info (rank → label + color) ───
-  static const Map<int, (String, Color)> _rankMeta = {
-    0: ('Best Overall', AppColors.primary),
-    1: ('Fastest', AppColors.secondary),
-    2: ('Cheapest', AppColors.success),
-  };
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,7 +60,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen>
                     ? SliverToBoxAdapter(child: _buildLoadingState())
                     : planner.analysisError != null
                     ? SliverToBoxAdapter(child: _buildErrorState(planner))
-                    : planner.hasSearched && planner.recommendations.isEmpty
+                    : planner.hasSearched &&
+                          planner.recommendations.isEmpty &&
+                          planner.routePlan?.reachable != true
                     ? SliverToBoxAdapter(child: _buildNoResultsState(planner))
                     : planner.hasSearched
                     ? _buildResults(planner)
@@ -381,6 +377,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen>
 
     return SliverList(
       delegate: SliverChildListDelegate([
+        if (planner.routePlan != null) ...[
+          _buildOptimizedRouteCard(planner),
+          const SizedBox(height: 16),
+        ],
         // Summary header
         _buildSummaryHeader(planner),
         const SizedBox(height: 20),
@@ -392,31 +392,35 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen>
         ],
 
         // Top 3 label
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text('Top Recommendations', style: AppTypography.headlineMedium),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'TOP 3',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
+        if (planner.recommendations.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text('Top Recommendations', style: AppTypography.headlineMedium),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'TOP 3',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
+            ],
+          ),
+        if (planner.recommendations.isNotEmpty) const SizedBox(height: 16),
 
         // Recommendation cards
         ...List.generate(
@@ -426,7 +430,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen>
             child: _RecommendationCard(
               rec: planner.recommendations[i],
               index: i,
-              rankMeta: _rankMeta,
+              rankMeta: _rankMetaFor(planner.preference),
             ),
           ),
         ),
@@ -434,10 +438,157 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen>
     );
   }
 
+  Map<int, (String, Color)> _rankMetaFor(RecommendationPreference preference) {
+    final selected = switch (preference) {
+      RecommendationPreference.fastest => ('Fastest pick', AppColors.secondary),
+      RecommendationPreference.cheapest => ('Cheapest pick', AppColors.success),
+      RecommendationPreference.reliable => ('Reliable pick', AppColors.warning),
+      RecommendationPreference.balanced => ('Balanced pick', AppColors.primary),
+    };
+    return {
+      0: selected,
+      1: ('Alternative', AppColors.secondary),
+      2: ('Alternative', AppColors.textMuted),
+    };
+  }
+
+  Widget _buildOptimizedRouteCard(RoutePlannerProvider planner) {
+    final plan = planner.routePlan!;
+    final label = '${plan.mode[0].toUpperCase()}${plan.mode.substring(1)}';
+    final usesSyntheticFallback = plan.modelSources.values.any(
+      (source) => source.contains('synthetic'),
+    );
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: (plan.reachable ? AppColors.secondary : AppColors.error)
+              .withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                plan.reachable ? Icons.alt_route_rounded : Icons.route_outlined,
+                color: plan.reachable ? AppColors.secondary : AppColors.error,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$label A* route',
+                  style: AppTypography.headlineSmall.copyWith(
+                    color: plan.reachable
+                        ? AppColors.secondary
+                        : AppColors.error,
+                  ),
+                ),
+              ),
+              Text(
+                plan.navigationProvider == 'google_routes'
+                    ? 'LIVE TRAFFIC'
+                    : 'ESTIMATED',
+                style: AppTypography.labelSmall.copyWith(
+                  color: plan.navigationProvider == 'google_routes'
+                      ? AppColors.success
+                      : AppColors.warning,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (!plan.reachable)
+            Text(
+              'No battery-feasible route was found with compatible chargers in the current corridor.',
+              style: AppTypography.bodySmall.copyWith(color: AppColors.error),
+            )
+          else ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _summaryChip(
+                  Icons.schedule_rounded,
+                  '${plan.totalEtaMinutes.ceil()} min ETA',
+                  AppColors.secondary,
+                ),
+                _summaryChip(
+                  Icons.route_rounded,
+                  '${plan.distanceKm.toStringAsFixed(1)} km',
+                  AppColors.primary,
+                ),
+                _summaryChip(
+                  Icons.ev_station_rounded,
+                  '${plan.waypoints.length} charging stop${plan.waypoints.length == 1 ? '' : 's'}',
+                  AppColors.warning,
+                ),
+                if (plan.requiresCharging)
+                  _summaryChip(
+                    Icons.currency_rupee,
+                    '₹${plan.estimatedCost.round()}',
+                    AppColors.success,
+                  ),
+                if (plan.requiresCharging)
+                  _summaryChip(
+                    Icons.hourglass_bottom_rounded,
+                    '${plan.waitingMinutes.ceil()} min wait',
+                    AppColors.warning,
+                  ),
+                if (plan.requiresCharging)
+                  _summaryChip(
+                    Icons.verified_rounded,
+                    '${(plan.reliabilityProbability * 100).round()}% reliable',
+                    AppColors.success,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              plan.requiresCharging
+                  ? 'Stops: ${plan.waypoints.map((point) => point.name).join(' → ')}'
+                  : 'Your current charge can reach the destination while keeping the selected reserve.',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            if (usesSyntheticFallback) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Waiting and reliability use synthetic-data fallbacks until their trained artifacts are packaged.',
+                style: AppTypography.labelSmall.copyWith(
+                  color: AppColors.warning,
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            PrimaryButton(
+              text: 'START NAVIGATION',
+              icon: Icons.navigation_rounded,
+              onPressed: () => NavigationUtils.openPlannedRoute(
+                originLatitude: planner.originLat!,
+                originLongitude: planner.originLng!,
+                destinationLatitude: planner.destinationLat!,
+                destinationLongitude: planner.destinationLng!,
+                waypoints: plan.waypoints
+                    .map((point) => (point.latitude, point.longitude))
+                    .toList(),
+                context: context,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ─── Summary Header ───
   Widget _buildSummaryHeader(RoutePlannerProvider planner) {
     final vehicle = planner.selectedVehicle;
-    final neededKwh = vehicle != null
+    final usableKwh = vehicle != null
         ? vehicle.batteryCapacityKwh *
               (planner.currentSOC - planner.reserveSOC) /
               100
@@ -485,7 +636,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen>
               ),
               _summaryChip(
                 Icons.bolt_rounded,
-                '${neededKwh.round()} kWh needed',
+                '${usableKwh.round()} kWh usable',
                 AppColors.warning,
               ),
               _summaryChip(

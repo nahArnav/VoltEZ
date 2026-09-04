@@ -1,9 +1,11 @@
+import math
 from uuid import UUID
 
 from geoalchemy2 import Geometry as GeometryType
 from geoalchemy2.types import Geography
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.errors import NotFoundError
 from app.repositories.business import business_repo
@@ -38,9 +40,7 @@ class ChargerService:
         charger_data["location"] = f"SRID=4326;POINT({lon} {lat})"
 
         if (connector_type_id is None) != (port_number is None):
-            raise ValueError(
-                "connector_type_id and port_number must be provided together"
-            )
+            raise ValueError("connector_type_id and port_number must be provided together")
         if connector_type_id is not None:
             # A port is useful only when the referenced connector is present;
             # the foreign-key error is converted into a clean validation error.
@@ -125,6 +125,54 @@ class ChargerService:
             charger.longitude = lng
             chargers.append(charger)
 
+        return chargers
+
+    @staticmethod
+    async def get_route_candidate_chargers(
+        db: AsyncSession,
+        *,
+        origin_latitude: float,
+        origin_longitude: float,
+        destination_latitude: float,
+        destination_longitude: float,
+        corridor_meters: float = 10000.0,
+        limit: int = 128,
+    ) -> list[Charger]:
+        """Fetch chargers in the route bounding corridor before A* filtering.
+
+        The database query uses the spatial index-friendly bounding envelope;
+        the recommendation service then applies the finer polyline-distance
+        filter. This scales better than loading every station and fixes the old
+        origin-only radius search for location-to-location trips.
+        """
+        corridor_km = min(max(corridor_meters / 1000.0, 2.0), 25.0)
+        middle_latitude = (origin_latitude + destination_latitude) / 2.0
+        latitude_padding = corridor_km / 110.574
+        longitude_scale = max(111.320 * math.cos(math.radians(middle_latitude)), 20.0)
+        longitude_padding = corridor_km / longitude_scale
+        envelope = func.ST_MakeEnvelope(
+            min(origin_longitude, destination_longitude) - longitude_padding,
+            min(origin_latitude, destination_latitude) - latitude_padding,
+            max(origin_longitude, destination_longitude) + longitude_padding,
+            max(origin_latitude, destination_latitude) + latitude_padding,
+            4326,
+        )
+        query = (
+            select(
+                Charger,
+                func.ST_Y(Charger.location.cast(GeometryType)).label("latitude"),
+                func.ST_X(Charger.location.cast(GeometryType)).label("longitude"),
+            )
+            .options(selectinload(Charger.ports))
+            .where(func.ST_Intersects(Charger.location, envelope))
+            .limit(min(max(limit, 1), 500))
+        )
+        rows = (await db.execute(query)).all()
+        chargers: list[Charger] = []
+        for charger, latitude, longitude in rows:
+            charger.latitude = latitude
+            charger.longitude = longitude
+            chargers.append(charger)
         return chargers
 
 

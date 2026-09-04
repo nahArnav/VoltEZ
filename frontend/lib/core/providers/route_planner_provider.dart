@@ -60,6 +60,9 @@ class RoutePlannerProvider extends ChangeNotifier {
   double? _routeDistanceKm;
   int? _routeDurationMinutes;
   bool _routeMetricsLoading = false;
+  String? _routePolyline;
+  String _routeProviderStatus = 'estimated';
+  OptimizedRoutePlan? _routePlan;
 
   Timer? _originSearchTimer;
   Timer? _destinationSearchTimer;
@@ -90,6 +93,9 @@ class RoutePlannerProvider extends ChangeNotifier {
   double? get routeDistanceKm => _routeDistanceKm;
   int? get routeDurationMinutes => _routeDurationMinutes;
   bool get routeMetricsLoading => _routeMetricsLoading;
+  String? get routePolyline => _routePolyline;
+  String get routeProviderStatus => _routeProviderStatus;
+  OptimizedRoutePlan? get routePlan => _routePlan;
   List<LocationSuggestion> get originSuggestions => _originSuggestions;
   List<LocationSuggestion> get destinationSuggestions =>
       _destinationSuggestions;
@@ -393,6 +399,7 @@ class RoutePlannerProvider extends ChangeNotifier {
     _hasSearched = false;
     _analysisError = null;
     _recommendations = [];
+    _routePlan = null;
     notifyListeners();
 
     try {
@@ -414,9 +421,18 @@ class RoutePlannerProvider extends ChangeNotifier {
         vehicleId: _selectedVehicle!.id,
         routeDistanceKm: _routeDistanceKm,
         routeDurationMinutes: _routeDurationMinutes,
+        routePolyline: _routePolyline,
       );
 
-      final results = await _api.getRecommendations(request);
+      final payload = await _api.getRecommendations(request);
+      final results = payload.recommendations;
+      _routePlan = payload.routePlan;
+      if (_routePlan != null) {
+        _routeDistanceKm = _routePlan!.distanceKm;
+        _routeDurationMinutes = _routePlan!.totalEtaMinutes.ceil();
+        _routePolyline = _routePlan!.polyline;
+        _routeProviderStatus = _routePlan!.navigationProvider;
+      }
 
       _recommendations = results
           .map(
@@ -433,6 +449,11 @@ class RoutePlannerProvider extends ChangeNotifier {
               reliabilityScore: r.reliabilityScore,
               connectorCompatible: r.connectorCompatible,
               factors: r.factors,
+              probabilityUnavailable: r.probabilityUnavailable,
+              predictedDemand: r.predictedDemand,
+              routeFeasible: r.routeFeasible,
+              estimatedTotalTripMinutes: r.estimatedTotalTripMinutes,
+              modelSources: r.modelSources,
             ),
           )
           .toList();
@@ -448,6 +469,9 @@ class RoutePlannerProvider extends ChangeNotifier {
   void _clearRouteMetrics() {
     _routeDistanceKm = null;
     _routeDurationMinutes = null;
+    _routePolyline = null;
+    _routeProviderStatus = 'estimated';
+    _routePlan = null;
   }
 
   /// Ask the backend for a driving route before ranking charging stops. The
@@ -478,12 +502,16 @@ class RoutePlannerProvider extends ChangeNotifier {
         if (duration is num) {
           _routeDurationMinutes = (duration.toDouble() / 60).ceil();
         }
+        _routePolyline = data['polyline'] as String?;
+        _routeProviderStatus = data['status'] as String? ?? 'estimated';
       }
     } catch (_) {
       // Recommendation ranking still works using the backend's documented
       // road-distance fallback when the route provider is temporarily down.
       _routeDistanceKm = null;
       _routeDurationMinutes = null;
+      _routePolyline = null;
+      _routeProviderStatus = 'estimated';
     } finally {
       _routeMetricsLoading = false;
       notifyListeners();
@@ -508,6 +536,11 @@ class RoutePlannerProvider extends ChangeNotifier {
     _isAnalyzing = false;
     _hasSearched = false;
     _analysisError = null;
+    _routeDistanceKm = null;
+    _routeDurationMinutes = null;
+    _routePolyline = null;
+    _routeProviderStatus = 'estimated';
+    _routePlan = null;
     _originSuggestions = const [];
     _destinationSuggestions = const [];
     notifyListeners();

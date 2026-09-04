@@ -1,3 +1,4 @@
+from typing import Literal, cast
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -44,6 +45,11 @@ class RecommendationRequest(BaseModel):
         ge=0,
         description="Driving ETA for the direct origin-to-destination route",
     )
+    route_polyline: str | None = Field(
+        None,
+        max_length=100000,
+        description="Encoded direct-route polyline used for charger corridor filtering",
+    )
 
     @model_validator(mode="after")
     def validate_destination_pair(self):
@@ -51,7 +57,46 @@ class RecommendationRequest(BaseModel):
             raise ValueError(
                 "destination_latitude and destination_longitude must be provided together"
             )
+        if self.target_soc <= self.reserve_soc:
+            raise ValueError("target_soc must be greater than reserve_soc")
         return self
+
+    @property
+    def optimization_mode(self) -> Literal["fastest", "cheapest", "balanced", "reliable"]:
+        requested = str((self.preferences or {}).get("mode", "balanced")).lower()
+        if requested not in {"fastest", "cheapest", "balanced", "reliable"}:
+            requested = "balanced"
+        return cast(
+            Literal["fastest", "cheapest", "balanced", "reliable"],
+            requested,
+        )
+
+
+class RouteWaypoint(BaseModel):
+    charger_id: UUID
+    name: str
+    latitude: float
+    longitude: float
+
+
+class RoutePlan(BaseModel):
+    mode: Literal["fastest", "cheapest", "balanced", "reliable"]
+    algorithm: Literal["astar"] = "astar"
+    reachable: bool
+    requires_charging: bool
+    waypoints: list[RouteWaypoint] = Field(default_factory=list)
+    distance_km: float = Field(ge=0.0)
+    drive_minutes: float = Field(ge=0.0)
+    charging_minutes: float = Field(ge=0.0)
+    waiting_minutes: float = Field(ge=0.0)
+    total_eta_minutes: float = Field(ge=0.0)
+    estimated_cost: float = Field(ge=0.0)
+    reliability_probability: float = Field(ge=0.0, le=1.0)
+    availability_probability: float = Field(ge=0.0, le=1.0)
+    expected_demand: float = Field(ge=0.0)
+    polyline: str = ""
+    navigation_provider: Literal["google_routes", "estimated", "unavailable"]
+    model_sources: dict[str, str] = Field(default_factory=dict)
 
 
 class RecommendationResult(BaseModel):
@@ -78,7 +123,16 @@ class RecommendationResult(BaseModel):
         description="Additional distance versus the direct origin-to-destination route",
         ge=0.0,
     )
+    predicted_wait_minutes: float = Field(default=0.0, ge=0.0)
+    probability_unavailable: float = Field(default=0.0, ge=0.0, le=1.0)
+    predicted_demand: float = Field(default=0.0, ge=0.0)
+    predicted_reliability: float = Field(default=0.5, ge=0.0, le=1.0)
+    estimated_total_trip_minutes: float = Field(default=0.0, ge=0.0)
+    route_feasible: bool = True
+    optimization_mode: Literal["fastest", "cheapest", "balanced", "reliable"] = "balanced"
+    model_sources: dict[str, str] = Field(default_factory=dict)
 
 
 class RecommendationResponse(BaseModel):
     recommendations: list[RecommendationResult]
+    route_plan: RoutePlan | None = None

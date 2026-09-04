@@ -79,17 +79,14 @@ def load_model_bundle(
     manifest_path = model_dir / "manifest.json"
 
     if not deployment_manifest_path.exists():
-        raise FileNotFoundError(
-            f"Deployment manifest not found: {deployment_manifest_path}"
-        )
+        raise FileNotFoundError(f"Deployment manifest not found: {deployment_manifest_path}")
 
     deployment_manifest = json.loads(deployment_manifest_path.read_text("utf-8"))
 
     # --- Extract expected hash from deployment manifest ---
     # deployment_manifest uses either 'model_artifact_sha256' or 'artifact_sha256'
-    expected_hash = (
-        deployment_manifest.get("model_artifact_sha256")
-        or deployment_manifest.get("artifact_sha256")
+    expected_hash = deployment_manifest.get("model_artifact_sha256") or deployment_manifest.get(
+        "artifact_sha256"
     )
 
     if not expected_hash:
@@ -146,7 +143,14 @@ def load_model_bundle(
     if "model" in payload:
         model = payload["model"]
         features = payload.get("features", [])
-        feature_order = [str(f) for f in features] if features else []
+        if isinstance(features, dict):
+            feature_order = [
+                str(feature)
+                for group in ("numeric", "categorical")
+                for feature in features.get(group, [])
+            ]
+        else:
+            feature_order = [str(f) for f in features] if features else []
     elif "base_model" in payload:
         model = payload  # Return the full payload for availability predictor
         feature_spec = payload.get("feature_spec", {})

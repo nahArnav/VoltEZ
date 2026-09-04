@@ -859,6 +859,102 @@ class Notification {
 
 enum RecommendationPreference { fastest, cheapest, balanced, reliable }
 
+class RouteWaypoint {
+  final String chargerId;
+  final String name;
+  final double latitude;
+  final double longitude;
+
+  const RouteWaypoint({
+    required this.chargerId,
+    required this.name,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  factory RouteWaypoint.fromJson(Map<String, dynamic> json) => RouteWaypoint(
+    chargerId: json['charger_id']?.toString() ?? '',
+    name: json['name'] as String? ?? 'EV charger',
+    latitude: (json['latitude'] as num).toDouble(),
+    longitude: (json['longitude'] as num).toDouble(),
+  );
+}
+
+class OptimizedRoutePlan {
+  final String mode;
+  final String algorithm;
+  final bool reachable;
+  final bool requiresCharging;
+  final List<RouteWaypoint> waypoints;
+  final double distanceKm;
+  final double driveMinutes;
+  final double chargingMinutes;
+  final double waitingMinutes;
+  final double totalEtaMinutes;
+  final double estimatedCost;
+  final double reliabilityProbability;
+  final double availabilityProbability;
+  final double expectedDemand;
+  final String polyline;
+  final String navigationProvider;
+  final Map<String, String> modelSources;
+
+  const OptimizedRoutePlan({
+    required this.mode,
+    required this.algorithm,
+    required this.reachable,
+    required this.requiresCharging,
+    required this.waypoints,
+    required this.distanceKm,
+    required this.driveMinutes,
+    required this.chargingMinutes,
+    required this.waitingMinutes,
+    required this.totalEtaMinutes,
+    required this.estimatedCost,
+    required this.reliabilityProbability,
+    required this.availabilityProbability,
+    required this.expectedDemand,
+    required this.polyline,
+    required this.navigationProvider,
+    required this.modelSources,
+  });
+
+  factory OptimizedRoutePlan.fromJson(Map<String, dynamic> json) =>
+      OptimizedRoutePlan(
+        mode: json['mode'] as String? ?? 'balanced',
+        algorithm: json['algorithm'] as String? ?? 'astar',
+        reachable: json['reachable'] as bool? ?? false,
+        requiresCharging: json['requires_charging'] as bool? ?? false,
+        waypoints:
+            (json['waypoints'] as List<dynamic>?)
+                ?.map(
+                  (item) =>
+                      RouteWaypoint.fromJson(item as Map<String, dynamic>),
+                )
+                .toList() ??
+            const [],
+        distanceKm: (json['distance_km'] as num?)?.toDouble() ?? 0,
+        driveMinutes: (json['drive_minutes'] as num?)?.toDouble() ?? 0,
+        chargingMinutes: (json['charging_minutes'] as num?)?.toDouble() ?? 0,
+        waitingMinutes: (json['waiting_minutes'] as num?)?.toDouble() ?? 0,
+        totalEtaMinutes: (json['total_eta_minutes'] as num?)?.toDouble() ?? 0,
+        estimatedCost: (json['estimated_cost'] as num?)?.toDouble() ?? 0,
+        reliabilityProbability:
+            (json['reliability_probability'] as num?)?.toDouble() ?? 0,
+        availabilityProbability:
+            (json['availability_probability'] as num?)?.toDouble() ?? 0,
+        expectedDemand: (json['expected_demand'] as num?)?.toDouble() ?? 0,
+        polyline: json['polyline'] as String? ?? '',
+        navigationProvider:
+            json['navigation_provider'] as String? ?? 'unavailable',
+        modelSources:
+            (json['model_sources'] as Map?)?.map(
+              (key, value) => MapEntry(key.toString(), value.toString()),
+            ) ??
+            const {},
+      );
+}
+
 class RecommendationReason {
   const RecommendationReason({
     required this.icon,
@@ -885,6 +981,11 @@ class ChargerRecommendation {
   final double reliabilityScore;
   final bool connectorCompatible;
   final List<RecommendationReason> factors;
+  final double probabilityUnavailable;
+  final double predictedDemand;
+  final bool routeFeasible;
+  final double estimatedTotalTripMinutes;
+  final Map<String, String> modelSources;
 
   const ChargerRecommendation({
     required this.charger,
@@ -899,6 +1000,11 @@ class ChargerRecommendation {
     this.reliabilityScore = 0.0,
     this.connectorCompatible = true,
     this.factors = const [],
+    this.probabilityUnavailable = 0.0,
+    this.predictedDemand = 0.0,
+    this.routeFeasible = true,
+    this.estimatedTotalTripMinutes = 0.0,
+    this.modelSources = const {},
   });
 }
 

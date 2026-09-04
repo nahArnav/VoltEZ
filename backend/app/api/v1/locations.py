@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.schemas.location import LocationSearchResult
+from app.services.driving_routes import compute_driving_route
 
 router = APIRouter(prefix="/locations", tags=["Location search"])
 
@@ -11,7 +12,6 @@ _NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 _USER_AGENT = "VoltEZ/1.0 (location-search; contact=voltez@example.invalid)"
 _PLACES_NEW_AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete"
 _PLACES_NEW_DETAILS_BASE_URL = "https://places.googleapis.com/v1/places"
-_ROUTES_COMPUTE_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 
 
 class RouteComputationResponse(BaseModel):
@@ -31,9 +31,7 @@ async def _search_google(query: str, limit: int) -> list[LocationSearchResult]:
     if not key:
         return []
 
-    async with httpx.AsyncClient(
-        timeout=4.0, headers={"User-Agent": _USER_AGENT}
-    ) as client:
+    async with httpx.AsyncClient(timeout=4.0, headers={"User-Agent": _USER_AGENT}) as client:
         # 1. Places API (New) Autocomplete
         autocomplete = await client.post(
             _PLACES_NEW_AUTOCOMPLETE_URL,
@@ -99,17 +97,22 @@ async def _search_google(query: str, limit: int) -> list[LocationSearchResult]:
 
 import re
 
+
 def _clean_display_name(raw_name: str) -> str:
     if not raw_name:
         return ""
     # Strip leading Plus Code (e.g. "FV38+53H, Katraj, Pune..." -> "Katraj, Pune...")
-    cleaned = re.sub(r'^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}\s*,\s*', '', raw_name, flags=re.IGNORECASE).strip()
-    parts = [p.strip() for p in cleaned.split(',') if p.strip()]
+    cleaned = re.sub(
+        r"^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}\s*,\s*", "", raw_name, flags=re.IGNORECASE
+    ).strip()
+    parts = [p.strip() for p in cleaned.split(",") if p.strip()]
     seen = set()
     deduped = []
     for part in parts:
         lower = part.lower()
-        if lower not in seen and not re.match(r'^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}$', part, re.IGNORECASE):
+        if lower not in seen and not re.match(
+            r"^[A-Z0-9]{2,8}\+[A-Z0-9]{2,4}$", part, re.IGNORECASE
+        ):
             seen.add(lower)
             deduped.append(part)
     return ", ".join(deduped) if deduped else raw_name
@@ -172,7 +175,9 @@ async def search_locations(
                     latitude=float(item["lat"]),
                     longitude=float(item["lon"]),
                     place_type=item.get("type"),
-                    importance=float(item["importance"]) if item.get("importance") is not None else None,
+                    importance=float(item["importance"])
+                    if item.get("importance") is not None
+                    else None,
                 )
             )
         except (KeyError, TypeError, ValueError):
@@ -188,54 +193,13 @@ async def compute_route(
     dest_lng: float = Query(...),
 ):
     """Compute live driving route, distance, and duration using Google Routes API."""
-    key = settings.GOOGLE_MAPS_API_KEY.strip()
-    if key:
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.post(
-                    _ROUTES_COMPUTE_URL,
-                    headers={
-                        "X-Goog-Api-Key": key,
-                        "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "origin": {"location": {"latLng": {"latitude": origin_lat, "longitude": origin_lng}}},
-                        "destination": {"location": {"latLng": {"latitude": dest_lat, "longitude": dest_lng}}},
-                        "travelMode": "DRIVE",
-                        "routingPreference": "TRAFFIC_AWARE",
-                    },
-                )
-                if resp.status_code == 200:
-                    payload = resp.json()
-                    routes = payload.get("routes") or []
-                    if routes:
-                        r0 = routes[0]
-                        duration_str = r0.get("duration", "0s").replace("s", "")
-                        duration_sec = int(duration_str) if duration_str.isdigit() else 0
-                        return RouteComputationResponse(
-                            distance_meters=int(r0.get("distanceMeters", 0)),
-                            duration_seconds=duration_sec,
-                            polyline=(r0.get("polyline") or {}).get("encodedPolyline", ""),
-                            status="ok",
-                        )
-        except Exception:
-            pass
-
-    # Fallback to Haversine / straight-line estimation
-    import math
-
-    lat1, lon1, lat2, lon2 = map(math.radians, [origin_lat, origin_lng, dest_lat, dest_lng])
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-    c = 2 * math.asin(math.sqrt(a))
-    dist_meters = int(6371000 * c * 1.3)  # 1.3x road winding factor
-    duration_sec = int(dist_meters / 8.33)  # ~30 km/h avg city speed
-    return RouteComputationResponse(
-        distance_meters=dist_meters,
-        duration_seconds=duration_sec,
-        polyline="",
-        status="estimated",
+    route = await compute_driving_route(
+        (origin_lat, origin_lng),
+        (dest_lat, dest_lng),
     )
-
+    return RouteComputationResponse(
+        distance_meters=route.distance_meters,
+        duration_seconds=route.duration_seconds,
+        polyline=route.polyline,
+        status=route.status,
+    )

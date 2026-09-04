@@ -39,6 +39,8 @@ async def lifespan(app: FastAPI):
 
     demand_bundle = None
     availability_bundle = None
+    waiting_bundle = None
+    reliability_bundle = None
 
     try:
         demand_dir = models_dir / "demand" / "voltez-demand-60m-pune-v1"
@@ -64,6 +66,28 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("[ML] Failed to load availability model: %s", e)
 
+    def load_optional_bundle(model_family: str):
+        family_dir = models_dir / model_family
+        if not family_dir.exists():
+            logger.warning("[ML] No packaged %s model; calibrated fallback enabled.", model_family)
+            return None
+        candidates = sorted(
+            path for path in family_dir.iterdir() if (path / "deployment_manifest.json").exists()
+        )
+        if not candidates:
+            logger.warning(
+                "[ML] No deployable %s bundle; calibrated fallback enabled.", model_family
+            )
+            return None
+        try:
+            return load_model_bundle(candidates[-1], strict_hash=True)
+        except Exception as exc:
+            logger.error("[ML] Failed to load %s model: %s", model_family, exc)
+            return None
+
+    waiting_bundle = load_optional_bundle("waiting_time")
+    reliability_bundle = load_optional_bundle("reliability")
+
     # Wire loaded bundles into the MLAdapter singleton
     from app.ml.adapters import ml_adapter
 
@@ -71,10 +95,14 @@ async def lifespan(app: FastAPI):
         ml_adapter.load_demand_model(demand_bundle)
     if availability_bundle is not None:
         ml_adapter.load_availability_model(availability_bundle)
+    ml_adapter.load_waiting_time_model(waiting_bundle)
+    ml_adapter.load_reliability_model(reliability_bundle)
 
     # Store bundles on app.state for access by health endpoints
     app.state.demand_bundle = demand_bundle
     app.state.availability_bundle = availability_bundle
+    app.state.waiting_bundle = waiting_bundle
+    app.state.reliability_bundle = reliability_bundle
     # Both core models are required for a production-ready instance. Individual
     # predictors still retain their documented heuristic fallback when a model
     # is unavailable in development, but readiness must fail closed so a
@@ -91,13 +119,14 @@ async def lifespan(app: FastAPI):
     logger.info("Disconnecting from Redis...")
     await app.state.redis.close()
 
+
 def create_app() -> FastAPI:
     # 1. Application Factory setup
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
-        lifespan=lifespan  # <-- 🆕 ADD THIS LINE
+        lifespan=lifespan,  # <-- 🆕 ADD THIS LINE
     )
 
     # 2. CORS Middleware (Allows your frontend teammate to make requests without getting blocked)
@@ -132,7 +161,7 @@ def create_app() -> FastAPI:
                 "endpoint": request.url.path,
                 "status_code": response.status_code,
                 "latency": f"{process_time:.4f}s",
-            }
+            },
         )
 
         response.headers["X-Request-ID"] = request_id
@@ -143,6 +172,7 @@ def create_app() -> FastAPI:
 
     # 5b. Mount /api/ai alias for direct compatibility with external integrations
     from app.api.v1.ai import router as direct_ai_router
+
     app.include_router(direct_ai_router, prefix="/api")
 
     # 6. System deployment endpoints
@@ -191,6 +221,8 @@ def create_app() -> FastAPI:
 
         demand_bundle = getattr(request.app.state, "demand_bundle", None)
         avail_bundle = getattr(request.app.state, "availability_bundle", None)
+        waiting_bundle = getattr(request.app.state, "waiting_bundle", None)
+        reliability_bundle = getattr(request.app.state, "reliability_bundle", None)
         checks["ml"] = bool(getattr(request.app.state, "ml_ready", False))
         is_ready = all(value is True for value in checks.values())
         payload = {
@@ -212,6 +244,18 @@ def create_app() -> FastAPI:
                     "stage": avail_bundle.stage if avail_bundle else None,
                     "features": avail_bundle.feature_count if avail_bundle else 0,
                     "hash_prefix": avail_bundle.artifact_hash[:16] if avail_bundle else None,
+                },
+                "waiting_time": {
+                    "loaded": waiting_bundle is not None,
+                    "model_id": waiting_bundle.model_id if waiting_bundle else None,
+                    "source": "artifact" if waiting_bundle else "synthetic-calibrated-fallback",
+                },
+                "reliability": {
+                    "loaded": reliability_bundle is not None,
+                    "model_id": reliability_bundle.model_id if reliability_bundle else None,
+                    "source": (
+                        "artifact" if reliability_bundle else "synthetic-calibrated-fallback"
+                    ),
                 },
             },
         }

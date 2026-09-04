@@ -229,6 +229,7 @@ class ApiService {
     required String preference,
     double? routeDistanceKm,
     int? routeDurationMinutes,
+    String? routePolyline,
     double radiusMeters = 25000,
   }) => _dio.post(
     '/recommendations/',
@@ -248,6 +249,7 @@ class ApiService {
       if (routeDistanceKm != null) 'route_distance_km': routeDistanceKm,
       if (routeDurationMinutes != null)
         'route_duration_minutes': routeDurationMinutes,
+      if (routePolyline != null) 'route_polyline': routePolyline,
     },
   );
 
