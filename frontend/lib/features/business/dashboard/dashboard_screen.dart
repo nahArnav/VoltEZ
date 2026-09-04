@@ -979,6 +979,27 @@ class _BookingList extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      if (cancellable) ...[
+                        IconButton(
+                          tooltip: 'Cancel booking',
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4),
+                          icon: const Icon(
+                            Icons.cancel_outlined,
+                            size: 18,
+                            color: AppColors.error,
+                          ),
+                          onPressed: () => _confirmCancelBooking(
+                            context,
+                            provider,
+                            booking,
+                            chargerName:
+                                booking['charger_name']?.toString() ?? 'booking',
+                            userName: userName,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       if (isCheckedInOrCharging)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -1150,11 +1171,30 @@ class _BookingList extends StatelessWidget {
           children: [
             Icon(Icons.cancel_outlined, color: AppColors.error),
             SizedBox(width: 8),
-            Text('Cancel this booking?'),
+            Text('Cancel Reservation'),
           ],
         ),
-        content: Text(
-          'Cancel $chargerName for $userName?\n\nThe reserved slot will be released and offered to other drivers.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to cancel the booking for $userName?',
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Station: $chargerName\n\nCancelling will immediately release this slot and make it available for other drivers.',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -1164,7 +1204,7 @@ class _BookingList extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('CANCEL BOOKING'),
+            child: const Text('YES, CANCEL'),
           ),
         ],
       ),
