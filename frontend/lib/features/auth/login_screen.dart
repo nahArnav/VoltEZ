@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/auth/auth_provider.dart';
-import '../../core/network/server_config.dart';
-import '../../core/widgets/server_config_dialog.dart';
 import '../../core/theme/colors.dart';
 import '../../core/theme/typography.dart';
 import '../../shared/widgets/primary_button.dart';
@@ -55,34 +53,17 @@ class _RoleSelect extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 10),
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'VOLTEZ',
                     style: TextStyle(
-                    color: Color(0xFF176B4D),
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -1.5,
+                      color: Color(0xFF176B4D),
+                      fontSize: 42,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.5,
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Server Configuration',
-                    icon: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        Icons.dns_rounded,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
-                    ),
-                    onPressed: () => showServerConfigModal(context),
                   ),
                 ],
               ),
@@ -116,53 +97,6 @@ class _RoleSelect extends StatelessWidget {
                 detail: 'Manage chargers, fleet and insights.',
                 color: AppColors.success,
                 onTap: () => onSelect(AccountRole.owner),
-              ),
-              const SizedBox(height: 24),
-              Center(
-                child: InkWell(
-                  onTap: () => showServerConfigModal(context),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.dns_outlined,
-                          size: 14,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Consumer<ServerConfig>(
-                          builder: (_, cfg, _) => Text(
-                            cfg.activeUrl
-                                .replaceFirst('http://', '')
-                                .replaceFirst('/api/v1', ''),
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(
-                          Icons.tune_rounded,
-                          size: 14,
-                          color: AppColors.textMuted,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
               ),
               const SizedBox(height: 12),
             ],
@@ -298,7 +232,7 @@ class _AuthPanelState extends State<_AuthPanel> {
               const SizedBox(height: 2),
               Text(
                 isConnectionError
-                    ? 'Cannot reach the API. For USB, launch scripts/run_phone.sh so ADB reverse forwarding is configured; otherwise enter your Mac LAN IP in Server settings.'
+                    ? 'Cannot reach the VoltEZ server. Please check your network connection and try again.'
                     : err,
                 style: const TextStyle(
                   color: AppColors.textSecondary,
@@ -306,11 +240,6 @@ class _AuthPanelState extends State<_AuthPanel> {
                 ),
               ),
             ],
-          ),
-          action: SnackBarAction(
-            label: 'SERVER ⚙️',
-            textColor: AppColors.primary,
-            onPressed: () => showServerConfigModal(context),
           ),
         ),
       );
@@ -358,23 +287,6 @@ class _AuthPanelState extends State<_AuthPanel> {
                       Icons.arrow_back_rounded,
                       color: AppColors.textPrimary,
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Server Configuration',
-                    icon: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        Icons.dns_rounded,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
-                    ),
-                    onPressed: () => showServerConfigModal(context),
                   ),
                 ],
               ),
@@ -478,52 +390,6 @@ class _AuthPanelState extends State<_AuthPanel> {
                 ),
               ),
               const SizedBox(height: 14),
-              Center(
-                child: InkWell(
-                  onTap: () => showServerConfigModal(context),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.dns_outlined,
-                          size: 14,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Consumer<ServerConfig>(
-                          builder: (_, cfg, _) => Text(
-                            cfg.activeUrl
-                                .replaceFirst('http://', '')
-                                .replaceFirst('/api/v1', ''),
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(
-                          Icons.tune_rounded,
-                          size: 14,
-                          color: AppColors.textMuted,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 10),
               Center(
                 child: Text(
