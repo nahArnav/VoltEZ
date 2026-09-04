@@ -253,23 +253,55 @@ class BookingConfirmationScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Booking ID',
-                              style: AppTypography.bodySmall),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color:
-                                  AppColors.surface,
-                              borderRadius:
-                                  BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              confirmed.bookingId,
-                              style: AppTypography.headlineSmall
-                                  .copyWith(
-                                fontSize: 13,
-                                fontFamily: 'monospace',
+                          Text('Booking ID', style: AppTypography.bodySmall),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: InkWell(
+                                onTap: () {
+                                  NavigationUtils.copyCode(
+                                    context,
+                                    confirmed.bookingId,
+                                    label: 'Booking ID',
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: AppColors.border.withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          confirmed.bookingId,
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                          style: AppTypography.headlineSmall.copyWith(
+                                            fontSize: 11,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(
+                                        Icons.copy_rounded,
+                                        size: 13,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),
