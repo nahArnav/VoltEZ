@@ -744,7 +744,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     const Text(
                       'AI Copilot & Tariff Intelligence',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
                       ),
@@ -849,224 +849,453 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
     var advice = '';
     var loading = false;
+    var adviceIsError = false;
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
-            return AlertDialog(
-              scrollable: true,
-              backgroundColor: AppColors.card,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                ),
-              ),
-              title: Row(
-                children: const [
-                  Icon(Icons.auto_awesome_rounded, color: AppColors.primary),
-                  SizedBox(width: 10),
-                  Expanded(child: Text('VoltEZ AI Copilot')),
-                ],
-              ),
-
-              content: SizedBox(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: promptCtrl,
-                      minLines: 1,
-                      maxLines: 3,
-                      style: AppTypography.bodyMedium,
-                      decoration: InputDecoration(
-                        labelText: 'Ask Gemini Copilot',
-                        hintText: 'e.g. Where can I find CCS2 50kW chargers?',
-                        filled: true,
-                        fillColor: AppColors.surface,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+            return _buildSponsorDialog(
+              context: context,
+              icon: Icons.auto_awesome_rounded,
+              accentColor: AppColors.primary,
+              title: 'VoltEZ AI Copilot',
+              subtitle: 'Charging guidance powered by Gemini',
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    key: const Key('gemini-prompt-field'),
+                    controller: promptCtrl,
+                    minLines: 3,
+                    maxLines: 5,
+                    textCapitalization: TextCapitalization.sentences,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Ask Gemini Copilot',
+                      labelStyle: AppTypography.bodySmall.copyWith(
+                        color: AppColors.secondary,
+                      ),
+                      hintText: 'e.g. Where can I find CCS2 50kW chargers?',
+                      filled: true,
+                      fillColor: AppColors.surface,
+                    ),
+                  ),
+                  if (loading) ...[
+                    const SizedBox(height: 16),
+                    _buildDialogStatus(
+                      accentColor: AppColors.primary,
+                      title: 'Getting live advice…',
+                      loading: true,
+                    ),
+                  ] else if (advice.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _buildDialogStatus(
+                      accentColor: adviceIsError
+                          ? AppColors.error
+                          : AppColors.primary,
+                      title: adviceIsError
+                          ? 'Copilot unavailable'
+                          : 'Gemini response',
+                      message: advice,
+                      isError: adviceIsError,
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Ask about compatible chargers, charging stops, or trip preparation.',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textMuted,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    if (loading)
-                      const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primary,
-                        ),
-                      )
-                    else if (advice.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
+                  ],
+                ],
+              ),
+              footer: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        minimumSize: const Size(0, 48),
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Text(
-                          advice,
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: Colors.white,
-                            height: 1.4,
-                          ),
                         ),
                       ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('CLOSE'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.textOnPrimary,
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('CLOSE'),
+                    ),
                   ),
-                  onPressed: () async {
-                    setState(() => loading = true);
-                    try {
-                      final planner = context.read<RoutePlannerProvider>();
-                      final vehicle = planner.selectedVehicle;
-                      final res = await ApiService().askSponsorCopilot({
-                        'prompt': promptCtrl.text.trim(),
-                        // Keep the copilot grounded in route-planner state,
-                        // rather than sending a demo battery percentage.
-                        'battery_level': planner.currentSOC.round(),
-                        if (vehicle != null) ...{
-                          'vehicle_model': vehicle.displayName,
-                          'connector_type': vehicle.primaryConnector,
-                        },
-                      });
-                      final data = res.data as Map<String, dynamic>;
-                      setState(() {
-                        advice = data['advice']?.toString() ?? 'Advice ready.';
-                        loading = false;
-                      });
-                    } catch (e) {
-                      setState(() {
-                        advice =
-                            'Live Gemini advice is unavailable right now. Configure GEMINI_API_KEY on the backend or try again later.';
-                        loading = false;
-                      });
-                    }
-                  },
-                  child: const Text('ASK AI'),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      key: const Key('ask-ai-button'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.textOnPrimary,
+                        minimumSize: const Size(0, 48),
+                      ),
+                      onPressed: loading
+                          ? null
+                          : () async {
+                              final prompt = promptCtrl.text.trim();
+                              if (prompt.length < 2) {
+                                setState(() {
+                                  advice = 'Enter a question before asking AI.';
+                                  adviceIsError = true;
+                                });
+                                return;
+                              }
+
+                              setState(() {
+                                loading = true;
+                                advice = '';
+                                adviceIsError = false;
+                              });
+                              try {
+                                final planner = context
+                                    .read<RoutePlannerProvider>();
+                                final vehicle = planner.selectedVehicle;
+                                final res = await ApiService().askSponsorCopilot({
+                                  'prompt': prompt,
+                                  // Keep the copilot grounded in route-planner
+                                  // state instead of using demo vehicle data.
+                                  'battery_level': planner.currentSOC.round(),
+                                  if (vehicle != null) ...{
+                                    'vehicle_model': vehicle.displayName,
+                                    'connector_type': vehicle.primaryConnector,
+                                  },
+                                });
+                                final data = res.data as Map<String, dynamic>;
+                                if (!context.mounted) return;
+                                setState(() {
+                                  advice =
+                                      data['advice']?.toString() ??
+                                      'Advice is unavailable right now.';
+                                  adviceIsError =
+                                      data['provider_status']?.toString() !=
+                                      'ok';
+                                  loading = false;
+                                });
+                              } catch (_) {
+                                if (!context.mounted) return;
+                                setState(() {
+                                  advice =
+                                      'Live Gemini advice is unavailable right now. Please try again shortly.';
+                                  adviceIsError = true;
+                                  loading = false;
+                                });
+                              }
+                            },
+                      child: loading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: AppColors.textOnPrimary,
+                              ),
+                            )
+                          : const Text('ASK AI'),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
       },
     );
+    promptCtrl.dispose();
   }
 
   Future<void> _showDiscomTariffDialog(BuildContext context) async {
-    var tariffs = <dynamic>[];
-    var loading = true;
-    var stateName = 'Maharashtra';
+    const stateName = 'Maharashtra';
+    final tariffRequest = ApiService().getSponsorTariffs(stateName).then((res) {
+      final data = res.data;
+      return data is Map<String, dynamic> ? data : <String, dynamic>{};
+    });
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            if (loading) {
-              ApiService()
-                  .getSponsorTariffs(stateName)
-                  .then((res) {
-                    final data = res.data as Map<String, dynamic>;
-                    setState(() {
-                      tariffs = data['results'] as List<dynamic>? ?? [];
-                      loading = false;
-                    });
-                  })
-                  .catchError((_) {
-                    setState(() {
-                      loading = false;
-                    });
-                  });
-            }
+        return _buildSponsorDialog(
+          context: dialogContext,
+          icon: Icons.insights_rounded,
+          accentColor: AppColors.secondary,
+          title: 'DISCOM Grid Tariffs',
+          subtitle: 'Live tariff sources for $stateName',
+          content: FutureBuilder<Map<String, dynamic>>(
+            future: tariffRequest,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return _buildDialogStatus(
+                  accentColor: AppColors.secondary,
+                  title: 'Checking live tariff sources…',
+                  loading: true,
+                );
+              }
 
-            return AlertDialog(
-              backgroundColor: AppColors.card,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: AppColors.secondary.withValues(alpha: 0.3),
-                ),
-              ),
-              title: Row(
-                children: const [
-                  Icon(Icons.insights_rounded, color: AppColors.secondary),
-                  SizedBox(width: 10),
-                  Expanded(child: Text('DISCOM Grid Tariffs')),
-                ],
-              ),
+              if (snapshot.hasError) {
+                return _buildDialogStatus(
+                  accentColor: AppColors.error,
+                  title: 'Tariffs unavailable',
+                  message:
+                      'Live tariff sources could not be loaded. Please try again shortly.',
+                  isError: true,
+                );
+              }
 
-              content: SizedBox(
-                width: double.maxFinite,
-                child: loading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.secondary,
-                        ),
-                      )
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
+              final data = snapshot.data ?? <String, dynamic>{};
+              final rawResults = data['results'];
+              final tariffs = rawResults is List ? rawResults : <dynamic>[];
+              final providerAvailable =
+                  data['provider_status']?.toString() == 'ok';
+
+              if (tariffs.isEmpty) {
+                return _buildDialogStatus(
+                  accentColor: AppColors.error,
+                  title: 'No live tariffs found',
+                  message: providerAvailable
+                      ? 'No current tariff sources were returned for $stateName.'
+                      : 'The live tariff provider is unavailable right now. Please try again shortly.',
+                  isError: true,
+                );
+              }
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Latest electricity-tariff references',
+                    style: AppTypography.labelLarge.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Verify the applicable DISCOM order before using a rate.',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ...tariffs.take(3).toList().asMap().entries.map((entry) {
+                    final rawItem = entry.value;
+                    final item = rawItem is Map<String, dynamic>
+                        ? rawItem
+                        : <String, dynamic>{};
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.borderLight),
+                      ),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Live Electricity Tariffs (Tavily Search Radar):',
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.textSecondary,
+                          Container(
+                            width: 28,
+                            height: 28,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${entry.key + 1}',
+                              style: AppTypography.labelMedium.copyWith(
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          if (tariffs.isEmpty)
-                            const Text(
-                              'No live tariff results are available. Configure TAVILY_API_KEY on the backend to enable this search.',
-                              style: TextStyle(color: AppColors.textSecondary),
-                            )
-                          else
-                            ...tariffs.take(3).map((t) {
-                              final item = t as Map<String, dynamic>;
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  item['title']?.toString() ?? '',
-                                  style: AppTypography.bodySmall.copyWith(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              );
-                            }),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              item['title']?.toString() ?? 'Tariff reference',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('DONE'),
+                    );
+                  }),
+                ],
+              );
+            },
+          ),
+          footer: Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              width: 124,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: AppColors.onSecondary,
+                  minimumSize: const Size(0, 48),
                 ),
-              ],
-            );
-          },
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('DONE'),
+              ),
+            ),
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildSponsorDialog({
+    required BuildContext context,
+    required IconData icon,
+    required Color accentColor,
+    required String title,
+    required String subtitle,
+    required Widget content,
+    required Widget footer,
+  }) {
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.82;
+
+    return Dialog(
+      backgroundColor: AppColors.card,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: accentColor.withValues(alpha: 0.28)),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 520, maxHeight: maxHeight),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: accentColor, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: AppTypography.headlineMedium.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: content,
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(padding: const EdgeInsets.all(16), child: footer),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogStatus({
+    required Color accentColor,
+    required String title,
+    String? message,
+    bool loading = false,
+    bool isError = false,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: isError ? 0.06 : 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accentColor.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (loading)
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: accentColor,
+              ),
+            )
+          else
+            Icon(
+              isError ? Icons.info_outline_rounded : Icons.auto_awesome_rounded,
+              color: accentColor,
+              size: 21,
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTypography.labelLarge.copyWith(
+                    color: isError ? AppColors.error : accentColor,
+                  ),
+                ),
+                if (message != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textPrimary,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

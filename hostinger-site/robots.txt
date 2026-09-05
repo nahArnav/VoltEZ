@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://voltez.arnavpatidar.com/sitemap.xml

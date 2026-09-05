@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
     <application
-        android:label="voltez_frontend"
+        android:label="VoltEZ"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
