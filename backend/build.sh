@@ -19,11 +19,4 @@ else
   pip install -r requirements.txt
 fi
 
-echo "🔄 Running Alembic database migrations..."
-if [ -n "$DATABASE_URL" ]; then
-  alembic upgrade head || echo "⚠️ Warning: Database migration failed, continuing startup..."
-else
-  echo "ℹ️ No DATABASE_URL provided at build time, migrations will run at startup."
-fi
-
 echo "✅ Build completed successfully!"

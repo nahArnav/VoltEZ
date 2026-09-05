@@ -4,6 +4,7 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from arq import create_pool
 from arq.connections import RedisSettings
 from fastapi import FastAPI, Request
@@ -27,6 +28,21 @@ async def lifespan(app: FastAPI):
     # --- Redis connection for booking holds and background jobs ---
     logger.info("Connecting to Redis for background tasks...")
     app.state.redis = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
+
+    # Reuse outbound TCP/TLS connections for Google, Gemini and Tavily calls.
+    # Creating a new HTTP client for every mobile request adds avoidable
+    # handshakes and is especially visible from a single-instance deployment.
+    app.state.http_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(12.0, connect=5.0, pool=2.0),
+        limits=httpx.Limits(
+            max_connections=40,
+            max_keepalive_connections=20,
+            keepalive_expiry=30.0,
+        ),
+        headers={
+            "User-Agent": "VoltEZ-Backend/1.0 (+https://voltez.arnavpatidar.com)",
+        },
+    )
 
     # --- Load ML models with SHA-256 hash verification ---
     from app.ml.model_loader import load_model_bundle
@@ -114,10 +130,13 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("[ML] One or more core models missing. Heuristic fallback remains enabled.")
 
-    yield
-
-    logger.info("Disconnecting from Redis...")
-    await app.state.redis.close()
+    try:
+        yield
+    finally:
+        logger.info("Closing backend connection pools...")
+        await app.state.redis.aclose()
+        await app.state.http_client.aclose()
+        await engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -205,19 +224,34 @@ def create_app() -> FastAPI:
                 raise RuntimeError("Redis pool is not initialized")
             await redis.ping()
 
+        async def probe_worker() -> None:
+            redis = getattr(request.app.state, "redis", None)
+            if redis is None:
+                raise RuntimeError("Redis pool is not initialized")
+            if not await redis.exists(settings.WORKER_HEALTH_CHECK_KEY):
+                raise RuntimeError("ARQ worker heartbeat is missing")
+
         # Keep the probe bounded: a failed dependency must produce a quick,
         # actionable 503 rather than tying up health-check workers.
-        checks: dict[str, bool] = {}
-        check_errors: dict[str, str] = {}
-        for name, probe in (("database", probe_database), ("redis", probe_redis)):
+        async def run_probe(name, probe):
             try:
                 await asyncio.wait_for(probe(), timeout=2.0)
             except Exception as exc:
-                checks[name] = False
-                check_errors[name] = str(exc)
                 logger.warning("Readiness check failed for %s: %s", name, exc)
-            else:
-                checks[name] = True
+                return name, False, str(exc)
+            return name, True, None
+
+        # Dependency failures should take at most the slowest probe timeout,
+        # not the sum of every timeout.
+        probes = [
+            run_probe("database", probe_database),
+            run_probe("redis", probe_redis),
+        ]
+        if settings.ENVIRONMENT.lower() == "production":
+            probes.append(run_probe("worker", probe_worker))
+        probe_results = await asyncio.gather(*probes)
+        checks = {name: healthy for name, healthy, _error in probe_results}
+        check_errors = {name: error for name, _healthy, error in probe_results if error is not None}
 
         demand_bundle = getattr(request.app.state, "demand_bundle", None)
         avail_bundle = getattr(request.app.state, "availability_bundle", None)

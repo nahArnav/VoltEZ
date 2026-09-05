@@ -1,18 +1,20 @@
 # ═════════════════════════════════════════════════════════════════════════════
-# Render Web Service Blueprint (100% Free Tier - No Credit Card Required)
+# Render Web Service Blueprint (1 CPU / 2 GB production service)
 # Docs: https://render.com/docs/blueprint-spec
 # ═════════════════════════════════════════════════════════════════════════════
 
 services:
   - type: web
-    name: voltez-api
+    name: VoltEZ
     runtime: python
+    region: singapore
+    branch: final-frontend
     buildCommand: bash build.sh
-
-    startCommand: cd backend && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    preDeployCommand: cd backend && alembic upgrade head
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /health/live
     autoDeploy: true
-    plan: free
+    plan: 1c-2g
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.3
@@ -26,6 +28,18 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
+      - key: DB_POOL_SIZE
+        value: 5
+      - key: DB_MAX_OVERFLOW
+        value: 5
+      - key: DB_POOL_RECYCLE_SECONDS
+        value: 240
+      - key: DB_POOL_TIMEOUT_SECONDS
+        value: 10
+      - key: DB_CONNECT_TIMEOUT_SECONDS
+        value: 10
+      - key: WORKER_HEALTH_CHECK_KEY
+        value: voltez:worker:health
       - key: SECRET_KEY
         generateValue: true
       - key: GEMINI_API_KEY

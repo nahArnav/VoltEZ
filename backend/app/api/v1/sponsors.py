@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
@@ -21,11 +21,16 @@ class TariffSearchResponse(BaseModel):
 
 @router.get("/tariffs", response_model=TariffSearchResponse)
 async def get_live_discom_tariffs(
+    request: Request,
     state: str = Query(default="Maharashtra", description="Indian State or DISCOM name"),
 ):
     """Fetch live EV charging electricity tariffs using Tavily search."""
     query = f"{state} EV charging station electricity tariff per kWh DISCOM regulatory order"
-    result = await search_tavily(query, max_results=4)
+    result = await search_tavily(
+        query,
+        max_results=4,
+        client=getattr(request.app.state, "http_client", None),
+    )
     if result.status == "ok":
         return TariffSearchResponse(
             query=query,
@@ -70,7 +75,7 @@ class CopilotResponse(BaseModel):
 
 
 @router.post("/copilot", response_model=CopilotResponse)
-async def ask_gemini_copilot(req: CopilotRequest):
+async def ask_gemini_copilot(req: CopilotRequest, request: Request):
     """Provide AI EV assistance or Host pricing advisory using Google Gemini."""
     system_ctx = (
         "You are VoltEZ EV Copilot, an AI assistant for electric vehicle drivers and private charger hosts in India. "
@@ -88,6 +93,7 @@ async def ask_gemini_copilot(req: CopilotRequest):
         user_prompt,
         max_output_tokens=300,
         temperature=0.2,
+        client=getattr(request.app.state, "http_client", None),
     )
     if result.text:
         return CopilotResponse(
