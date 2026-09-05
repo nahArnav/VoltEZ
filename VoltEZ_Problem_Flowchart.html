@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoltEZ — Problem Flowchart</title>
+<style>
+  :root {
+    --forest: #0d3b2a;
+    --forest-deep: #082a1e;
+    --forest-soft: #14563d;
+    --sage: #e8f0e4;
+    --sage-mid: #cfe0c8;
+    --cream: #f6f2e8;
+    --cream-deep: #ede5d2;
+    --blue: #1e5f8a;
+    --blue-soft: #e3eef6;
+    --amber: #c07a1e;
+    --amber-soft: #f9eeda;
+    --ink: #22332b;
+    --muted: #5d7268;
+    --white: #ffffff;
+    --radius: 18px;
+    --shadow: 0 10px 30px rgba(13, 59, 42, 0.10);
+    --shadow-lg: 0 18px 44px rgba(13, 59, 42, 0.16);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background:
+      radial-gradient(1200px 500px at 85% -10%, rgba(30, 95, 138, 0.08), transparent 60%),
+      radial-gradient(900px 500px at 0% 110%, rgba(20, 86, 61, 0.10), transparent 60%),
+      var(--cream);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 48px 20px 64px;
+  }
+
+  .flow {
+    max-width: 920px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ─── Header ─── */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-size: 13px;
+    color: var(--forest-soft);
+    margin-bottom: 26px;
+  }
+  .brand .bolt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--forest-soft), var(--forest-deep));
+    color: #dff3d2;
+    font-size: 16px;
+  }
+
+  /* ─── Title card ─── */
+  .title-card {
+    width: 100%;
+    background: linear-gradient(135deg, var(--forest) 0%, var(--forest-deep) 100%);
+    border-radius: 24px;
+    padding: 40px 44px;
+    color: var(--white);
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+  }
+  .title-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(320px 140px at 15% 0%, rgba(207, 224, 200, 0.16), transparent 70%),
+      radial-gradient(360px 160px at 90% 100%, rgba(30, 95, 138, 0.35), transparent 70%);
+  }
+  .title-card .kicker {
+    position: relative;
+    font-size: 12px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: #cfe0c8;
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+  .title-card h1 {
+    position: relative;
+    font-size: clamp(22px, 3.4vw, 30px);
+    font-weight: 800;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  .title-card .sub {
+    position: relative;
+    margin-top: 14px;
+    color: #dce9d6;
+    font-size: 15px;
+  }
+  .title-card .chips {
+    position: relative;
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .title-card .chip {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(4px);
+  }
+
+  /* ─── Arrows ─── */
+  .arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--forest-soft);
+    margin: 6px 0;
+  }
+  .arrow .shaft {
+    width: 3px;
+    height: 34px;
+    background: linear-gradient(to bottom, var(--forest-soft), var(--blue));
+    border-radius: 2px;
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  .arrow .head {
+    width: 0; height: 0;
+    border-left: 9px solid transparent;
+    border-right: 9px solid transparent;
+    border-top: 13px solid var(--blue);
+    margin-top: -1px;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.55; transform: scaleY(0.92); }
+    50%      { opacity: 1;    transform: scaleY(1); }
+  }
+
+  /* ─── Section label ─── */
+  .section-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.30em;
+    text-transform: uppercase;
+    color: var(--blue);
+    background: var(--blue-soft);
+    border: 1px solid #c9ddec;
+    padding: 7px 18px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-label .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--blue);
+  }
+  .section-label.amber {
+    color: #9a5f13;
+    background: var(--amber-soft);
+    border-color: #e8d3a8;
+  }
+  .section-label.amber .dot { background: var(--amber); }
+
+  /* ─── Card rows ─── */
+  .cards {
+    width: 100%;
+    display: grid;
+    gap: 16px;
+  }
+  .row-4 { grid-template-columns: repeat(4, 1fr); }
+  .row-3 { grid-template-columns: repeat(3, 1fr); }
+  .row-2 { grid-template-columns: repeat(2, 1fr); }
+
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 22px 20px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(13, 59, 42, 0.08);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+  }
+  .card .accent {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 5px;
+  }
+  .card.blue  .accent { background: linear-gradient(90deg, var(--blue), #4a8ab5); }
+  .card.sage  .accent { background: linear-gradient(90deg, var(--forest-soft), var(--sage-mid)); }
+  .card.amber .accent { background: linear-gradient(90deg, var(--amber), #d9a44f); }
+  .card.grey  .accent { background: linear-gradient(90deg, #7d8f86, #b7c4bd); }
+
+  .card .icon {
+    width: 46px; height: 46px;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: 14px;
+  }
+  .card.blue  .icon { background: var(--blue-soft); }
+  .card.sage  .icon { background: var(--sage); }
+  .card.amber .icon { background: var(--amber-soft); }
+  .card.grey  .icon { background: #eef1ef; }
+
+  .card h3 {
+    font-size: 15.5px;
+    font-weight: 700;
+    line-height: 1.35;
+    margin-bottom: 7px;
+    color: var(--ink);
+  }
+  .card p {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+
+  /* ─── Wide statement card ─── */
+  .statement {
+    width: 100%;
+    max-width: 640px;
+    background: linear-gradient(135deg, #ffffff 0%, #f4f8f1 100%);
+    border: 1.5px solid var(--sage-mid);
+    border-radius: var(--radius);
+    padding: 22px 28px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: center;
+  }
+  .statement .arr { font-size: 22px; color: var(--blue); font-weight: 800; }
+  .statement strong {
+    font-size: 16.5px;
+    color: var(--forest-deep);
+    line-height: 1.45;
+    font-weight: 800;
+  }
+  .statement em {
+    font-style: normal;
+    color: var(--forest-soft);
+  }
+
+  /* ─── Gap card ─── */
+  .gap-card {
+    width: 100%;
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(13, 59, 42, 0.08);
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 26px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .gap-card::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 6px;
+    background: linear-gradient(180deg, var(--amber), #e0b25e);
+  }
+  .gap-card .icon {
+    flex-shrink: 0;
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: var(--amber-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+  .gap-card h3 {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--forest-deep);
+    margin-bottom: 6px;
+  }
+  .gap-card p {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+  .gap-card .tag {
+    display: inline-block;
+    margin-top: 12px;
+    background: var(--amber-soft);
+    color: #9a5f13;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 999px;
+  }
+
+  /* ─── Footer ─── */
+  .footer {
+    margin-top: 46px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 0.06em;
+  }
+  .footer .bolt {
+    color: var(--forest-soft);
+    font-size: 14px;
+  }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 760px) {
+    .row-4, .row-3 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .row-2, .row-4, .row-3 { grid-template-columns: 1fr; }
+    .title-card { padding: 30px 22px; }
+  }
+</style>
+</head>
+<body>
+  <div class="flow">
+
+    <!-- Brand -->
+    <div class="brand">
+      <span class="bolt">⚡</span> VoltEZ
+    </div>
+
+    <!-- 1 · Problem Title -->
+    <div class="title-card">
+      <div class="kicker">Problem Title</div>
+      <h1>EV Mobility Intelligence Platform for Smart Charging Infrastructure &amp; Route Optimization</h1>
+      <div class="sub">An intelligent layer over EV charging that removes uncertainty — for drivers, fleets, and operators.</div>
+      <div class="chips">
+        <span class="chip">🔋 Smart Charging</span>
+        <span class="chip">🗺️ Route Optimization</span>
+        <span class="chip">🤖 Predictive Intelligence</span>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- 2 · Who faces this problem -->
+    <div class="section-label"><span class="dot"></span> Who faces this problem?</div>
+    <div class="cards row-4">
+      <div class="card blue">
+        <div class="accent"></div>
+        <div class="icon">🚗</div>
+        <h3>Long-Distance EV Drivers</h3>
+        <p>Intercity &amp; highway commuters who depend on public charging and can't afford a dead-end.</p>
+      </div>
+      <div class="card blue">
+        <div class="accent"></div>
+        <div class="icon">🛵</div>
+        <h3>Gig Delivery Fleets</h3>
+        <p>Operators whose income depends on uptime — every stalled charge is lost deliveries.</p>
+      </div>
+      <div class="card blue">
+        <div class="accent"></div>
+        <div class="icon">🏢</div>
+        <h3>Apartment Dwellers</h3>
+        <p>No home charger, no parking spot — public infrastructure is their only lifeline.</p>
+      </div>
+      <div class="card blue">
+        <div class="accent"></div>
+        <div class="icon">🤔</div>
+        <h3>Prospective EV Buyers</h3>
+        <p>Held back by uncertainty around charging — the single biggest hesitation to purchase.</p>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- 3 · Core impact -->
+    <div class="section-label amber"><span class="dot"></span> Core Impact</div>
+    <div class="cards row-3">
+      <div class="card amber">
+        <div class="accent"></div>
+        <div class="icon">😰</div>
+        <h3>Range Anxiety</h3>
+        <p>Constant fear of running out of charge with no predictable place to plug in.</p>
+      </div>
+      <div class="card amber">
+        <div class="accent"></div>
+        <div class="icon">💸</div>
+        <h3>Lost Income</h3>
+        <p>Delivery downtime and missed trips eat directly into drivers' and fleets' earnings.</p>
+      </div>
+      <div class="card amber">
+        <div class="accent"></div>
+        <div class="icon">⏱️</div>
+        <h3>Unreliable Daily Travel</h3>
+        <p>Commutes and errands become risky, improvised, and stressful for EV users.</p>
+      </div>
+    </div>
+
+    <div class="arrow" style="margin:2px 0"><div class="shaft" style="height:16px"></div></div>
+
+    <div class="statement">
+      <span class="arr">⇒</span>
+      <strong>Charging accessibility is the <em>main barrier to EV adoption</em></strong>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- 4 · Current gap -->
+    <div class="section-label amber"><span class="dot"></span> What's the current gap in the system?</div>
+    <div class="gap-card">
+      <div class="icon">🚫</div>
+      <div>
+        <h3>No demand-supply intelligence on the network</h3>
+        <p>
+          Charging networks run today without dynamic pricing or predictive congestion alerts —
+          so supply and demand are never balanced. Drivers arrive to find busy or idle stations,
+          while operators can't anticipate demand, manage congestion, or price intelligently.
+        </p>
+        <span class="tag">Missing: Dynamic Pricing · Predictive Congestion Alerts</span>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- 5 · Evidence -->
+    <div class="section-label"><span class="dot"></span> What evidence validates the need?</div>
+    <div class="cards row-2">
+      <div class="card sage">
+        <div class="accent"></div>
+        <div class="icon">📈</div>
+        <h3>Rapid EV Adoption</h3>
+        <p>
+          Growing EV usage is steadily increasing demand for reliable, accessible public and
+          semi-public charging infrastructure — supply is struggling to keep pace.
+        </p>
+      </div>
+      <div class="card sage">
+        <div class="accent"></div>
+        <div class="icon">😤</div>
+        <h3>User &amp; Operator Pain Points</h3>
+        <p>
+          Drivers face daily uncertainty around charger availability, while operators lack
+          effective tools for demand forecasting, congestion management, and pricing.
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span class="bolt">⚡</span> VoltEZ · EV Mobility Intelligence Platform · Problem Flowchart
+    </div>
+
+  </div>
+</body>
+</html>
