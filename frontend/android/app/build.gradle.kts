@@ -7,6 +7,9 @@ plugins {
 val googleMapsApiKey = providers.gradleProperty("GOOGLE_MAPS_API_KEY")
     .orElse(providers.environmentVariable("GOOGLE_MAPS_API_KEY"))
     .orElse("")
+val googleWebClientId = providers.gradleProperty("GOOGLE_WEB_CLIENT_ID")
+    .orElse(providers.environmentVariable("GOOGLE_WEB_CLIENT_ID"))
+    .orElse("152097519727-fklf39muufc7i87h35sn2d5d5fbmf1va.apps.googleusercontent.com")
 
 android {
     namespace = "com.voltez.app"
@@ -31,6 +34,15 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey.get()
+        buildConfigField(
+            "String",
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"${googleWebClientId.get()}\"",
+        )
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -50,4 +62,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
 }

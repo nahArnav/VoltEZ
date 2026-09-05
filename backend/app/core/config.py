@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     # and Routes API for high-quality coordinate-backed suggestions & live ETAs.
     GOOGLE_MAPS_API_KEY: str = ""
 
+    # Public OAuth client identifier used as the expected audience when the
+    # backend verifies Android Google ID tokens. This is not a client secret.
+    GOOGLE_WEB_CLIENT_ID: str = (
+        "152097519727-fklf39muufc7i87h35sn2d5d5fbmf1va.apps.googleusercontent.com"
+    )
+
     # Sponsor Integrations
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.7-flash"

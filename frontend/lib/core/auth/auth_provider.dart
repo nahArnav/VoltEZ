@@ -1,15 +1,29 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../shared/models/models.dart';
+import 'auth_repository.dart';
+import 'google_credential_service.dart';
 import '../network/api_service.dart';
 import '../services/notification_service.dart';
 
 /// Auth state managed via ChangeNotifier (Provider).
 /// Handles login, logout, role persistence, and token storage.
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({ApiService? api}) : _api = api ?? ApiService();
+  AuthProvider({
+    ApiService? api,
+    AuthRepository? repository,
+    GoogleCredentialService? googleCredentialService,
+  }) : _api = api ?? ApiService(),
+       _googleCredentialService =
+           googleCredentialService ?? const GoogleCredentialService() {
+    _repository = repository ?? AuthRepository(_api);
+  }
 
   final ApiService _api;
+  late final AuthRepository _repository;
+  final GoogleCredentialService _googleCredentialService;
   static const _storage = FlutterSecureStorage();
   static const _accessKey = 'voltez_access_token';
   static const _refreshKey = 'voltez_refresh_token';
@@ -62,6 +76,79 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // ─── Google Sign-In ───
+  // Credential Manager -> Google ID token -> backend -> VoltEZ JWT session.
+  Future<bool> signInWithGoogle({required AccountRole role}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final googleIdToken = await _googleCredentialService.getIdToken();
+      final tokens = await _repository.signInWithGoogle(
+        idToken: googleIdToken,
+        role: role.name,
+      );
+
+      await _startSession(tokens);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on PlatformException catch (e) {
+      _error = switch (e.code) {
+        'google_sign_in_cancelled' => 'Google sign-in was cancelled.',
+        'no_google_credential' =>
+          'No Google account is available on this device.',
+        _ => e.message ?? 'Google sign-in failed. Please try again.',
+      };
+    } catch (e) {
+      _error = _authenticationError(e);
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
+  Future<void> _startSession(AuthTokenPair tokens) async {
+    _api.setToken(tokens.accessToken);
+    _api.setRefreshToken(tokens.refreshToken);
+    await _storage.write(key: _accessKey, value: tokens.accessToken);
+    await _storage.write(key: _refreshKey, value: tokens.refreshToken);
+
+    try {
+      final userResponse = await _api.getMe();
+      _user = User.fromJson(userResponse.data as Map<String, dynamic>);
+    } catch (_) {
+      _api.setToken(null);
+      _api.setRefreshToken(null);
+      await _storage.delete(key: _accessKey);
+      await _storage.delete(key: _refreshKey);
+      rethrow;
+    }
+  }
+
+  String _authenticationError(Object error) {
+    if (error is DioException) {
+      final responseData = error.response?.data;
+      if (responseData is Map<String, dynamic>) {
+        final detail = responseData['detail'];
+        if (detail is String && detail.isNotEmpty) return detail;
+      }
+      return switch (error.type) {
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.receiveTimeout ||
+        DioExceptionType.sendTimeout =>
+          'The VoltEZ server timed out. Please try again.',
+        DioExceptionType.connectionError =>
+          'Unable to reach the VoltEZ server. Check your connection.',
+        _ => 'Google authentication was rejected by the server.',
+      };
+    }
+    if (error is FormatException) return error.message;
+    return 'Google sign-in failed. Please try again.';
+  }
+
   // ─── Signup ───
   // Backend: POST /auth/register → returns UserResponse
   Future<bool> signup(
@@ -111,12 +198,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-
-    // ─── Update Profile ───
-  Future<bool> updateProfile({
-    required String name,
-    String? phone,
-  }) async {
+  // ─── Update Profile ───
+  Future<bool> updateProfile({required String name, String? phone}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -127,9 +210,7 @@ class AuthProvider extends ChangeNotifier {
         if (phone != null) 'phone': phone.trim(),
       });
 
-      _user = User.fromJson(
-        response.data as Map<String, dynamic>,
-      );
+      _user = User.fromJson(response.data as Map<String, dynamic>);
 
       _isLoading = false;
       notifyListeners();
@@ -164,6 +245,11 @@ class AuthProvider extends ChangeNotifier {
     _api.setRefreshToken(null);
     await _storage.delete(key: _accessKey);
     await _storage.delete(key: _refreshKey);
+    try {
+      await _googleCredentialService.clearCredentialState();
+    } on PlatformException {
+      // The VoltEZ session is already cleared; native sign-out is best effort.
+    }
     await NotificationService.instance.clear();
     notifyListeners();
   }

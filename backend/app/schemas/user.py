@@ -45,6 +45,11 @@ class TokenRefresh(BaseModel):
     refresh_token: str
 
 
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+    role: Literal["driver", "owner"] = "driver"
+
+
 # Properties to return to client (hides password_hash)
 class UserResponse(UserBase):
     id: UUID

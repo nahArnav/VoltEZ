@@ -8,10 +8,24 @@ from app.core.security import create_access_token, create_refresh_token, decode_
 # Adjust the path to your get_db function if it's located elsewhere (e.g., app.core.database)
 from app.db.session import get_db
 from app.repositories.user import user_repo
-from app.schemas.user import TokenRefresh, TokenResponse, UserCreate, UserResponse
+from app.schemas.user import (
+    GoogleAuthRequest,
+    TokenRefresh,
+    TokenResponse,
+    UserCreate,
+    UserResponse,
+)
 from app.services.auth import auth_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def _issue_tokens(user) -> TokenResponse:
+    return TokenResponse(
+        access_token=create_access_token(subject=str(user.id), role=str(user.role)),
+        refresh_token=create_refresh_token(subject=str(user.id)),
+        token_type="bearer",
+    )
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -40,13 +54,22 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Generate tokens
-    access_token = create_access_token(subject=str(user.id), role=str(user.role))
-    refresh_token = create_refresh_token(subject=str(user.id))
+    return _issue_tokens(user)
 
-    return TokenResponse(
-        access_token=access_token, refresh_token=refresh_token, token_type="bearer"
+
+@router.post("/google", response_model=TokenResponse)
+async def google_login(
+    token_in: GoogleAuthRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Exchange a verified Google ID token for a VoltEZ JWT session."""
+    identity = await auth_service.verify_google_id_token(token_in.id_token)
+    user = await auth_service.find_or_create_google_user(
+        db,
+        identity=identity,
+        role=token_in.role,
     )
+    return _issue_tokens(user)
 
 
 @router.post("/refresh", response_model=TokenResponse)

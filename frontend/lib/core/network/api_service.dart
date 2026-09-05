@@ -131,6 +131,17 @@ class ApiService {
     options: Options(contentType: Headers.formUrlEncodedContentType),
   );
 
+  /// POST /auth/google
+  /// Body: { id_token, role }
+  /// Returns VoltEZ access and refresh tokens, never Google credentials.
+  Future<Response> googleLogin({
+    required String idToken,
+    required String role,
+  }) => _dio.post(
+    '/auth/google',
+    data: {'id_token': idToken, 'role': role.toLowerCase()},
+  );
+
   /// POST /auth/refresh
   /// Body: { refresh_token }
   /// Returns: { access_token, refresh_token, token_type: "bearer" }

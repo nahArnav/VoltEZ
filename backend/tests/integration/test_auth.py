@@ -2,6 +2,8 @@ from uuid import uuid4
 
 import pytest
 
+from app.services.auth import GoogleIdentity, auth_service
+
 pytestmark = pytest.mark.integration
 
 
@@ -61,3 +63,36 @@ async def test_login_user(client):
     data = response.json()
     assert "access_token" in data  # Proves the system gave us a JWT
     assert data["token_type"].lower() == "bearer"
+
+
+@pytest.mark.asyncio
+async def test_google_login_creates_session_and_returns_current_user(client, monkeypatch):
+    email = f"google-{uuid4()}@example.com"
+
+    async def verified_identity(_id_token: str) -> GoogleIdentity:
+        return GoogleIdentity(
+            subject="google-account-123",
+            email=email,
+            name="Google Driver",
+        )
+
+    monkeypatch.setattr(auth_service, "verify_google_id_token", verified_identity)
+
+    response = await client.post(
+        "/api/v1/auth/google",
+        json={"id_token": "signed-google-id-token", "role": "driver"},
+    )
+
+    assert response.status_code == 200, response.text
+    tokens = response.json()
+    assert tokens["access_token"]
+    assert tokens["refresh_token"]
+
+    me = await client.get(
+        "/api/v1/users/me",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert me.status_code == 200, me.text
+    assert me.json()["email"] == email
+    assert me.json()["name"] == "Google Driver"
+    assert me.json()["role"] == "driver"

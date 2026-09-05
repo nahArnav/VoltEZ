@@ -263,6 +263,35 @@ class _AuthPanelState extends State<_AuthPanel> {
     }
   }
 
+  Future<void> _submitGoogle() async {
+    final auth = context.read<AuthProvider>();
+    final success = await auth.signInWithGoogle(role: widget.role);
+
+    if (!mounted) return;
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.error ?? 'Google sign-in failed.')),
+      );
+      return;
+    }
+
+    if (auth.currentRole != widget.role) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This account belongs to a different role.'),
+        ),
+      );
+      await auth.logout();
+      return;
+    }
+
+    if (!mounted) return;
+    context.go(
+      widget.role == AccountRole.owner ? '/business/dashboard' : '/driver/home',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -375,7 +404,7 @@ class _AuthPanelState extends State<_AuthPanel> {
                       width: double.infinity,
                       height: 48,
                       child: OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: auth.isLoading ? null : _submitGoogle,
                         icon: const Icon(Icons.g_mobiledata_rounded),
                         label: const Text('Continue with Google'),
                         style: OutlinedButton.styleFrom(
