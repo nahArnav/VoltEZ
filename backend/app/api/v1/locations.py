@@ -1,17 +1,31 @@
+import re
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 import httpx
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.schemas.location import LocationSearchResult
 from app.services.driving_routes import compute_driving_route
 
 router = APIRouter(prefix="/locations", tags=["Location search"])
 
-_NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-_USER_AGENT = "VoltEZ/1.0 (location-search; contact=voltez@example.invalid)"
-_PLACES_NEW_AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete"
-_PLACES_NEW_DETAILS_BASE_URL = "https://places.googleapis.com/v1/places"
+_PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
+logger = get_logger("location_search")
+
+
+@asynccontextmanager
+async def _places_client(
+    client: httpx.AsyncClient | None,
+) -> AsyncIterator[httpx.AsyncClient]:
+    if client is not None:
+        yield client
+        return
+    async with httpx.AsyncClient(timeout=4.0) as owned_client:
+        yield owned_client
 
 
 class RouteComputationResponse(BaseModel):
@@ -21,62 +35,56 @@ class RouteComputationResponse(BaseModel):
     status: str = Field(default="ok", description="Route status")
 
 
-async def _search_google(query: str, limit: int) -> list[LocationSearchResult]:
-    """Return coordinate-backed Google Places (New) suggestions when configured.
+async def _search_google(
+    query: str,
+    limit: int,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> list[LocationSearchResult]:
+    """Return coordinate-backed Google Places (New) search results.
 
-    Calls Google Places API (New) autocomplete followed by Place Details to ensure
-    exact latitude & longitude coordinates.
+    Text Search returns coordinates in the same response. The previous
+    autocomplete implementation fetched Place Details once per suggestion,
+    multiplying latency, billable calls and quota pressure.
     """
     key = settings.GOOGLE_MAPS_API_KEY.strip()
     if not key:
-        return []
+        raise RuntimeError("GOOGLE_MAPS_API_KEY is not configured")
 
-    async with httpx.AsyncClient(timeout=4.0, headers={"User-Agent": _USER_AGENT}) as client:
-        # 1. Places API (New) Autocomplete
-        autocomplete = await client.post(
-            _PLACES_NEW_AUTOCOMPLETE_URL,
+    async with _places_client(client) as active_client:
+        response = await active_client.post(
+            _PLACES_TEXT_SEARCH_URL,
             headers={
                 "X-Goog-Api-Key": key,
+                "X-Goog-FieldMask": (
+                    "places.id,places.displayName,places.formattedAddress,places.location"
+                ),
                 "Content-Type": "application/json",
             },
             json={
-                "input": query,
-                "includedRegionCodes": ["in"],
+                "textQuery": query,
+                "pageSize": limit,
+                "languageCode": "en",
+                "regionCode": "IN",
             },
+            timeout=4.0,
         )
-        if autocomplete.status_code != 200:
-            return []
-        payload = autocomplete.json()
-        suggestions = payload.get("suggestions") or []
-        if not suggestions:
-            return []
+        if response.status_code != 200:
+            logger.warning(
+                "Google Places Text Search failed status=%d",
+                response.status_code,
+            )
+            response.raise_for_status()
 
         results: list[LocationSearchResult] = []
-        for item in suggestions[:limit]:
-            pred = item.get("placePrediction") or {}
-            place_id = pred.get("placeId")
-            if not place_id:
-                continue
-
-            # 2. Place Details (New)
-            details = await client.get(
-                f"{_PLACES_NEW_DETAILS_BASE_URL}/{place_id}",
-                headers={
-                    "X-Goog-Api-Key": key,
-                    "X-Goog-FieldMask": "id,displayName,formattedAddress,location,types",
-                },
-            )
-            if details.status_code != 200:
-                continue
-            detail_payload = details.json()
-            loc = detail_payload.get("location") or {}
+        for place in response.json().get("places") or []:
+            loc = place.get("location") or {}
             if "latitude" not in loc or "longitude" not in loc:
                 continue
 
             display_name = (
-                (detail_payload.get("displayName") or {}).get("text")
-                or detail_payload.get("formattedAddress")
-                or (pred.get("text") or {}).get("text")
+                (place.get("displayName") or {}).get("text")
+                or place.get("formattedAddress")
                 or query
             )
 
@@ -86,16 +94,13 @@ async def _search_google(query: str, limit: int) -> list[LocationSearchResult]:
                         display_name=display_name,
                         latitude=float(loc["latitude"]),
                         longitude=float(loc["longitude"]),
-                        place_type=(detail_payload.get("types") or [None])[0],
+                        place_type=None,
                         importance=None,
                     )
                 )
             except (KeyError, TypeError, ValueError):
                 continue
         return results
-
-
-import re
 
 
 def _clean_display_name(raw_name: str) -> str:
@@ -120,6 +125,7 @@ def _clean_display_name(raw_name: str) -> str:
 
 @router.get("/search", response_model=list[LocationSearchResult])
 async def search_locations(
+    request: Request,
     q: str = Query(..., min_length=3, max_length=200),
     limit: int = Query(default=5, ge=1, le=10),
 ):
@@ -127,66 +133,37 @@ async def search_locations(
     if len(query) < 3:
         return []
 
-    # Prefer Google Places (New) when configured. A provider outage falls through to the
-    # no-key Nominatim adapter so local development and offline environments continue to work.
+    # Google Places is the production provider. The Android client has an OS
+    # geocoder fallback; returning quickly here is preferable to proxying the
+    # public Nominatim endpoint, whose policy explicitly forbids autocomplete.
     try:
-        google_results = await _search_google(query, limit)
-        if google_results:
-            return [
-                LocationSearchResult(
-                    display_name=_clean_display_name(r.display_name),
-                    latitude=r.latitude,
-                    longitude=r.longitude,
-                    place_type=r.place_type,
-                    importance=r.importance,
-                )
-                for r in google_results
-            ]
-    except (httpx.HTTPError, ValueError, KeyError, TypeError):
-        pass
-
-    params = {
-        "q": query,
-        "format": "jsonv2",
-        "addressdetails": 1,
-        "limit": limit,
-        "countrycodes": "in",
-        "dedupe": 1,
-    }
-    try:
-        async with httpx.AsyncClient(timeout=4.0, headers={"User-Agent": _USER_AGENT}) as client:
-            response = await client.get(_NOMINATIM_URL, params=params)
-            response.raise_for_status()
-            payload = response.json()
-    except (httpx.HTTPError, ValueError) as exc:
+        google_results = await _search_google(
+            query,
+            limit,
+            client=getattr(request.app.state, "http_client", None),
+        )
+    except (httpx.HTTPError, RuntimeError, ValueError, KeyError, TypeError) as exc:
+        logger.warning("Location provider unavailable error=%s", type(exc).__name__)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Location search is temporarily unavailable. Try a fuller address.",
+            detail="Google Places search is unavailable. Check Places API (New) configuration.",
         ) from exc
 
-    results: list[LocationSearchResult] = []
-    for item in payload if isinstance(payload, list) else []:
-        try:
-            raw_display = str(item.get("display_name", ""))
-            clean_display = _clean_display_name(raw_display)
-            results.append(
-                LocationSearchResult(
-                    display_name=clean_display,
-                    latitude=float(item["lat"]),
-                    longitude=float(item["lon"]),
-                    place_type=item.get("type"),
-                    importance=float(item["importance"])
-                    if item.get("importance") is not None
-                    else None,
-                )
-            )
-        except (KeyError, TypeError, ValueError):
-            continue
-    return results
+    return [
+        LocationSearchResult(
+            display_name=_clean_display_name(result.display_name),
+            latitude=result.latitude,
+            longitude=result.longitude,
+            place_type=result.place_type,
+            importance=result.importance,
+        )
+        for result in google_results
+    ]
 
 
 @router.get("/route", response_model=RouteComputationResponse)
 async def compute_route(
+    request: Request,
     origin_lat: float = Query(...),
     origin_lng: float = Query(...),
     dest_lat: float = Query(...),
@@ -196,6 +173,7 @@ async def compute_route(
     route = await compute_driving_route(
         (origin_lat, origin_lng),
         (dest_lat, dest_lng),
+        client=getattr(request.app.state, "http_client", None),
     )
     return RouteComputationResponse(
         distance_meters=route.distance_meters,

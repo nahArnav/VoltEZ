@@ -4,6 +4,8 @@ The public API routes deliberately expose only coarse status/error codes. Full
 provider responses stay in Render logs and API keys are never logged.
 """
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,6 +20,20 @@ _GEMINI_GENERATE_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 )
 _TAVILY_SEARCH_URL = "https://api.tavily.com/search"
+
+
+@asynccontextmanager
+async def _provider_client(
+    client: httpx.AsyncClient | None,
+    *,
+    timeout: float,
+) -> AsyncIterator[httpx.AsyncClient]:
+    """Reuse the app-scoped HTTP pool, with a test/local fallback."""
+    if client is not None:
+        yield client
+        return
+    async with httpx.AsyncClient(timeout=timeout) as owned_client:
+        yield owned_client
 
 
 def normalize_secret(value: str) -> str:
@@ -84,6 +100,7 @@ async def generate_gemini_text(
     *,
     max_output_tokens: int = 500,
     temperature: float = 0.2,
+    client: httpx.AsyncClient | None = None,
 ) -> GeminiResult:
     key = normalize_secret(settings.GEMINI_API_KEY)
     if not key:
@@ -104,13 +121,14 @@ async def generate_gemini_text(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=12.0) as client:
+        async with _provider_client(client, timeout=12.0) as active_client:
             for model in _gemini_models():
                 try:
-                    response = await client.post(
+                    response = await active_client.post(
                         _GEMINI_GENERATE_URL.format(model=model),
                         headers=headers,
                         json=body,
+                        timeout=12.0,
                     )
                 except httpx.HTTPError as exc:
                     last_status = "network_error"
@@ -160,14 +178,19 @@ async def generate_gemini_text(
     )
 
 
-async def search_tavily(query: str, *, max_results: int = 4) -> TavilyResult:
+async def search_tavily(
+    query: str,
+    *,
+    max_results: int = 4,
+    client: httpx.AsyncClient | None = None,
+) -> TavilyResult:
     key = normalize_secret(settings.TAVILY_API_KEY)
     if not key:
         return TavilyResult(results=[], status="not_configured")
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
+        async with _provider_client(client, timeout=10.0) as active_client:
+            response = await active_client.post(
                 _TAVILY_SEARCH_URL,
                 headers={
                     "Authorization": f"Bearer {key}",
@@ -178,6 +201,7 @@ async def search_tavily(query: str, *, max_results: int = 4) -> TavilyResult:
                     "search_depth": "basic",
                     "max_results": max_results,
                 },
+                timeout=10.0,
             )
     except httpx.HTTPError as exc:
         logger.warning("Tavily request failed error=%s", type(exc).__name__)

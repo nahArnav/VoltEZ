@@ -12,6 +12,15 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "local-development-secret-change-before-deploying"
     DATABASE_URL: str
 
+    # Keep the API's connection footprint predictable on small cloud
+    # instances while proactively replacing connections closed by serverless
+    # or managed PostgreSQL providers.
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
+    DB_POOL_RECYCLE_SECONDS: int = 240
+    DB_POOL_TIMEOUT_SECONDS: int = 10
+    DB_CONNECT_TIMEOUT_SECONDS: int = 10
+
     # ML Integrations
     ML_MODEL_API_URL: str = "http://localhost:8001"
 
@@ -38,7 +47,6 @@ class Settings(BaseSettings):
     FIREBASE_PRIVATE_KEY: str = ""
     FCM_VAPID_KEY: str = ""
 
-
     # Razorpay Integration
     RAZORPAY_KEY_ID: str = "rzp_test_placeholder"
     RAZORPAY_KEY_SECRET: str = "rzp_secret_placeholder"
@@ -57,6 +65,7 @@ class Settings(BaseSettings):
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
+    WORKER_HEALTH_CHECK_KEY: str = "voltez:worker:health"
 
     # JWT configuration
     ALGORITHM: str = "HS256"
@@ -94,12 +103,16 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self):
-        """Warn on insecure values in production instead of hard-failing."""
+        """Refuse to run production with a predictable signing secret."""
         if self.ENVIRONMENT.lower() != "production":
             return self
-        if len(self.SECRET_KEY) < 32:
-            import warnings
-            warnings.warn("SECRET_KEY should contain at least 32 characters in production", stacklevel=2)
+        if (
+            self.SECRET_KEY == "local-development-secret-change-before-deploying"
+            or len(self.SECRET_KEY) < 32
+        ):
+            raise ValueError(
+                "SECRET_KEY must contain at least 32 unpredictable characters in production"
+            )
         # Cash pay-at-charger is a valid production mode. Gateway credentials
         # are required only when card/UPI checkout is enabled, not to boot the
         # application or accept cash reservations.

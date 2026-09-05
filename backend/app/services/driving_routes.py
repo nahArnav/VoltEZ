@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import httpx
@@ -19,6 +21,17 @@ class DrivingRoute:
     duration_seconds: int
     polyline: str
     status: str
+
+
+@asynccontextmanager
+async def _route_client(
+    client: httpx.AsyncClient | None,
+) -> AsyncIterator[httpx.AsyncClient]:
+    if client is not None:
+        yield client
+        return
+    async with httpx.AsyncClient(timeout=10.0) as owned_client:
+        yield owned_client
 
 
 def _haversine_meters(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -38,6 +51,8 @@ async def compute_driving_route(
     origin: tuple[float, float],
     destination: tuple[float, float],
     intermediates: list[tuple[float, float]] | None = None,
+    *,
+    client: httpx.AsyncClient | None = None,
 ) -> DrivingRoute:
     """Compute one ordered, traffic-aware road route.
 
@@ -66,8 +81,8 @@ async def compute_driving_route(
             "polylineQuality": "HIGH_QUALITY",
         }
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
+            async with _route_client(client) as active_client:
+                response = await active_client.post(
                     ROUTES_COMPUTE_URL,
                     headers={
                         "X-Goog-Api-Key": key,
@@ -77,6 +92,7 @@ async def compute_driving_route(
                         "Content-Type": "application/json",
                     },
                     json=payload,
+                    timeout=10.0,
                 )
             if response.status_code == 200:
                 routes = response.json().get("routes") or []

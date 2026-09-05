@@ -28,6 +28,11 @@ class _HealthyRedis:
         return True
 
 
+class _RedisWithoutWorker(_HealthyRedis):
+    async def exists(self, _key):
+        return 0
+
+
 class _FailingEngine:
     def connect(self):
         raise ConnectionError("database unavailable")
@@ -35,9 +40,7 @@ class _FailingEngine:
 
 def _readiness_endpoint(app):
     return next(
-        route.endpoint
-        for route in app.routes
-        if getattr(route, "path", None) == "/health/ready"
+        route.endpoint for route in app.routes if getattr(route, "path", None) == "/health/ready"
     )
 
 
@@ -46,7 +49,9 @@ async def test_readiness_reports_healthy_only_when_dependencies_and_models_are_r
     app = create_app()
     app.state.redis = _HealthyRedis()
     app.state.ml_ready = True
-    bundle = SimpleNamespace(model_id="test-model", stage="production", feature_count=2, artifact_hash="a" * 64)
+    bundle = SimpleNamespace(
+        model_id="test-model", stage="production", feature_count=2, artifact_hash="a" * 64
+    )
     app.state.demand_bundle = bundle
     app.state.availability_bundle = bundle
     monkeypatch.setattr(main_module, "engine", _HealthyEngine())
@@ -81,3 +86,27 @@ async def test_readiness_returns_503_when_a_dependency_is_unavailable(monkeypatc
     assert payload["status"] == "not_ready"
     assert payload["checks"]["database"] is False
     assert payload["checks"]["redis"] is True
+
+
+@pytest.mark.asyncio
+async def test_production_readiness_requires_worker_heartbeat(monkeypatch):
+    app = create_app()
+    app.state.redis = _RedisWithoutWorker()
+    app.state.ml_ready = True
+    bundle = SimpleNamespace(
+        model_id="test-model",
+        stage="production",
+        feature_count=2,
+        artifact_hash="a" * 64,
+    )
+    app.state.demand_bundle = bundle
+    app.state.availability_bundle = bundle
+    monkeypatch.setattr(main_module, "engine", _HealthyEngine())
+    monkeypatch.setattr(main_module.settings, "ENVIRONMENT", "production")
+
+    response = await _readiness_endpoint(app)(SimpleNamespace(app=app))
+
+    assert response.status_code == 503
+    payload = json.loads(response.body)
+    assert payload["checks"]["worker"] is False
+    assert "heartbeat" in payload["errors"]["worker"].lower()

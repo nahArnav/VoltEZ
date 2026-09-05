@@ -1,67 +1,105 @@
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from arq.connections import RedisSettings
+from sqlalchemy import and_, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.db.session import AsyncSessionLocal
 from app.schemas.enums import BookingStatus
 from database.models.booking import Booking
 from database.models.booking_event import BookingEvent
 
+logger = get_logger("worker")
+_HELD_STATUSES = (BookingStatus.PENDING.value, BookingStatus.HELD.value)
 
-async def expire_unpaid_booking(ctx, booking_id: str):
-    """
-    This task wakes up 10 minutes after a booking is created.
-    If the booking is still unpaid, it expires the hold and records the transition.
-    """
-    print(f"🚦 [Worker] Waking up to check booking: {booking_id}")
 
-    # 1. Open a quick connection to the database
+def _mark_booking_expired(db: AsyncSession, booking: Booking, *, actor: str) -> bool:
+    """Expire a hold once and append the same auditable state transition."""
+    if booking.status not in _HELD_STATUSES:
+        return False
+
+    old_status = booking.status
+    booking.status = BookingStatus.EXPIRED.value
+    db.add(booking)
+    db.add(
+        BookingEvent(
+            booking_id=booking.id,
+            old_status=old_status,
+            new_status=BookingStatus.EXPIRED.value,
+            actor=actor,
+        )
+    )
+    return True
+
+
+async def expire_unpaid_booking(ctx: dict, booking_id: str) -> None:
+    """Expire a single unpaid booking after its ten-minute ARQ delay."""
+    del ctx
+    try:
+        parsed_id = UUID(booking_id)
+    except ValueError:
+        logger.warning("Ignoring an expiry job with an invalid booking identifier")
+        return
+
     async with AsyncSessionLocal() as db:
-        # 2. Get the current booking status
-        booking = await db.get(Booking, UUID(booking_id))
-
-        if not booking:
-            print(f"❌ [Worker] Booking {booking_id} not found.")
+        booking = await db.get(Booking, parsed_id)
+        if booking is None:
+            logger.info("Expiry job referenced a booking that no longer exists")
             return
-
-        # 3. Check if they actually paid
-        # Since Step 2.2, new bookings are marked as HELD. We check for both for backward compatibility.
-        if booking.status in (BookingStatus.PENDING.value, BookingStatus.HELD.value):
-            print(f"⚠️ [Worker] Booking {booking_id} is still {booking.status}. Expiring now!")
-
-            old_status = booking.status
-            booking.status = BookingStatus.EXPIRED.value
-            db.add(
-                BookingEvent(
-                    booking_id=booking.id,
-                    old_status=old_status,
-                    new_status=BookingStatus.EXPIRED.value,
-                    actor="system:hold-expiry-worker",
-                )
-            )
+        if _mark_booking_expired(db, booking, actor="system:hold-expiry-worker"):
             await db.commit()
-
-            print(f"✅ [Worker] Booking {booking_id} successfully expired. Charger is free.")
-        else:
-            print(f"👍 [Worker] Booking {booking_id} status is {booking.status}. No action needed.")
+            logger.info("Expired one unpaid booking hold")
 
 
+async def reconcile_expired_booking_holds() -> int:
+    """Recover expired holds whose delayed Redis job was lost or never consumed.
+
+    This makes switching Redis providers safe: the database remains the source
+    of truth, and starting a worker repairs stale holds before processing new
+    queue entries.
+    """
+    now = datetime.now(UTC)
+    legacy_cutoff = now - timedelta(minutes=10)
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Booking).where(
+                Booking.status.in_(_HELD_STATUSES),
+                or_(
+                    Booking.hold_expires_at <= now,
+                    and_(
+                        Booking.hold_expires_at.is_(None),
+                        Booking.created_at <= legacy_cutoff,
+                    ),
+                ),
+            )
+        )
+        repaired = sum(
+            _mark_booking_expired(db, booking, actor="system:worker-startup-reconciliation")
+            for booking in result.scalars().all()
+        )
+        if repaired:
+            await db.commit()
+            logger.info("Reconciled %d expired booking holds at worker startup", repaired)
+        return repaired
 
 
-# ARQ Worker Configuration
 class WorkerSettings:
-    # Tell ARQ which functions it is allowed to run
     functions = [expire_unpaid_booking]
-
-    # Connect to the Redis container using the env config
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
-
-    # Optional startup/shutdown hooks
-    @staticmethod
-    async def on_startup(ctx):
-        print("🤖 Busboy Worker is starting up and listening for jobs...")
+    health_check_interval = 30
+    health_check_key = settings.WORKER_HEALTH_CHECK_KEY
+    max_jobs = 5
 
     @staticmethod
-    async def on_shutdown(ctx):
-        print("🛑 Busboy Worker is shutting down...")
+    async def on_startup(ctx: dict) -> None:
+        del ctx
+        repaired = await reconcile_expired_booking_holds()
+        logger.info("VoltEZ worker ready; startup_reconciled=%d", repaired)
+
+    @staticmethod
+    async def on_shutdown(ctx: dict) -> None:
+        del ctx
+        logger.info("VoltEZ worker shutting down")
